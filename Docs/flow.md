@@ -162,6 +162,9 @@ _Assuming that NBASE creates the Process satisfactorily, I discus only the HM St
                 * Get buffer to send data on socket
                 * For each subscriber in node_cb subscriber queue, send message. [Might need some mechanism to allow failed send on few subscribers and retry later. State resides in Notification CB. Maybe implement a delayed queue there.]
                 * Reset Flag.
+                * Add Timestamp to Node CB [The one that was put in Node Update Message to Peer].
+                * Add Timestamp to Hardware Location CB [Timestamp in Node CB must never be newer than that in Hadware Location CB]
+                * Queue Update on Peer Nodes Queue
                 * Update Aggregate Tables.
                 * Go to sleep again.                          
     
@@ -207,6 +210,7 @@ _Assuming that NBASE creates the Process satisfactorily, I discus only the HM St
                     * Get notification parameters: PROCESS_CB pointer
                     * Resolve dependency on PCT_TYPE from Aggregate Tables and update pointers here.
                     * Send Notification to all subscribers [If any, for that PCT_TYPE]
+                    * Add timestamps and send to Peer Queue also.
                     * Reset Notification Flag
                     * Add Process CB to aggregate processes table
                     * Goto Sleep
@@ -269,6 +273,8 @@ _Assuming that NBASE creates the Process satisfactorily, I discus only the HM St
 
 * Read Message from Socket
 * Create HM\_PROCESS\_NOTIFICATION message (IPS)
+* If Location not in Remote Location Tree, add to tree
+    * Initialize Connection to location
 * Send to PID of subscriber on HM\_TO\_USER Queue ID.
 
 ## Node goes down:
@@ -281,7 +287,52 @@ _Assuming that NBASE creates the Process satisfactorily, I discus only the HM St
         * Parse subscribers and subscriptions
         * Send Notification to each
     
-# HA Features                              
+## HM Receives HELLO Response from Peer
+
+* Transport Layer calls in Hardware Location CB callback
+* Hardware Location CB Receives message header:
+    
+    * PEER_HELLO
+    * Initialize Location CB
+        * Parse complete message
+        * Update Location CB
+            * Index
+        * Nodes CB Tree initialize
+* Expect DB Updates
+
+## HM Receives DB UPDATE
+    
+* Hardware Location CB Receives message header:
+    
+    * PEER_DB_UPDATE
+    * Find Location CB
+        * Parse complete message
+            * Put Timestamp in Location CB Last Update [Read from Message]
+            * Parse Node Information
+                * Number of Nodes [For Pre-allocation of Node CBs?]
+                * Node Indices
+                * Node groups
+                * Node Listen IPs
+                * Timestamp
+            * Add to Node Tree
+                * Process subscriptions and notifications
+                * If active-backup candidates found, add backup to active and active to backup relationships.
+            * Parse Process Information
+                * PCT Type
+                * PID
+                * Interfaces
+                * Role
+                * Timestamp
+            * Add to Processes Tree
+                * Process subscriptions and notifications
+
+## Peer Goes Down
+
+* Kickout timer determines the Peer as down
+* Parse Node and Process Dependency lists
+    * If backup available, send message to backup about primary failover \[Event Handler in the location may take decisions accordingly.\]\[With priority\]                                      
+    * Send Notifications to All
+    * Mark Nodes and Processes on that Node as down.                     
                 
                                                         
                 
