@@ -106,11 +106,48 @@
 #define 	HM_CONFIG_ROLE									((uint32_t) 15)
 #define 	HM_CONFIG_SUBSCRIPTION_INSTANCE					((uint32_t) 16)
 
+/***************************************************************************/
+/* Attribute values vocabulary											   */
+/***************************************************************************/
+/* Timer Resolutions */
+#define HM_CONFIG_ATTR_RES_MIL_SEC							((uint32_t) 1)
+#define HM_CONFIG_ATTR_RES_SEC								((uint32_t) 2)
+/* Heartbeat Scopes */
+#define HM_CONFIG_ATTR_HB_SCOPE_NODE						((uint32_t) 3)
+#define HM_CONFIG_ATTR_HB_SCOPE_CLUSTER						((uint32_t) 4)
+/* IP Type*/
+#define HM_CONFIG_ATTR_IP_TYPE_TCP							((uint32_t) 5)
+#define HM_CONFIG_ATTR_IP_TYPE_UDP							((uint32_t) 6)
+#define HM_CONFIG_ATTR_IP_TYPE_MCAST						((uint32_t) 7)
+/* Address Type */
+#define HM_CONFIG_ATTR_ADDR_TYPE_LOCAL						((uint32_t) 8)
+#define HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER					((uint32_t) 9)
+/* Subscription types */
+#define HM_CONFIG_ATTR_SUBS_TYPE_GROUP						((uint32_t) 10)
+#define HM_CONFIG_ATTR_SUBS_TYPE_PROC						((uint32_t) 11)
+#define HM_CONFIG_ATTR_SUBS_TYPE_IF							((uint32_t) 12)
+/* IP Versions */
+#define HM_CONFIG_ATTR_IP_VERSION_4							((uint32_t) 13)
+#define HM_CONFIG_ATTR_IP_VERSION_6							((uint32_t) 14)
+
 
 /***************************************************************************/
-/* Hearbeat Scope														   */
+/* Scope of configuration												   */
 /***************************************************************************/
-#define HM_CONFIG_HEARTBEAT_SCOPE_CLUSTER					((uint32_t) 1)
-#define HM_CONFIG_HEARTBEAT_SCOPE_NODE						((uint32_t) 2)
+#define HM_CONFIG_SCOPE_CLUSTER								((uint32_t) 1)
+#define HM_CONFIG_SCOPE_NODE								((uint32_t) 2)
+
+/***************************************************************************/
+/* Default values of some parameters									   */
+/***************************************************************************/
+#define HM_CONFIG_DEFAULT_NODE_KICKOUT						((uint32_t) 3)
+#define HM_CONFIG_DEFAULT_PEER_KICKOUT						((uint32_t) 3)
+#define HM_CONFIG_DEFAULT_NODE_TICK_TIME					((uint32_t) 1000)
+#define HM_CONFIG_DEFAULT_PEER_TICK_TIME					((uint32_t) 1000)
+
+#define HM_DEFAULT_TCP_LISTEN_PORT							((uint32_t) 0x8000)
+#define HM_DEFAULT_UDP_COMM_PORT							((uint32_t) 0x8001)
+#define HM_DEFAULT_MCAST_COMM_PORT							((uint32_t) 0x8002)
+#define HM_DEFAULT_MCAST_GROUP								((uint32_t) 3)
 
 #endif /* SRC_HMDEF_H_ */

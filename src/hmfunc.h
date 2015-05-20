@@ -27,4 +27,7 @@ HM_SOCKET_CB * hm_alloc_sock_cb(struct sockaddr_storage *);
 /* hmlocmgmt.c */
 int32_t hm_init_location_cb(HM_LOCATION_CB *);
 
+/* hmutil2.c */
+int32_t hm_compare_ulong(void *, void *);
+int32_t hm_compare_2_ulong(void *, void *);
 #endif /* SRC_HMFUNC_H_ */

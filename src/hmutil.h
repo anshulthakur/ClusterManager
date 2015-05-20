@@ -26,6 +26,11 @@
 /***************************************************************************/
 #define BYTE 		uint8_t
 
+typedef struct sockaddr_in				SOCKADDR_IN;
+typedef struct sockaddr					SOCKADDR;
+typedef struct sockaddr_in6				SOCKADDR_IN6;
+typedef struct in_addr					IN_ADDR;
+typedef struct in6_addr					IN_ADDR6;
 /*****************************************************************************/
 /* AVL3 functions.                                                           */
 /*****************************************************************************/
@@ -68,11 +73,12 @@ void avl3_verify_tree(HM_AVL3_TREE *,
   (TREE).last = NULL;                                                         \
   (TREE).root = NULL;
 
-#define HM_AVL3_INIT_NODE(NODE)             (NODE).parent = NULL;                \
+#define HM_AVL3_INIT_NODE(NODE, SELF)    (NODE).parent = NULL;                \
                                          (NODE).left = NULL;                  \
                                          (NODE).right = NULL;                 \
                                          (NODE).left_height = -1;                \
-                                         (NODE).right_height = -1
+                                         (NODE).right_height = -1;				\
+										 (NODE).self = SELF
 
 #define HM_AVL3_INSERT(TREE, NODE, TREE_INFO)                                    \
     (NULL == avl3_insert_or_find(&(TREE), &(NODE), &(TREE_INFO) ))
@@ -183,6 +189,12 @@ void avl3_verify_tree(HM_AVL3_TREE *,
                                 (E).next = NULL;                           \
                                 (E).prev = NULL
 
+
+/*****************************************************************************/
+/* Find the offset of specified field within specified structure             */
+/*****************************************************************************/
+#define HM_OFFSETOF(STRUCT, FIELD)                                           \
+            (uint32_t)((BYTE *)(&((STRUCT *)0)->FIELD) - (BYTE *)0)
 
 /***************************************************************************/
 /* Stack operations														   */

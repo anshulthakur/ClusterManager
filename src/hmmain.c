@@ -5,8 +5,28 @@
  *      Author: anshul
  */
 
-
+#define HM_MAIN_DEFINE_VARS
 #include <hmincl.h>
+
+HM_ATTRIBUTE_MAP attribute_map[] = {
+		{"ms", 								HM_CONFIG_ATTR_RES_MIL_SEC},
+		{"s",								HM_CONFIG_ATTR_RES_SEC},
+		{"node",							HM_CONFIG_ATTR_HB_SCOPE_NODE},
+		{"cluster",							HM_CONFIG_ATTR_HB_SCOPE_CLUSTER},
+		{"tcp",								HM_CONFIG_ATTR_IP_TYPE_TCP},
+		{"udp",								HM_CONFIG_ATTR_IP_TYPE_UDP},
+		{"mcast",							HM_CONFIG_ATTR_IP_TYPE_MCAST},
+		{"local",							HM_CONFIG_ATTR_ADDR_TYPE_LOCAL},
+		{"remote",							HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER},
+		{"group",							HM_CONFIG_ATTR_SUBS_TYPE_GROUP},
+		{"process",							HM_CONFIG_ATTR_SUBS_TYPE_PROC},
+		{"interface",						HM_CONFIG_ATTR_SUBS_TYPE_IF},
+		{"4",								HM_CONFIG_ATTR_IP_VERSION_4},
+		{"6",								HM_CONFIG_ATTR_IP_VERSION_6},
+};
+
+uint32_t size_of_map = (sizeof(attribute_map)/sizeof(attribute_map[0]));
+
 
 HM_GLOBAL_DATA global;
 
@@ -276,6 +296,47 @@ int32_t hm_init_location_layer()
 }/* hm_init_location_layer */
 
 /***************************************************************************/
+/* Name:	hm_get_attr_type 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	static int32_t									*/
+/* Purpose: Gets the attribute type value			*/
+/***************************************************************************/
+static int32_t hm_get_attr_type(char *value)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_ERR;
+	int32_t i;
+	HM_ATTRIBUTE_MAP *map = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(value != NULL);
+
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	TRACE_DETAIL(("Look for %s", value));
+	for(i=0; i< size_of_map; i++)
+	{
+		if(strncmp(value, attribute_map[i].attribute, strlen(value))==0)
+		{
+			ret_val = attribute_map[i].type;
+			TRACE_DETAIL(("Found attribute type %d", attribute_map[i].type));
+			break;
+		}
+	}
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return(ret_val);
+}/* hm_get_attr_type */
+
+/***************************************************************************/
 /* Name:	hm_get_node_type 											   */
 /* Parameters: Input - 													   */
 /*			   Input/Output -											   */
@@ -394,7 +455,16 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 	HM_CONFIG_NODE *config_node = NULL;
 	HM_CONFIG_NODE *parent_node = NULL;
 
+	HM_HEARTBEAT_CONFIG *hb_config = NULL;
+	HM_CONFIG_ADDRESS_CB *address_cb = NULL;
+	HM_CONFIG_NODE_CB *node_config_cb = NULL;
+	HM_CONFIG_SUBSCRIPTION_CB *subs_cb = NULL;
+
+	SOCKADDR_IN *sock_addr = NULL;
+
 	HM_STACK *reverse_stack = NULL;
+	int32_t ip_scope, ip_type;
+	char ip_version;
 
 	int32_t node_type;
 	/***************************************************************************/
@@ -441,25 +511,164 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 
 			config_node->type = node_type;
 			config_node->self = (void *)current_node;
-			TRACE_DETAIL(("Push to stack if necessary"));
+			TRACE_DETAIL(("Push to context stack if necessary"));
 			switch (node_type)
 			{
 			case HM_CONFIG_ROOT:
-			case HM_CONFIG_HM_INSTANCE:
 			case HM_CONFIG_NODE_TREE:
+				HM_STACK_PUSH(stack, config_node);
+				break;
+
 			case HM_CONFIG_NODE_INSTANCE:
+				/***************************************************************************/
+				/* Allocate a node CB now												   */
+				/***************************************************************************/
+				node_config_cb = (HM_CONFIG_NODE_CB *)malloc(sizeof(HM_CONFIG_NODE_CB));
+				if(node_config_cb == NULL)
+				{
+					TRACE_ERROR(("Error allocating resources for Node information"));
+					free(config_node);
+					config_node = NULL;
+					ret_val = HM_ERR;
+					goto EXIT_LABEL;
+				}
+				node_config_cb->node_cb = hm_alloc_node_cb();
+				if(node_config_cb == NULL)
+				{
+					TRACE_ERROR(("Error allocating resources for Node information"));
+					free(config_node);
+					free(node_config_cb);
+					config_node = NULL;
+					node_config_cb = NULL;
+					ret_val = HM_ERR;
+					goto EXIT_LABEL;
+				}
+				config_node->opaque = (void *)node_config_cb;
+				/***************************************************************************/
+				/* Add node to list														   */
+				/***************************************************************************/
+				HM_INIT_LQE(node_config_cb->node, node_config_cb);
+				HM_INSERT_BEFORE(hm_config->node_list, node_config_cb->node);
+
+				HM_INIT_ROOT(node_config_cb->subscriptions);
+
+				HM_STACK_PUSH(stack, config_node);
+				break;
 
 			case HM_CONFIG_SUBSCRIPTION_TREE:
+				parent_node = HM_STACK_POP(stack);
+				TRACE_DETAIL(("Parent Type: %d", parent_node->type));
+				if (parent_node->type == HM_CONFIG_NODE_INSTANCE)
+				{
+					TRACE_DETAIL(("Parent Instance is Node Instance"));
+					/***************************************************************************/
+					/* Push parent node back on stack										   */
+					/***************************************************************************/
+					ret_val = HM_STACK_PUSH(stack, parent_node);
+					if (ret_val == HM_ERR)
+					{
+						free(config_node);
+						config_node = NULL;
+						goto EXIT_LABEL;
+					}
+					/***************************************************************************/
+					/* Push current node to stack. We're now expecting its value node		   */
+					/* So, set the pointer to its config_cb in LOCAL in the opaque data		   */
+					/***************************************************************************/
+					//TODO
+					ret_val = HM_STACK_PUSH(stack, config_node);
+					if (ret_val == HM_ERR)
+					{
+						free(config_node);
+						config_node = NULL;
+						goto EXIT_LABEL;
+					}
+					/***************************************************************************/
+					/* Config node must point to the node of parent node config CB			   */
+					/***************************************************************************/
+					config_node->opaque = parent_node->opaque;
+				}
+				break;
+
+			case HM_CONFIG_HM_INSTANCE:
+				/***************************************************************************/
+				/* Set opaque pointer to the config_cb									   */
+				/***************************************************************************/
+				TRACE_ASSERT(hm_config != NULL);
+				config_node->opaque = (void *)hm_config;
 				HM_STACK_PUSH(stack, config_node);
 				break;
 
 			case HM_CONFIG_ADDRESS:
-				TRACE_INFO(("Address Type: %s", xmlGetProp(current_node, "type")));
+				/***************************************************************************/
+				/* Allocate an address structure										   */
+				/***************************************************************************/
+				address_cb = (HM_CONFIG_ADDRESS_CB *)malloc(sizeof(HM_CONFIG_ADDRESS_CB));
+				if(address_cb == NULL)
+				{
+					TRACE_ERROR(("Error allocating address structures."));
+					free(config_node);
+					config_node = NULL;
+					goto EXIT_LABEL;
+				}
+				/***************************************************************************/
+				/* Fetch the scope of address first so that we may know the variable to use*/
+				/***************************************************************************/
+				TRACE_DETAIL(("Address type: %s",xmlGetProp((xmlNode *)config_node->self, "type")));
+				if((ip_scope = hm_get_attr_type(xmlGetProp((xmlNode *)config_node->self, "type")))== HM_ERR)
+				{
+					TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+				}
+#ifdef I_WANT_TO_DEBUG
+				else
+				{
+					switch (ip_scope)
+					{
+					case HM_CONFIG_ATTR_ADDR_TYPE_LOCAL:
+						TRACE_INFO(("Address scope is local"));
+						break;
+					case HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER:
+						TRACE_INFO(("Address scope is cluster"));
+						break;
+					default:
+						TRACE_ERROR(("Unknown type %d", ret_val));
+					}
+				}
+#endif
+				address_cb->scope = ip_scope;
+				config_node->opaque = (void *)address_cb;
 				HM_STACK_PUSH(stack, config_node);
 				break;
 
 			case HM_CONFIG_HEARTBEAT:
 				TRACE_INFO(("Scope of Heartbeat: %s", xmlGetProp(current_node, "scope")));
+				if((ret_val = hm_get_attr_type(xmlGetProp(current_node, "scope")))== HM_ERR)
+				{
+					TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+				}
+				else
+				{
+					switch (ret_val)
+					{
+					case HM_CONFIG_ATTR_HB_SCOPE_NODE:
+						TRACE_INFO(("Heartbeat scope is local"));
+						/***************************************************************************/
+						/* Set pointer to appropriate structure									   */
+						/***************************************************************************/
+						config_node->opaque = &hm_config->instance_info.node;
+						hm_config->instance_info.node.scope = HM_CONFIG_ATTR_HB_SCOPE_NODE;
+
+						break;
+					case HM_CONFIG_ATTR_HB_SCOPE_CLUSTER:
+						TRACE_INFO(("Heartbeat scope is cluster"));
+						config_node->opaque = &hm_config->instance_info.node;
+						hm_config->instance_info.node.scope = HM_CONFIG_ATTR_HB_SCOPE_CLUSTER;
+						break;
+
+					default:
+						TRACE_ERROR(("Unknown type %d", ret_val));
+					}
+				}
 				HM_STACK_PUSH(stack, config_node);
 				break;
 
@@ -512,7 +721,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 					/* Push current node to stack. We're now expecting its value node		   */
 					/* So, set the pointer to its config_cb in LOCAL in the opaque data		   */
 					/***************************************************************************/
-					//TODO
+					config_node->opaque = parent_node->opaque;
+
 					ret_val = HM_STACK_PUSH(stack, config_node);
 					if (ret_val == HM_ERR)
 					{
@@ -530,6 +740,27 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				if (parent_node->type == HM_CONFIG_HEARTBEAT)
 				{
 					TRACE_DETAIL(("Parent Instance is Hardware Manager Keepalive"));
+					hb_config = (HM_HEARTBEAT_CONFIG *)parent_node->opaque;
+					if((ret_val = hm_get_attr_type(xmlGetProp(current_node, "resolution")))== HM_ERR)
+					{
+						TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+					}
+					else
+					{
+						switch (ret_val)
+						{
+						case HM_CONFIG_ATTR_RES_MIL_SEC:
+							TRACE_INFO(("Heartbeat resolution is in milliseconds"));
+							hb_config->resolution = HM_CONFIG_ATTR_RES_MIL_SEC;
+							break;
+						case HM_CONFIG_ATTR_RES_SEC:
+							TRACE_INFO(("Heartbeat resolution is in seconds"));
+							hb_config->resolution = HM_CONFIG_ATTR_RES_MIL_SEC;
+							break;
+						default:
+							TRACE_ERROR(("Unknown type %d", ret_val));
+						}
+					}
 					ret_val = HM_STACK_PUSH(stack, parent_node);
 					if(ret_val == HM_ERR)
 					{
@@ -540,6 +771,10 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					/***************************************************************************/
+					/* Set pointer to parent's memory										   */
+					/***************************************************************************/
+					config_node->opaque = (void *)hb_config;
 					/***************************************************************************/
 					/* We expect its value to come next										   */
 					/***************************************************************************/
@@ -564,6 +799,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				if (parent_node->type == HM_CONFIG_HEARTBEAT)
 				{
 					TRACE_DETAIL(("Parent Instance is Hardware Manager Keepalive"));
+					hb_config = (HM_HEARTBEAT_CONFIG *)parent_node->opaque;
 					ret_val = HM_STACK_PUSH(stack, parent_node);
 					if(ret_val == HM_ERR)
 					{
@@ -574,6 +810,11 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					/***************************************************************************/
+					/* Set pointer to parent's memory										   */
+					/***************************************************************************/
+					config_node->opaque = (void *)hb_config;
+
 					/***************************************************************************/
 					/* We expect its value to come next										   */
 					/***************************************************************************/
@@ -596,7 +837,10 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				if (parent_node->type == HM_CONFIG_ADDRESS)
 				{
 					TRACE_DETAIL(("Parent Instance is an Address Node"));
+					address_cb = (HM_CONFIG_ADDRESS_CB *)parent_node->opaque;
+					TRACE_ASSERT(address_cb != NULL);
 					ret_val = HM_STACK_PUSH(stack, parent_node);
+
 					if(ret_val == HM_ERR)
 					{
 						TRACE_ERROR(("Error pushing parent node back on stack"));
@@ -620,8 +864,105 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						goto EXIT_LABEL;
 					}
 				}
-				TRACE_INFO(("[Attribute] Version: %s", xmlGetProp(current_node, "version")));
-				TRACE_INFO(("[Attribute] Type: %s", xmlGetProp(current_node, "type")));
+
+				if((ip_version = hm_get_attr_type(xmlGetProp(current_node, "version")))== HM_ERR)
+				{
+					TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+				}
+#ifdef I_WANT_TO_DEBUG
+				else
+				{
+					switch (ip_version)
+					{
+					case HM_CONFIG_ATTR_IP_VERSION_4:
+						TRACE_INFO(("IP Version is 4"));
+
+						break;
+					case HM_CONFIG_ATTR_IP_VERSION_6:
+						TRACE_INFO(("IP Version is 6"));
+						break;
+					default:
+						TRACE_ERROR(("Unknown version %d", ip_version));
+					}
+				}
+#endif
+
+				if((ip_type = hm_get_attr_type(xmlGetProp(current_node, "type")))== HM_ERR)
+				{
+					TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+				}
+#ifdef I_WANT_TO_DEBUG
+				else
+				{
+					switch (ip_type)
+					{
+					case HM_CONFIG_ATTR_IP_TYPE_TCP:
+						TRACE_INFO(("IP Type TCP"));
+						break;
+					case HM_CONFIG_ATTR_IP_TYPE_UDP:
+						TRACE_INFO(("IP Type UDP"));
+						break;
+					case HM_CONFIG_ATTR_IP_TYPE_MCAST:
+						TRACE_INFO(("IP Type Multicast"));
+						break;
+
+					default:
+						TRACE_ERROR(("Unknown type %d", ret_val));
+					}
+				}
+#endif
+				ip_scope = address_cb->scope;
+				/***************************************************************************/
+				/* 3 variables can have 8 combinations. We go down according to most frequ-*/
+				/* -ently occuring ones													   */
+				/***************************************************************************/
+				if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
+					ip_type==HM_CONFIG_ATTR_IP_TYPE_TCP &&
+					ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL)
+				{
+					TRACE_DETAIL(("IPv4 TCP Address for Nodes"));
+					hm_config->instance_info.tcp = address_cb;
+					address_cb->address.type = HM_TRANSPORT_TCP_LISTEN;
+				}
+				else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
+							ip_type==HM_CONFIG_ATTR_IP_TYPE_UDP &&
+							ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL)
+				{
+					TRACE_DETAIL(("IPv4 UDP Address for Nodes"));
+					hm_config->instance_info.udp = address_cb;
+					address_cb->address.type = HM_TRANSPORT_UDP;
+				}
+				else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
+							ip_type==HM_CONFIG_ATTR_IP_TYPE_MCAST &&
+							ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL)
+				{
+					TRACE_DETAIL(("IPv4 UDP Address for Multicast on cluster"));
+					hm_config->instance_info.mcast = address_cb;
+					address_cb->address.type = HM_TRANSPORT_MCAST;
+					address_cb->scope = HM_CONFIG_ATTR_ADDR_TYPE_LOCAL;
+				}
+				else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
+							ip_type==HM_CONFIG_ATTR_IP_TYPE_TCP &&
+							ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER)
+
+				{
+					TRACE_DETAIL(("Remote Node information."));
+					HM_INIT_LQE(address_cb->node, address_cb);
+					address_cb->address.type = HM_TRANSPORT_TCP_IO;
+					address_cb->scope = HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER;
+					/***************************************************************************/
+					/* Insert into List														   */
+					/***************************************************************************/
+					HM_INSERT_BEFORE(hm_config->instance_info.addresses, address_cb->node);
+				}
+				else
+				{
+					TRACE_DETAIL(("Unknown: IP Type: %d; IP Version: %c; IP Scope: %d.",
+															ip_type, ip_version, ip_scope));
+					address_cb = NULL;
+				}
+				parent_node->opaque = (void *)address_cb;
+				config_node->opaque = (void *)address_cb;
 				break;
 
 			case HM_CONFIG_PORT:
@@ -630,7 +971,11 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				if (parent_node->type == HM_CONFIG_ADDRESS)
 				{
 					TRACE_DETAIL(("Parent Instance is an Address Node"));
+					address_cb = (HM_CONFIG_ADDRESS_CB *)parent_node->opaque;
+					TRACE_ASSERT(address_cb != NULL);
+
 					ret_val = HM_STACK_PUSH(stack, parent_node);
+
 					if(ret_val == HM_ERR)
 					{
 						TRACE_ERROR(("Error pushing parent node back on stack"));
@@ -686,6 +1031,10 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					/***************************************************************************/
+					/* We'll be writing into the mcast_group next. Hopefully!				   */
+					/***************************************************************************/
+					config_node->opaque = (void *)&hm_config->instance_info;
 				}
 				else if (parent_node->type == HM_CONFIG_NODE_INSTANCE)
 				{
@@ -713,6 +1062,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					config_node->opaque = parent_node->opaque;
 				}
 				break;
 
@@ -745,6 +1095,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					config_node->opaque = parent_node->opaque;
 				}
 				break;
 
@@ -777,6 +1128,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					config_node->opaque = parent_node->opaque;
 				}
 				break;
 
@@ -809,8 +1161,55 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					node_config_cb = (HM_CONFIG_NODE_CB *)parent_node->opaque;
+					subs_cb = (HM_CONFIG_SUBSCRIPTION_CB *)malloc(sizeof(HM_CONFIG_SUBSCRIPTION_CB));
+					if(subs_cb == NULL)
+					{
+						TRACE_ERROR(("Error allocation resources for subscriptions"));
+						free(config_node);
+						free(parent_node);
+						parent_node = NULL;
+						config_node = NULL;
+						goto EXIT_LABEL;
+					}
+					HM_INIT_LQE(subs_cb->node, subs_cb);
+
+					if((ret_val = hm_get_attr_type(xmlGetProp(current_node, "type")))== HM_ERR)
+					{
+						TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+					}
+					else
+					{
+						switch (ret_val)
+						{
+						case HM_CONFIG_ATTR_SUBS_TYPE_GROUP:
+							TRACE_INFO(("Subscription type is a group"));
+							subs_cb->subs_type = HM_CONFIG_ATTR_SUBS_TYPE_GROUP;
+							break;
+						case HM_CONFIG_ATTR_SUBS_TYPE_PROC:
+							TRACE_INFO(("Subscription type is a process"));
+							subs_cb->subs_type = HM_CONFIG_ATTR_SUBS_TYPE_PROC;
+							break;
+						case HM_CONFIG_ATTR_SUBS_TYPE_IF:
+							TRACE_INFO(("Subscription type is an interface"));
+							subs_cb->subs_type = HM_CONFIG_ATTR_SUBS_TYPE_IF;
+							break;
+
+						default:
+							TRACE_ERROR(("Unknown type %d", ret_val));
+						}
+					}
+					/***************************************************************************/
+					/* Error or not, insert it into list									   */
+					/***************************************************************************/
+					HM_INSERT_BEFORE(node_config_cb->subscriptions, subs_cb->node);
+					config_node->opaque = (void *)subs_cb;
 				}
-				TRACE_INFO(("[Attribute] type: %s", xmlGetProp(current_node, "type")));
+				else
+				{
+					TRACE_WARN(("Subscription instance occured without a subscription tree. Ignoring the rest."));
+					continue;
+				}
 				break;
 			default:
 				/***************************************************************************/
@@ -892,7 +1291,9 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						TRACE_INFO(("Node Index: %s", current_node->content));
+						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
+						node_config_cb->node_cb->index = atoi(current_node->content);
+						TRACE_INFO(("Node Index: %d", node_config_cb->node_cb->index));
 					}
 					/***************************************************************************/
 					/* Free the reverse stack												   */
@@ -918,7 +1319,34 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 					break;
 
 				case HM_CONFIG_IP:
-					TRACE_INFO(("IP: %s", current_node->content));
+					parent_node = HM_STACK_POP(stack);
+					TRACE_ASSERT(parent_node->type == HM_CONFIG_ADDRESS);
+					if (parent_node->type == HM_CONFIG_ADDRESS)
+					{
+						TRACE_DETAIL(("Parent Instance is an Address Node"));
+						address_cb = (HM_CONFIG_ADDRESS_CB *)parent_node->opaque;
+						TRACE_ASSERT(address_cb != NULL);
+						ret_val = HM_STACK_PUSH(stack, parent_node);
+
+						if(ret_val == HM_ERR)
+						{
+							TRACE_ERROR(("Error pushing parent node back on stack"));
+							free(parent_node);
+							free(config_node);
+							parent_node = NULL;
+							config_node = NULL;
+							goto EXIT_LABEL;
+						}
+					}
+					sock_addr = (SOCKADDR_IN *)&address_cb->address.address;
+					inet_pton(AF_INET, current_node->content, &sock_addr->sin_addr);
+#ifdef I_WANT_TO_DEBUG
+					{
+						char tmp[100];
+						TRACE_INFO(("IP: %s", inet_ntop(AF_INET,
+								&sock_addr->sin_addr, tmp, sizeof(tmp))));
+					}
+#endif
 					free(config_node);
 					break;
 
@@ -956,7 +1384,9 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						TRACE_INFO(("Node Group: %s", current_node->content));
+						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
+						node_config_cb->node_cb->group = atoi(current_node->content);
+						TRACE_INFO(("Node Group: %d", node_config_cb->node_cb->group));
 					}
 					free(config_node);
 					break;
@@ -975,7 +1405,13 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						TRACE_INFO(("Node Name: %s", current_node->content));
+						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
+						TRACE_ASSERT(node_config_cb != NULL);
+
+						snprintf(node_config_cb->node_cb->name,
+								sizeof(node_config_cb->node_cb->name),
+								"%s",current_node->content);
+						TRACE_INFO(("Node Name: %s", node_config_cb->node_cb->name));
 					}
 					free(config_node);
 					break;
@@ -994,7 +1430,18 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						TRACE_INFO(("Node Role: %s", current_node->content));
+						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
+						TRACE_ASSERT(node_config_cb != NULL);
+
+						if(strstr(current_node->content, "active")== NULL)
+						{
+							node_config_cb->node_cb->role = NODE_ROLE_PASSIVE;
+						}
+						else
+						{
+							node_config_cb->node_cb->role = NODE_ROLE_ACTIVE;
+						}
+						TRACE_INFO(("Node Role: %d", node_config_cb->node_cb->role));
 					}
 					free(config_node);
 					break;
@@ -1013,7 +1460,10 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						TRACE_INFO(("Subscription group: %s", current_node->content));
+						subs_cb = (HM_CONFIG_SUBSCRIPTION_CB *)config_node->opaque;
+						subs_cb->value = atoi(current_node->content);
+
+						TRACE_INFO(("Subscription group: %d", subs_cb->value));
 					}
 					free(config_node);
 					break;
@@ -1139,6 +1589,7 @@ int32_t hm_parse_config(HM_CONFIG_CB *config_cb, char *config_file)
 	/* Start parsing the XML Tree now and build configuration				   */
 	/***************************************************************************/
 	hm_recurse_tree(root, config_stack, config_cb);
+
 
 EXIT_LABEL:
 	/***************************************************************************/

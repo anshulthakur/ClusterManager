@@ -109,10 +109,9 @@
 #include <hmpeerif.h>
 #include <hmdef.h>
 #include <hmstrc.h>
-#include <hmglob.h>
 #include <hmfunc.h>
-
 #include <hmutil.h>
+#include <hmglob.h>
 #include <hmlog.h>
 
 #endif /* SRC_HMINCL_H_ */
