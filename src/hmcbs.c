@@ -22,7 +22,6 @@ HM_CONFIG_CB * hm_alloc_config_cb()
 	/***************************************************************************/
 	HM_CONFIG_CB *config_cb = NULL;
 
-	SOCKADDR_IN *addr = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -84,10 +83,7 @@ EXIT_LABEL:
 /* Return:	HM_TRANSPORT_CB *									*/
 /* Purpose: Allocates a Transport Connection Control Block			*/
 /***************************************************************************/
-HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t conn_type,
-										const char *ip,
-										uint16_t port
-										)
+HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t conn_type)
 {
 	/***************************************************************************/
 	/* Variable Declarations												   */
@@ -100,12 +96,24 @@ HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t conn_type,
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+	transport_cb = (HM_TRANSPORT_CB *)malloc(sizeof(HM_TRANSPORT_CB));
+	if(transport_cb == NULL)
+	{
+		TRACE_ERROR(("Error allocating memory for transport CB"));
+		goto EXIT_LABEL;
+	}
+	/* Got TCB */
+	transport_cb->type = conn_type;
+	transport_cb->location_cb = NULL;
+	transport_cb->node_cb = NULL;
+	transport_cb->sock_cb = NULL;
 
+EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
-	return transport_cb;
+	return (transport_cb);
 }/* hm_alloc_transport_cb */
 
 /***************************************************************************/
@@ -129,10 +137,14 @@ int32_t hm_free_transport_cb(HM_TRANSPORT_CB *tprt_cb)
 	/* Sanity Checks														   */
 	/***************************************************************************/
 	TRACE_ENTRY();
+	TRACE_ASSERT(tprt_cb !=NULL);
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+	//TODO: Check if the connections are closed.
 
+	free(tprt_cb);
+	tprt_cb = NULL;
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -147,7 +159,7 @@ int32_t hm_free_transport_cb(HM_TRANSPORT_CB *tprt_cb)
 /* Return:	HM_SOCKET_CB *									*/
 /* Purpose: purpose			*/
 /***************************************************************************/
-HM_SOCKET_CB * hm_alloc_sock_cb(struct sockaddr_storage *address)
+HM_SOCKET_CB * hm_alloc_sock_cb()
 {
 	/***************************************************************************/
 	/* Variable Declarations												   */
@@ -160,13 +172,55 @@ HM_SOCKET_CB * hm_alloc_sock_cb(struct sockaddr_storage *address)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+	sock_cb = (HM_SOCKET_CB *)malloc(sizeof(HM_SOCKET_CB));
+	if(sock_cb == NULL)
+	{
+		TRACE_ERROR(("Error allocating memory for socket control block"));
+		goto EXIT_LABEL;
+	}
+	memset(sock_cb, 0, sizeof(HM_SOCKET_CB));
 
+	sock_cb->conn_state = HM_TPRT_CONN_NULL;
+	sock_cb->tprt_cb = NULL;
+	sock_cb->sock_fd = -1;
+
+EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
 	return sock_cb;
 }/* hm_alloc_sock_cb */
+
+/***************************************************************************/
+/* Name:	hm_free_sock_cb 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	void									*/
+/* Purpose: Frees the socket connection CB			*/
+/***************************************************************************/
+void hm_free_sock_cb(HM_SOCKET_CB *sock_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(sock_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	free(sock_cb);
+	sock_cb = NULL;
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+}/* hm_free_sock_cb */
 
 /***************************************************************************/
 /* Name:	hm_alloc_node_cb 											   */
@@ -176,7 +230,7 @@ HM_SOCKET_CB * hm_alloc_sock_cb(struct sockaddr_storage *address)
 /* Purpose: Allocates a Node Control Block structure and initializes the   */
 /* default values.														   */
 /***************************************************************************/
-HM_NODE_CB * hm_alloc_node_cb()
+HM_NODE_CB * hm_alloc_node_cb(uint32_t local)
 {
 	/***************************************************************************/
 	/* Variable Declarations												   */
@@ -218,6 +272,23 @@ HM_NODE_CB * hm_alloc_node_cb()
 	node_cb->keepalive_missed = 0;
 	node_cb->keepalive_period = HM_CONFIG_DEFAULT_NODE_TICK_TIME;
 
+	node_cb->timer_cb = NULL;
+	/***************************************************************************/
+	/* Create a Timer														   */
+	/***************************************************************************/
+	if(local == TRUE)
+	{
+		node_cb->timer_cb = HM_TIMER_CREATE(node_cb->keepalive_period, TRUE,
+					hm_node_keepalive_callback, (void *)node_cb );
+		if(node_cb->timer_cb == NULL)
+		{
+			TRACE_ERROR(("Error creating timer for node"));
+			free(node_cb);
+			node_cb = NULL;
+			goto EXIT_LABEL;
+		}
+	}
+
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
@@ -240,7 +311,6 @@ int32_t hm_free_node_cb(HM_NODE_CB *node_cb)
 	/***************************************************************************/
 	int32_t ret_val = HM_OK;
 	HM_PROCESS_CB *tree_node = NULL;
-	HM_TRANSPORT_CB *tprt_cb = NULL;
 
 	/***************************************************************************/
 	/* Sanity Checks														   */
@@ -296,6 +366,15 @@ int32_t hm_free_node_cb(HM_NODE_CB *node_cb)
 	/* Empty the subscription list											   */
 	/***************************************************************************/
 	//TODO
+
+	/***************************************************************************/
+	/* Close any node keepalive timers										   */
+	/***************************************************************************/
+	if(node_cb->timer_cb != NULL)
+	{
+		HM_TIMER_DELETE(node_cb->timer_cb);
+	}
+
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */

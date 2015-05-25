@@ -25,16 +25,18 @@
 /* Group HM_TRANSPORT_ADDR_TYPE: Transport Types						   */
 /***************************************************************************/
 #define HM_TRANSPORT_TCP_LISTEN								((uint16_t)	0)
-#define HM_TRANSPORT_TCP_IO									((uint16_t)	1)
-#define HM_TRANSPORT_UDP									((uint16_t)	2)
-#define HM_TRANSPORT_MCAST									((uint16_t)	3)
-#define HM_TRANSPORT_SCTP									((uint16_t)	4)
+#define HM_TRANSPORT_TCP_IN									((uint16_t)	1)
+#define HM_TRANSPORT_TCP_OUT								((uint16_t)	2)
+#define HM_TRANSPORT_UDP									((uint16_t)	3)
+#define HM_TRANSPORT_MCAST									((uint16_t)	4)
+#define HM_TRANSPORT_SCTP									((uint16_t)	5)
 /* IPv6 variants */
-#define HM_TRANSPORT_TCP_IPv6_LISTEN						((uint16_t)	5)
-#define HM_TRANSPORT_TCP_IPv6_IO							((uint16_t)	6)
-#define HM_TRANSPORT_UDP_IPv6								((uint16_t)	7)
-#define HM_TRANSPORT_MCAST_IPv6								((uint16_t)	8)
-#define HM_TRANSPORT_SCTP_IPv6								((uint16_t)	9)
+#define HM_TRANSPORT_TCP_IPv6_LISTEN						((uint16_t)	6)
+#define HM_TRANSPORT_TCP_IPv6_IN							((uint16_t)	7)
+#define HM_TRANSPORT_TCP_IPv6_OUT							((uint16_t)	8)
+#define HM_TRANSPORT_UDP_IPv6								((uint16_t)	9)
+#define HM_TRANSPORT_MCAST_IPv6								((uint16_t)10)
+#define HM_TRANSPORT_SCTP_IPv6								((uint16_t)11)
 
 #define HM_TRANSPORT_DEFAULT						HM_TRANSPORT_TCP_LISTEN
 

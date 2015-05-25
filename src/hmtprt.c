@@ -9,127 +9,30 @@
 
 #include <hmincl.h>
 
-#if 0
-/**PROC+**********************************************************************/
-/* Name:     hm_tprt_create_connection 		                                 */
-/*                                                                           */
-/* Purpose:   Creates a non-blocking socket and returns its descriptor.      */
-/*                                                                           */
-/* Returns:   int32_t sock_fd :	Socket File descriptor of socket created.    */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 		: target: IP Address/Domain Name of target           */
-/*			  IN		: service: Port										 */
-/*			  IN		: conn_type: Connection Type requested.				 */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
-
-int32_t hm_tprt_create_connection(	const char *target,
-									const char *service,
-									uint32_t conn_type
-								  )
+/***************************************************************************/
+/* Name:	hm_open_socket 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Opens a non-blocking socket			*/
+/***************************************************************************/
+static int32_t hm_open_socket(struct addrinfo *res)
 {
 	/***************************************************************************/
-	/* Descriptor of the socket created. Default value denotes error condition */
+	/* Variable Declarations												   */
 	/***************************************************************************/
 	int32_t sock_fd = -1;
 	int32_t val;
 	int32_t option_val;
 
-	int32_t ret_code;
-
-	struct addrinfo hints, *res, *ressave;
-
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
 	TRACE_ENTRY();
-
-	switch(conn_type)
-	{
-	case HM_TRANSPORT_TCP_LISTEN:
-		TRACE_INFO(("IPv4 Listen Socket"));
-		hints.ai_family = AF_INET;
-		hints.ai_flags = AI_PASSIVE;
-		hints.ai_socktype = SOCK_STREAM;
-		break;
-
-	case HM_TRANSPORT_TCP_IO:
-		TRACE_INFO(("IPv4 I/O Socket"));
-		hints.ai_family = AF_INET;
-		hints.ai_socktype = SOCK_STREAM;
-		break;
-
-	case HM_TRANSPORT_UDP:
-		TRACE_INFO(("IPv4 UDP Socket"));
-		hints.ai_family = AF_INET;
-		hints.ai_socktype = SOCK_DGRAM;
-		break;
-
-	case HM_TRANSPORT_MCAST:
-		TRACE_INFO(("IPv4 Multicast Socket"));
-		hints.ai_family = AF_INET;
-		hints.ai_socktype = SOCK_DGRAM;
-		break;
-
-	case HM_TRANSPORT_SCTP:
-		TRACE_INFO(("IPv4 SCTP Socket"));
-		hints.ai_family = AF_INET;
-		hints.ai_socktype = SOCK_STREAM;
-		break;
-
-	case HM_TRANSPORT_TCP_IPv6_LISTEN:
-		TRACE_INFO(("IPv6 Listen Socket"));
-		hints.ai_family = AF_INET6;
-		hints.ai_flags = AI_PASSIVE;
-		hints.ai_socktype = SOCK_STREAM;
-		break;
-
-	case HM_TRANSPORT_TCP_IPv6_IO:
-		TRACE_INFO(("IPv6 I/O Socket"));
-		hints.ai_family = AF_INET6;
-		hints.ai_socktype = SOCK_STREAM;
-		break;
-
-	case HM_TRANSPORT_UDP_IPv6:
-		TRACE_INFO(("IPv6 UDP Socket"));
-		hints.ai_family = AF_INET6;
-		hints.ai_socktype = SOCK_DGRAM;
-		break;
-
-	case HM_TRANSPORT_MCAST_IPv6:
-		TRACE_INFO(("IPv6 Multicast Socket"));
-		hints.ai_family = AF_INET6;
-		hints.ai_socktype = SOCK_DGRAM;
-		break;
-
-	case HM_TRANSPORT_SCTP_IPv6:
-		TRACE_INFO(("IPv6 SCTP Socket"));
-		hints.ai_family = AF_INET6;
-		hints.ai_socktype = SOCK_STREAM;
-		break;
-
-	default:
-		TRACE_ERROR(("Unknown connection Type %d", conn_type));
-		goto EXIT_LABEL;
-	}
-
+	TRACE_ASSERT(res != NULL);
 	/***************************************************************************/
-	/* If unsatisfactory, this code chunk may be replaced by a more elaborate  */
-	/* memset(0) and filling of sin_addr structures.						   */
+	/* Main Routine															   */
 	/***************************************************************************/
-	if((ret_code = getaddrinfo(target, service, &hints, &res)) !=0)
-	{
-		TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_code);
-		goto EXIT_LABEL;
-	}
-
-	ressave = res;
-	/***************************************************************************/
-	/* Right now, we are only expecting a single address in response.		   */
-	/* Set appropriate socket options depending on the type of socket.		   */
-	/***************************************************************************/
-	TRACE_DETAIL(("Opening Socket"));
 	sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (sock_fd < 0)
 	{
@@ -173,6 +76,220 @@ int32_t hm_tprt_create_connection(	const char *target,
 	}
 
 	/***************************************************************************/
+	/* Add the descriptor to global descriptor set							   */
+	/***************************************************************************/
+	if(max_fd < sock_fd)
+	{
+		TRACE_DETAIL(("Update maximum socket descriptor value to %d", sock_fd));
+		max_fd = sock_fd;
+	}
+	TRACE_DETAIL(("Add FD to set"));
+	FD_SET(sock_fd, &hm_tprt_conn_set);
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return sock_fd;
+}/* hm_open_socket */
+
+/**PROC+**********************************************************************/
+/* Name:     hm_tprt_create_connection 		                                 */
+/*                                                                           */
+/* Purpose:   Creates a non-blocking socket and returns its descriptor.      */
+/*                                                                           */
+/* Returns:   int32_t sock_fd :	Socket File descriptor of socket created.    */
+/*           				                                                 */
+/*                                                                           */
+/* Params:    IN 		: target: IP Address/Domain Name of target           */
+/*			  IN		: service: Port										 */
+/*			  IN		: conn_type: Connection Type requested.				 */
+/*            IN/OUT										                 */
+/*                                                                           */
+/* Operation: 											                     */
+/*                                                                           */
+/**PROC-**********************************************************************/
+HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type,
+								void * params )
+{
+	/***************************************************************************/
+	/* Descriptor of the socket created. Default value denotes error condition */
+	/***************************************************************************/
+	int32_t sock_fd = -1;
+	int32_t val;
+	int32_t option_val;
+
+	HM_SOCKET_CB *sock_cb = NULL;
+
+	char target[128], service[128];
+
+	int32_t ret_val;
+
+	struct addrinfo hints, *res, *ressave;
+
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(params != NULL);
+	/***************************************************************************/
+	/* Create a socket control block										   */
+	/***************************************************************************/
+	sock_cb = hm_alloc_sock_cb();
+	if(sock_cb == NULL)
+	{
+		TRACE_ERROR(("Resource allocation failed for socket control block"));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+
+	/***************************************************************************/
+	/* Depending on the connection type, determine the sockaddr strcuture	   */
+	switch(conn_type)
+	{
+	case HM_TRANSPORT_TCP_LISTEN:
+		TRACE_INFO(("IPv4 Listen Socket"));
+		hints.ai_family = AF_INET;
+		hints.ai_flags = AI_PASSIVE;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
+		break;
+
+	case HM_TRANSPORT_TCP_OUT:
+		TRACE_INFO(("IPv4 Outgoing Socket"));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
+		break;
+
+	case HM_TRANSPORT_TCP_IN:
+		TRACE_INFO(("IPv4 Incoming Socket"));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		break;
+
+	case HM_TRANSPORT_UDP:
+		TRACE_INFO(("IPv4 UDP Socket"));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
+		break;
+
+	case HM_TRANSPORT_MCAST:
+		TRACE_INFO(("IPv4 Multicast Socket"));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
+		break;
+
+	case HM_TRANSPORT_SCTP:
+		TRACE_INFO(("IPv4 SCTP Socket"));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_SCTP;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
+		break;
+
+	case HM_TRANSPORT_TCP_IPv6_LISTEN:
+		TRACE_INFO(("IPv6 Listen Socket"));
+		hints.ai_family = AF_INET6;
+		hints.ai_flags = AI_PASSIVE;
+		hints.ai_socktype = SOCK_STREAM;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+		break;
+
+	case HM_TRANSPORT_TCP_IPv6_OUT:
+		TRACE_INFO(("IPv6 I/O Socket"));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_STREAM;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+		break;
+
+	case HM_TRANSPORT_TCP_IPv6_IN:
+		TRACE_INFO(("IPv6 I/O Socket"));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_STREAM;
+		break;
+
+	case HM_TRANSPORT_UDP_IPv6:
+		TRACE_INFO(("IPv6 UDP Socket"));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_DGRAM;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+		break;
+
+	case HM_TRANSPORT_MCAST_IPv6:
+		TRACE_INFO(("IPv6 Multicast Socket"));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_DGRAM;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+		break;
+
+	case HM_TRANSPORT_SCTP_IPv6:
+		TRACE_INFO(("IPv6 SCTP Socket"));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_STREAM;
+		inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
+		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+		break;
+
+	default:
+		TRACE_ERROR(("Unknown connection Type %d", conn_type));
+		TRACE_ASSERT(0==1);
+		goto EXIT_LABEL;
+	}
+
+	switch(conn_type)
+	{
+	case HM_TRANSPORT_TCP_IN:
+	case HM_TRANSPORT_TCP_IPv6_IN:
+		TRACE_INFO(("Accept incoming connection"));
+		goto EXIT_LABEL;
+
+	default:
+		TRACE_INFO(("One of Outgoing Connections Type %d", conn_type));
+	}
+
+	/***************************************************************************/
+	/* If unsatisfactory, this code chunk may be replaced by a more elaborate  */
+	/* memset(0) and filling of sin_addr structures.						   */
+	/***************************************************************************/
+	TRACE_DETAIL(("AI_FAMILY: %d", hints.ai_family));
+	TRACE_DETAIL(("Target: %s:%s", target, service));
+	if((ret_val = getaddrinfo(target, service, &hints, &res)) !=0)
+	{
+		TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_val);
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+
+	ressave = res;
+	/***************************************************************************/
+	/* Right now, we are only expecting a single address in response.		   */
+	/* Set appropriate socket options depending on the type of socket.		   */
+	/***************************************************************************/
+	TRACE_DETAIL(("Opening Socket"));
+	sock_fd = hm_open_socket(res);
+	if(sock_fd == -1)
+	{
+		TRACE_ERROR(("Error opening socket"));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+	/***************************************************************************/
 	/* Other specific options and processing.								   */
 	/***************************************************************************/
 	switch (conn_type)
@@ -215,7 +332,8 @@ int32_t hm_tprt_create_connection(	const char *target,
 		}
 		break;
 
-	case HM_TRANSPORT_TCP_IO:
+	case HM_TRANSPORT_TCP_OUT:
+		TRACE_INFO(("Trying to connect"));
 		if(connect(sock_fd, res->ai_addr, res->ai_addrlen)!=0)
 		{
 			TRACE_PERROR(("Connect failed on socket %d", sock_fd));
@@ -225,20 +343,45 @@ int32_t hm_tprt_create_connection(	const char *target,
 		}
 		break;
 	case HM_TRANSPORT_UDP:
-
+		/***************************************************************************/
+		/* Bind to address														   */
+		/***************************************************************************/
+		TRACE_DETAIL(("Binding to address"));
+		if(bind(sock_fd, res->ai_addr, res->ai_addrlen) != 0)
+		{
+			TRACE_PERROR(("Error binding to port"));
+			close(sock_fd);
+			sock_fd = -1;
+			goto EXIT_LABEL;
+		}
         break;
 
 	case HM_TRANSPORT_MCAST:
-
+		/***************************************************************************/
+		/* Bind to address														   */
+		/***************************************************************************/
+		TRACE_DETAIL(("Binding to address"));
+		if(bind(sock_fd, res->ai_addr, res->ai_addrlen) != 0)
+		{
+			TRACE_PERROR(("Error binding to port"));
+			close(sock_fd);
+			sock_fd = -1;
+			goto EXIT_LABEL;
+		}
+		//TODO: Join multicast group
 		break;
 
 	default:
+		TRACE_WARN(("Unknown Connection type"));
 		break;
 	}
-
+	/***************************************************************************/
+	/* All went well. Set the sock_fd as that of sock_cb					   */
+	/***************************************************************************/
+	sock_cb->sock_fd = sock_fd;
 
 EXIT_LABEL:
-	if (ret_code == 0)
+	if (ret_val == 0)
 	{
 		/***************************************************************************/
 		/* Free the address structures that were allocated in getaddrinfo in kernel*/
@@ -246,13 +389,22 @@ EXIT_LABEL:
 		/* using getaddrinfo()													   */
 		/***************************************************************************/
 		freeaddrinfo(ressave);
+		/***************************************************************************/
+		/* Add the socket descriptor to the global FD set.						   */
+		/***************************************************************************/
+		//FIXME
+	}
+	else if(ret_val == HM_ERR)
+	{
+		hm_free_sock_cb(sock_cb);
+		sock_cb = NULL;
 	}
 
 	TRACE_EXIT();
-	return (sock_fd);
+	return (sock_cb);
 } /* hm_tprt_create_connection */
 
-
+#if 0
 /**PROC+**********************************************************************/
 /* Name:     hm_tprt_send_on_socket	                                         */
 /*                                                                           */

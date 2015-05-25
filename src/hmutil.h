@@ -135,8 +135,8 @@ void avl3_verify_tree(HM_AVL3_TREE *,
 #define HM_LIST_ROOT(R)        ((R).self == NULL)
 #define HM_EMPTY_LIST(R)       ((R).next == &(R))
 #define HM_IN_LIST(E)          ((E).next != NULL)
-#define HM_NEXT_IN_LIST(E)     (HM_VOID *)((E).next->self)
-#define HM_PREV_IN_LIST(E)     (HM_VOID *)((E).prev->self)
+#define HM_NEXT_IN_LIST(E)     (VOID *)((E).next->self)
+#define HM_PREV_IN_LIST(E)     (VOID *)((E).prev->self)
 
 #define HM_INSERT_AFTER(P, E)  TRACE_ASSERT((E).next == NULL);         \
 								TRACE_ASSERT((E).prev == NULL);         \
@@ -217,4 +217,23 @@ void * hm_stack_pop(HM_STACK *);
 
 #define HM_POP_ALLOWED(stack)												\
 	((stack->top > -1)? TRUE: FALSE)
+
+
+/***************************************************************************/
+/* Timer functions														   */
+/***************************************************************************/
+HM_TIMER_CB * hm_timer_create(uint32_t, uint32_t , HM_TIMER_CALLBACK *,void * );
+int32_t hm_timer_start(HM_TIMER_CB *);
+int32_t hm_timer_modify(HM_TIMER_CB *, uint32_t );
+int32_t hm_timer_stop(HM_TIMER_CB *);
+VOID hm_timer_delete(HM_TIMER_CB *);
+
+
+#define HM_TIMER_CREATE(PERIOD, REPEATING, CALLBACK, PARENT) 				\
+		hm_timer_create(PERIOD, REPEATING, CALLBACK, PARENT)
+#define HM_TIMER_START(CB) hm_timer_start(CB)
+#define HM_TIMER_MODIFY(CB, NEW_PERIOD) hm_timer_modify(CB, NEW_PERIOD);
+#define HM_TIMER_STOP(CB) hm_timer_stop(CB)
+#define HM_TIMER_DELETE(CB) hm_timer_delete(CB)
+
 #endif /* SRC_HMUTIL_H_ */

@@ -11,9 +11,136 @@
 /***************************************************************************/
 /* Timer Related Functions												   */
 /***************************************************************************/
+
+/***************************************************************************/
+/* Name:	hm_timer_set_timer 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Sets the given time in ms on timer			*/
+/***************************************************************************/
+static int32_t hm_timer_set_timer(timer_t *timerID, int32_t period)
+{
+	int32_t rc = HM_OK;
+    struct itimerspec its;
+
+    TRACE_ENTRY();
+	/***************************************************************************/
+	/* Validate Input														   */
+	/***************************************************************************/
+	TRACE_ASSERT(timerID != NULL);
+
+    /***************************************************************************/
+	/* Determine the number of seconds and nano seconds from input time in MS  */
+	/***************************************************************************/
+    if(period/1000 == 0)
+    {
+    	its.it_interval.tv_sec = (time_t )0;
+    	its.it_interval.tv_nsec = (long int )(period * 1000000);
+
+    }
+    else if(period/1000 > 0)
+    {
+    	its.it_interval.tv_sec = (time_t )(period/1000);
+    	its.it_interval.tv_nsec = (long int )((period%1000) * 1000000);
+    }
+
+    TRACE_DETAIL(("Timer Interval Sec = %lu",(unsigned long )its.it_interval.tv_sec));
+    TRACE_DETAIL(("Timer Interval nS = %lu", (unsigned long )its.it_interval.tv_nsec));
+
 #if 0
+    if(timer_cb->period/1000 == 0)
+    {
+    	its.it_value.tv_sec = (time_t )0;
+    	its.it_value.tv_nsec =(long int ) (timer_cb->period * 1000000);
+
+    }
+    else if(expireMS/1000 > 0)
+    {
+    	its.it_value.tv_sec = (time_t )(expireMS/1000);
+    	its.it_value.tv_nsec = (long int )((expireMS%1000) * 1000000);
+    }
+
+    printf("\nTimer Value Seconds = %lu\nTimer Value nS = %lu",
+    				(unsigned long )its.it_value.tv_sec,
+    				(unsigned long )its.it_value.tv_nsec);
+#endif
+
+    if((timer_settime(timerID, 0, &its, NULL))!=0)
+    {
+    	TRACE_PERROR(("Error in setting the timer"));
+    	rc = HM_ERR;
+    	goto EXIT_LABEL;
+    }
+EXIT_LABEL:
+
+	TRACE_EXIT();
+	return (rc);
+}/* hm_timer_set_timer */
+
 /**PROC+**********************************************************************/
-/* Name:     hm_tprt_make_timer		                                         */
+/* Name:     hm_base_timer_handler  		                                 */
+/*                                                                           */
+/* Purpose:  Function invoked when any timer of this module expires.         */
+/*                                                                           */
+/* Returns:   VOID  :									                     */
+/*           				                                                 */
+/*                                                                           */
+/* Params:    IN 	: sig - Signal			                                 */
+/*			  IN	: si  - Signal Info containing the parameters of timer	 */
+/*			  IN	: uc  - Not used (additional data)						 */
+/*            IN/OUT										                 */
+/*                                                                           */
+/* Operation: Finds the appropriate timer in the list of timers with the     */
+/*			 transport layer. If the Timer is of Connection Type, then the   */
+/*			 connection must be closed down on this timer's expiry.			 */
+/*			 If it is of Keepalive type, Call into the FSM with Keepalive as */
+/*           input signal                                                    */
+/**PROC-**********************************************************************/
+VOID hm_base_timer_handler(int32_t sig, siginfo_t *si, void *uc )
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+    timer_t *tidp = NULL;
+    HM_TIMER_CB *timer_cb = NULL;
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	tidp = si->si_value.sival_ptr;
+
+	/* Find the Node in global timer table using  '*tidp' value stored in tidp */
+	/* and invoke its callback.												   */
+	timer_cb = (HM_TIMER_CB *)HM_AVL3_FIND(global_timer_table,
+										&tidp,timer_table_by_handle);
+	TRACE_ASSERT(timer_cb != NULL);
+	if(timer_cb ==NULL)
+	{
+		TRACE_ERROR(("Timer CB not found! Delete timer!"));
+		timer_delete(*tidp);
+		goto EXIT_LABEL;
+	}
+	TRACE_DETAIL(("Found CB. Invoke callback"));
+	timer_cb->callback((void *)timer_cb);
+
+	/***************************************************************************/
+	/* TODO: Do we need to re-arm the timer or will it keep repeating?		   */
+	/***************************************************************************/
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+}/* hm_base_timer_handler */
+
+/**PROC+**********************************************************************/
+/* Name:     hm_timer_create		                                         */
 /*                                                                           */
 /* Purpose:   Creates a timer with the given parameters.                     */
 /*                                                                           */
@@ -26,57 +153,113 @@
 /* Operation: 											                     */
 /*                                                                           */
 /**PROC-**********************************************************************/
-
-int32_t hm_tprt_make_timer(char name[], timer_t *timerID)
+HM_TIMER_CB * hm_timer_create(uint32_t period,
+								uint32_t repeat,
+								HM_TIMER_CALLBACK *func,
+								void * parent)
 {
-	static int32_t rc = FALSE;
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_TIMER_CB *timer_cb = NULL;
     struct sigevent         te;
 
     struct sigaction        sa;
     extern sigset_t mask;
     int32_t  sigNo = SIGRTMIN;
-
-
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
 	TRACE_ENTRY();
+
+	TRACE_ASSERT(period >0);
+	TRACE_ASSERT((repeat == TRUE)||(repeat == FALSE));
+	TRACE_ASSERT(func != NULL);
+
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	/* Allocated Timer CB	*/
+	timer_cb = (HM_TIMER_CB *)malloc(sizeof(HM_TIMER_CB));
+	if(timer_cb == NULL)
+	{
+		TRACE_ERROR(("Error allocating resources for timer creation."));
+		goto EXIT_LABEL;
+	}
+
+	timer_cb->callback = func;
+	HM_AVL3_INIT_NODE(timer_cb->node, timer_cb);
+	timer_cb->parent = parent;
+	timer_cb->timerID = NULL;
+	timer_cb->handle = -1;
+	timer_cb->repeat = repeat;
+	timer_cb->running = FALSE;
+	timer_cb->period = period;
 
     /* Set up signal handler. */
     sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = hm_tprt_timer_handler;
+    sa.sa_sigaction = hm_base_timer_handler;
+
     sigemptyset(&sa.sa_mask);
     if (sigaction(sigNo, &sa, NULL) == -1)
     {
-        printf("Failed to setup signal handling for %s.\n", name);
-        return(-1);
+        TRACE_ERROR(("Failed to setup signal handling for timer"));
+        free(timer_cb);
+        timer_cb = NULL;
+        goto EXIT_LABEL;
     }
 
     /* Block timer signal temporarily */
-
-    printf("\nBlocking signal %d\n", sigNo);
+    TRACE_DETAIL(("Blocking signal %d", sigNo));
     sigemptyset(&mask);
     sigaddset(&mask, sigNo);
     if (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)
 	{
-		perror("sigprocmask");
-		exit(0);
+		TRACE_PERROR(("Error blocking signal while timer creation"));
+        free(timer_cb);
+        timer_cb = NULL;
+        goto EXIT_LABEL;
 	}
 
     /* Set and enable alarm */
     te.sigev_notify = SIGEV_SIGNAL;
     te.sigev_signo = sigNo;
-    te.sigev_value.sival_ptr = timerID;
-    if(timer_create(CLOCK_REALTIME, &te, timerID)== -1)
+    te.sigev_value.sival_ptr = &timer_cb->timerID;
+    if(timer_create(CLOCK_REALTIME, &te, &timer_cb->timerID)== -1)
     {
-    	printf("\nError creating timer.");
-    	perror("Cause: ");
+    	TRACE_PERROR(("Error creating timer."));
+        free(timer_cb);
+        timer_cb = NULL;
+        goto EXIT_LABEL;
     }
 
-    rc = TRUE;
+    timer_cb->handle = (uint32_t)*(&timer_cb->timerID);
+    TRACE_DETAIL(("Timer handle: %x", timer_cb->handle));
+    TRACE_DETAIL(("Memory: %x", timer_cb->timerID));
+    /***************************************************************************/
+	/* Insert the timer into global table									   */
+	/***************************************************************************/
+	if(HM_AVL3_INSERT(global_timer_table, timer_cb->node, timer_table_by_handle)!= TRUE)
+	{
+		TRACE_ERROR(("Error inserting timer into global table."));
+		/***************************************************************************/
+		/* delete the timer and then remove it from the timer list				   */
+		/***************************************************************************/
+		timer_delete(timer_cb->timerID);
+        free(timer_cb);
+        timer_cb = NULL;
+	}
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
 	TRACE_EXIT();
-	return (rc);
-} /* hm_tprt_make_timer */
+	return (timer_cb);
+} /* hm_timer_create */
 
 /**PROC+**********************************************************************/
-/* Name:     hm_tprt_set_timer  	                                         */
+/* Name:     hm_timer_start                                         		 */
 /*                                                                           */
 /* Purpose:   Arms the timer.						                         */
 /*                                                                           */
@@ -91,75 +274,103 @@ int32_t hm_tprt_make_timer(char name[], timer_t *timerID)
 /* Operation: 											                     */
 /*                                                                           */
 /**PROC-**********************************************************************/
-
-uint32_t hm_tprt_set_timer(timer_t *timerID, int32_t expireMS, int32_t intervalMS)
+int32_t hm_timer_start(HM_TIMER_CB *timer_cb)
 {
-	uint32_t rc = FALSE;
-    struct itimerspec its;
 
-    TRACE_ENTRY();
-	/***************************************************************************/
-	/* Validate Input														   */
-	/***************************************************************************/
-	if(timerID == NULL)
+	int32_t ret_val = HM_OK;
+	TRACE_ENTRY();
+	TRACE_ASSERT(timer_cb != NULL);
+
+	if(hm_timer_set_timer(&timer_cb->timerID, timer_cb->period)!= HM_OK)
 	{
-		printf("\nInvalid reference to Timer");
-		goto EXIT_LABEL;
+		TRACE_ERROR(("Error occurred while starting timer"));
+		ret_val = HM_ERR;
 	}
-
-    /***************************************************************************/
-	/* Determine the number of seconds and nano seconds from input time in MS  */
-	/***************************************************************************/
-    if(intervalMS/1000 == 0)
-    {
-    	its.it_interval.tv_sec = (time_t )0;
-    	its.it_interval.tv_nsec = (long int )(intervalMS * 1000000);
-
-    }
-    else if(intervalMS/1000 > 0)
-    {
-    	its.it_interval.tv_sec = (time_t )(intervalMS/1000);
-    	its.it_interval.tv_nsec = (long int )((intervalMS%1000) * 1000000);
-    }
-
-    printf("\n Timer Interval Seconds = %lu\nTimer Interval nS = %lu",
-    							(unsigned long )its.it_interval.tv_sec,
-    							(unsigned long )its.it_interval.tv_nsec);
-    if(expireMS/1000 == 0)
-    {
-    	its.it_value.tv_sec = (time_t )0;
-    	its.it_value.tv_nsec =(long int ) (expireMS * 1000000);
-
-    }
-    else if(expireMS/1000 > 0)
-    {
-    	its.it_value.tv_sec = (time_t )(expireMS/1000);
-    	its.it_value.tv_nsec = (long int )((expireMS%1000) * 1000000);
-    }
-
-    printf("\nTimer Value Seconds = %lu\nTimer Value nS = %lu",
-    				(unsigned long )its.it_value.tv_sec,
-    				(unsigned long )its.it_value.tv_nsec);
-
-    printf("\nTimer ID %p", timerID);
-    fflush(stdout);
-
-    if((timer_settime(timerID, 0, &its, NULL))!=0)
-    {
-    	printf("\n Error in setting the timer");
-    	goto EXIT_LABEL;
-    }
-
-    rc = TRUE;
-
-EXIT_LABEL:
+	timer_cb->running = TRUE;
 
 	TRACE_EXIT();
-	return (rc);
-} /* hm_tprt_set_timer */
+	return ret_val;
+} /* hm_timer_start */
+
 
 /**PROC+**********************************************************************/
-/* Name:     hm_tprt_timer_delete  	                                         */
+/* Name:     hm_timer_modify                                         		 */
+/*                                                                           */
+/* Purpose:   Arms the timer with new value if running.                      */
+/*                                                                           */
+/* Returns:   BOOL rc :									                     */
+/*           				                                                 */
+/*                                                                           */
+/* Params:    IN 	:timer_ID – Reference to the timer that must be set.     */
+/*			  IN	: expireMS - Timer expires in (milliseconds)			 */
+/*            IN	: intervalMS - Repeats after (milliseconds)              */
+/*            IN/OUT										                 */
+/*                                                                           */
+/* Operation: 											                     */
+/*                                                                           */
+/**PROC-**********************************************************************/
+int32_t hm_timer_modify(HM_TIMER_CB *timer_cb, uint32_t period)
+{
+
+	int32_t ret_val = HM_OK;
+	TRACE_ENTRY();
+	TRACE_ASSERT(timer_cb != NULL);
+	TRACE_ASSERT(period !=0);
+
+	timer_cb->period = period;
+	if(timer_cb->running)
+	{
+		if(hm_timer_set_timer(&timer_cb->timerID, period)!= HM_OK)
+		{
+			TRACE_ERROR(("Error occurred while modifying timer"));
+			ret_val = HM_ERR;
+		}
+	}
+
+	TRACE_EXIT();
+	return ret_val;
+} /* hm_timer_modify */
+
+/***************************************************************************/
+/* Name:	hm_timer_stop 												   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t														   */
+/* Purpose: Stops the timer if it is running. Silently exits otherwise	   */
+/***************************************************************************/
+int32_t hm_timer_stop(HM_TIMER_CB *timer_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+    struct itimerspec its;
+	int32_t ret_val = HM_OK;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(timer_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(timer_cb->running)
+	{
+		if(hm_timer_set_timer(&timer_cb->timerID, 0)!= HM_OK)
+		{
+			TRACE_ERROR(("Error occurred while stopping timer"));
+			ret_val = HM_ERR;
+		}
+	}
+	timer_cb->running = FALSE;
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+}/* hm_timer_stop */
+
+/**PROC+**********************************************************************/
+/* Name:     hm_timer_delete  	   	                                         */
 /*                                                                           */
 /* Purpose:   Deletes the timer.					                         */
 /*                                                                           */
@@ -171,76 +382,28 @@ EXIT_LABEL:
 /* Operation: Deletes the timer and remove it from the timer list            */
 /*                                                                           */
 /**PROC-**********************************************************************/
-
-VOID hm_tprt_timer_delete(timer_t* timer_id)
+VOID hm_timer_delete(HM_TIMER_CB *timer_cb)
 {
-	HM_TPRT_TIMER_CB *timer_cb = NULL;
 
 	TRACE_ENTRY();
 
-	fflush(stdout);
+	/***************************************************************************/
+	/* delete the timer and then remove it from the timer list				   */
+	/***************************************************************************/
+	timer_delete(timer_cb->timerID);
 
-	// delete the timer and then remove it from the timer list
-	timer_delete(timer_id);
+	/***************************************************************************/
+	/* Remove from the global tree											   */
+	/***************************************************************************/
+	HM_AVL3_DELETE(global_timer_table, timer_cb->node);
 
-	// check in keep alive timer list
-	 for(timer_cb = (HM_TPRT_TIMER_CB *)(tprt_local.heartbeat_timer_list.next);
-                timer_cb != NULL;
-                timer_cb = (HM_TPRT_TIMER_CB *)LQE_NEXT_IN_LIST(((LQE *)timer_cb)))
-	{
-		 printf("\n Found Keepalive timer");
-		 if(timer_id == &(timer_cb->timer_val))
-			LQE_REMOVE_FROM_LIST(timer_cb->node);
-		 FREE(timer_cb);
-	}
-
-	// check in the connection timer list as well
-	for(timer_cb = (HM_TPRT_TIMER_CB *)(tprt_local.connection_timer_list.next);
-                        timer_cb != NULL;
-                        timer_cb = (HM_TPRT_TIMER_CB *)LQE_NEXT_IN_LIST(((LQE *)timer_cb)))
-	{
-		printf("\n Found Connection timer");
-		if(timer_id == &(timer_cb->timer_val))
-                LQE_REMOVE_FROM_LIST(timer_cb->node);
-		FREE(timer_cb);
-	}
+	free(timer_cb);
+	timer_cb = NULL;
 
 	TRACE_EXIT();
 	return ;
-}/* hm_tprt_timer_delete */
+}/* hm_timer_delete */
 
-
-/**PROC+**********************************************************************/
-/* Name:     hm_tprt_timer_handler  		                                 */
-/*                                                                           */
-/* Purpose:  Function invoked when any timer of this module expires.         */
-/*                                                                           */
-/* Returns:   VOID  :									                     */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	: sig - Signal			                                 */
-/*			  IN	: si  - Signal Info containing the parameters of timer	 */
-/*			  IN	: uc : additional data						 */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: Finds the appropriate timer in the list of timers with the     */
-/*			 transport layer. If the Timer is of Connection Type, then the   */
-/*			 connection must be closed down on this timer's expiry.			 */
-/*			 If it is of Keepalive type, Call into the FSM with Keepalive as */
-/*           input signal                                                    */
-/**PROC-**********************************************************************/
-
-VOID hm_tprt_timer_handler( int sig, siginfo_t *si, void * uc )
-{
-    timer_t *tidp;
-
-    TRACE_ENTRY();
-
-	TRACE_EXIT();
-
-    return;
-} /* hm_tprt_timer_handler */
-#endif
 
 /***************************************************************************/
 /* Stack functions														   */
@@ -503,3 +666,118 @@ int32_t hm_compare_2_ulong(void *key1, void *key2)
 	TRACE_EXIT();
 	return (ret_val);
 }/* hm_compare_ulong */
+
+
+/***************************************************************************/
+/* Name:	hm_aggregate_compare_node_id 								   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t													       */
+/* Purpose: Compares the composite key for node: ID and Node ID			   */
+/* Node IDs are unique currently, so it wouldn't have mattered if we had   */
+/* compared them directly with their Node IDs. But this may not hold in the*/
+/* future and we might need more info. Hence this function.			       */
+/***************************************************************************/
+int32_t hm_aggregate_compare_node_id(void *key1, void *key2)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = -1;
+	HM_NODE_CB *node1 = (HM_NODE_CB *)key1;
+	HM_NODE_CB *node2 = (HM_NODE_CB *)key2;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(node1->index < node2->index)
+	{
+		ret_val = 1;
+	}
+	else if(node1->index == node2->index)
+	{
+		ret_val = 0;
+	}
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_aggregate_compare_node_id */
+
+/***************************************************************************/
+/* Name:	hm_aggregate_compare_pid 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Compares the PID of two Process CBs			*/
+/***************************************************************************/
+int32_t hm_aggregate_compare_pid(void *key1, void *key2)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = -1;
+	HM_PROCESS_CB *node1 = (HM_PROCESS_CB *)key1;
+	HM_PROCESS_CB *node2 = (HM_PROCESS_CB *)key2;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(node1->pid < node2->pid)
+	{
+		ret_val = 1;
+	}
+	else if(node1->pid == node2->pid)
+	{
+		ret_val = 0;
+	}
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_aggregate_compare_pid */
+
+/***************************************************************************/
+/* Name:	hm_aggregate_compare_if_id 									   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t														   */
+/* Purpose: Compares interface types								   	   */
+/***************************************************************************/
+int32_t hm_aggregate_compare_if_id(void *key1, void *key2)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = -1;
+	HM_INTERFACE_CB *node1 = (HM_INTERFACE_CB *)key1;
+	HM_INTERFACE_CB *node2 = (HM_INTERFACE_CB *)key2;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(node1->if_type < node2->if_type)
+	{
+		ret_val = 1;
+	}
+	else if(node1->if_type == node2->if_type)
+	{
+		ret_val = 0;
+	}
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_aggregate_compare_if_id */

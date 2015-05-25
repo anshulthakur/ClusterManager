@@ -13,7 +13,33 @@
 /* Hardware Manager Global Data											   */
 /***************************************************************************/
 
+#ifdef HM_MAIN_DEFINE_VARS
+HM_ATTRIBUTE_MAP attribute_map[] = {
+		{"ms", 								HM_CONFIG_ATTR_RES_MIL_SEC},
+		{"s",								HM_CONFIG_ATTR_RES_SEC},
+		{"node",							HM_CONFIG_ATTR_HB_SCOPE_NODE},
+		{"cluster",							HM_CONFIG_ATTR_HB_SCOPE_CLUSTER},
+		{"tcp",								HM_CONFIG_ATTR_IP_TYPE_TCP},
+		{"udp",								HM_CONFIG_ATTR_IP_TYPE_UDP},
+		{"mcast",							HM_CONFIG_ATTR_IP_TYPE_MCAST},
+		{"local",							HM_CONFIG_ATTR_ADDR_TYPE_LOCAL},
+		{"remote",							HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER},
+		{"group",							HM_CONFIG_ATTR_SUBS_TYPE_GROUP},
+		{"process",							HM_CONFIG_ATTR_SUBS_TYPE_PROC},
+		{"interface",						HM_CONFIG_ATTR_SUBS_TYPE_IF},
+		{"4",								HM_CONFIG_ATTR_IP_VERSION_4},
+		{"6",								HM_CONFIG_ATTR_IP_VERSION_6},
+};
+
+uint32_t size_of_map = (sizeof(attribute_map)/sizeof(attribute_map[0]));
+HM_GLOBAL_DATA global;
+
+#else
+
 extern HM_GLOBAL_DATA global;
+extern HM_ATTRIBUTE_MAP attribute_map[];
+extern uint32_t size_of_map;
+#endif
 
 #define LOCAL global
 
@@ -33,13 +59,91 @@ HM_AVL3_TREE_INFO node_process_tree_by_id = {
 	HM_OFFSETOF(HM_PROCESS_CB, id)	, /* key offset*/
 	HM_OFFSETOF(HM_PROCESS_CB, node)  /* node offset */
 };
+HM_AVL3_TREE_INFO locations_tree_by_hardware_id = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_LOCATION_CB, index)	, /* key offset*/
+	HM_OFFSETOF(HM_LOCATION_CB, hm_id_node)  /* node offset */
+};
+HM_AVL3_TREE_INFO locations_tree_by_db_id = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_LOCATION_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_LOCATION_CB, db_node)  /* node offset */
+};
+HM_AVL3_TREE_INFO nodes_tree_by_db_id = {
+	hm_aggregate_compare_node_id, /* pointer to function*/
+	HM_OFFSETOF(HM_NODE_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_NODE_CB, db_node)  /* node offset */
+};
+HM_AVL3_TREE_INFO nodes_tree_by_node_id = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_NODE_CB, index)	, /* key offset*/
+	HM_OFFSETOF(HM_NODE_CB, index_node)  /* node offset */
+};
+HM_AVL3_TREE_INFO process_tree_by_db_id = {
+	hm_aggregate_compare_pid, /* pointer to function*/
+	HM_OFFSETOF(HM_PROCESS_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_PROCESS_CB, db_node)  /* node offset */
+};
+HM_AVL3_TREE_INFO process_tree_by_pid = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_PROCESS_CB, pid)	, /* key offset*/
+	HM_OFFSETOF(HM_PROCESS_CB, node)  /* node offset */
+};
+HM_AVL3_TREE_INFO interface_tree_by_db_id = {
+	hm_aggregate_compare_if_id, /* pointer to function*/
+	HM_OFFSETOF(HM_PROCESS_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_PROCESS_CB, db_node)  /* node offset */
+};
+HM_AVL3_TREE_INFO interface_tree_by_if_id = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_INTERFACE_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_INTERFACE_CB, db_node)  /* node offset */
+};
 
+/***************************************************************************/
+/* Signal Mask															   */
+/***************************************************************************/
+sigset_t mask;
+/***************************************************************************/
+/* Maximum descriptor value in the binary								   */
+/***************************************************************************/
+int32_t max_fd;
+
+/***************************************************************************/
+/* Global Socket descriptor set											   */
+/***************************************************************************/
+fd_set hm_tprt_conn_set;
+
+/***************************************************************************/
+/* Timers table															   */
+/***************************************************************************/
+HM_AVL3_TREE global_timer_table;
+HM_AVL3_TREE_INFO timer_table_by_handle = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_TIMER_CB, handle), /* key offset*/
+	HM_OFFSETOF(HM_TIMER_CB, node)  /* node offset */
+};
 #else
 
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
+extern HM_AVL3_TREE_INFO locations_tree_by_hardware_id;
+extern HM_AVL3_TREE_INFO locations_tree_by_db_id;
+extern HM_AVL3_TREE_INFO nodes_tree_by_db_id;
+extern HM_AVL3_TREE_INFO nodes_tree_by_node_id;
+extern HM_AVL3_TREE_INFO process_tree_by_pid;
+extern HM_AVL3_TREE_INFO process_tree_by_db_id;
+extern HM_AVL3_TREE_INFO interface_tree_by_db_id;
+extern HM_AVL3_TREE_INFO interface_tree_by_if_id;
 
+
+extern sigset_t mask;
+
+extern int32_t  max_fd;
+extern fd_set hm_tprt_conn_set;
+extern HM_AVL3_TREE global_timer_table;
+extern HM_AVL3_TREE_INFO timer_table_by_handle;
 #endif
 
 #endif /* SRC_HMGLOB_H_ */
