@@ -406,7 +406,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 					/* Push current node to stack. We're now expecting its value node		   */
 					/* So, set the pointer to its config_cb in LOCAL in the opaque data		   */
 					/***************************************************************************/
-					//TODO
+					config_node->opaque = parent_node->opaque;
+
 					ret_val = HM_STACK_PUSH(stack, config_node);
 					if (ret_val == HM_ERR)
 					{
@@ -989,7 +990,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						TRACE_INFO(("Hardware Index: %s", current_node->content));
+						hm_config->instance_info.index = atoi(current_node->content);
+						TRACE_INFO(("Hardware Index: %d", hm_config->instance_info.index));
 					}
 					else if(parent_node->type == HM_CONFIG_NODE_INSTANCE)
 					{

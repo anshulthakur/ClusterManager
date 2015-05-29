@@ -66,13 +66,13 @@ HM_AVL3_TREE_INFO locations_tree_by_hardware_id = {
 };
 HM_AVL3_TREE_INFO locations_tree_by_db_id = {
 	hm_compare_ulong, /* pointer to function*/
-	HM_OFFSETOF(HM_LOCATION_CB, id)	, /* key offset*/
-	HM_OFFSETOF(HM_LOCATION_CB, db_node)  /* node offset */
+	HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, index)	, /* key offset*/
+	HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, node)  /* node offset */
 };
 HM_AVL3_TREE_INFO nodes_tree_by_db_id = {
 	hm_aggregate_compare_node_id, /* pointer to function*/
-	HM_OFFSETOF(HM_NODE_CB, id)	, /* key offset*/
-	HM_OFFSETOF(HM_NODE_CB, db_node)  /* node offset */
+	HM_OFFSETOF(HM_GLOBAL_NODE_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_GLOBAL_NODE_CB, node)  /* node offset */
 };
 HM_AVL3_TREE_INFO nodes_tree_by_node_id = {
 	hm_compare_ulong, /* pointer to function*/
@@ -81,8 +81,8 @@ HM_AVL3_TREE_INFO nodes_tree_by_node_id = {
 };
 HM_AVL3_TREE_INFO process_tree_by_db_id = {
 	hm_aggregate_compare_pid, /* pointer to function*/
-	HM_OFFSETOF(HM_PROCESS_CB, id)	, /* key offset*/
-	HM_OFFSETOF(HM_PROCESS_CB, db_node)  /* node offset */
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /* node offset */
 };
 HM_AVL3_TREE_INFO process_tree_by_pid = {
 	hm_compare_ulong, /* pointer to function*/
@@ -91,15 +91,29 @@ HM_AVL3_TREE_INFO process_tree_by_pid = {
 };
 HM_AVL3_TREE_INFO interface_tree_by_db_id = {
 	hm_aggregate_compare_if_id, /* pointer to function*/
-	HM_OFFSETOF(HM_PROCESS_CB, id)	, /* key offset*/
-	HM_OFFSETOF(HM_PROCESS_CB, db_node)  /* node offset */
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /* node offset */
 };
 HM_AVL3_TREE_INFO interface_tree_by_if_id = {
 	hm_compare_ulong, /* pointer to function*/
-	HM_OFFSETOF(HM_INTERFACE_CB, id)	, /* key offset*/
-	HM_OFFSETOF(HM_INTERFACE_CB, db_node)  /* node offset */
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /* node offset */
 };
-
+HM_AVL3_TREE_INFO subs_tree_by_db_id = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_SUBSCRIPTION_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /* node offset */
+};
+HM_AVL3_TREE_INFO subs_tree_by_subs_type_and_val = {
+	hm_compare_2_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_SUBSCRIPTION_CB, table_type)	, /* key offset*/
+	HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /* node offset */
+};
+HM_AVL3_TREE_INFO subs_tree_by_subs_type = {
+	hm_compare_ulong, /* pointer to function*/
+	HM_OFFSETOF(HM_SUBSCRIPTION_CB, table_type)	, /* key offset*/
+	HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /* node offset */
+};
 /***************************************************************************/
 /* Signal Mask															   */
 /***************************************************************************/
@@ -136,7 +150,9 @@ extern HM_AVL3_TREE_INFO process_tree_by_pid;
 extern HM_AVL3_TREE_INFO process_tree_by_db_id;
 extern HM_AVL3_TREE_INFO interface_tree_by_db_id;
 extern HM_AVL3_TREE_INFO interface_tree_by_if_id;
-
+extern HM_AVL3_TREE_INFO subs_tree_by_db_id;
+extern HM_AVL3_TREE_INFO subs_tree_by_subs_type_and_val;
+extern HM_AVL3_TREE_INFO subs_tree_by_subs_type;
 
 extern sigset_t mask;
 

@@ -124,13 +124,16 @@
 /* Address Type */
 #define HM_CONFIG_ATTR_ADDR_TYPE_LOCAL						((uint32_t) 8)
 #define HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER					((uint32_t) 9)
-/* Subscription types */
-#define HM_CONFIG_ATTR_SUBS_TYPE_GROUP						((uint32_t) 10)
-#define HM_CONFIG_ATTR_SUBS_TYPE_PROC						((uint32_t) 11)
-#define HM_CONFIG_ATTR_SUBS_TYPE_IF							((uint32_t) 12)
 /* IP Versions */
-#define HM_CONFIG_ATTR_IP_VERSION_4							((uint32_t) 13)
-#define HM_CONFIG_ATTR_IP_VERSION_6							((uint32_t) 14)
+#define HM_CONFIG_ATTR_IP_VERSION_4							((uint32_t) 10)
+#define HM_CONFIG_ATTR_IP_VERSION_6							((uint32_t) 11)
+/* Subscription types */
+#define HM_CONFIG_ATTR_SUBS_TYPE_GROUP						((uint32_t) 12)
+#define HM_CONFIG_ATTR_SUBS_TYPE_PROC						((uint32_t) 13)
+#define HM_CONFIG_ATTR_SUBS_TYPE_IF							((uint32_t) 14)
+#define HM_CONFIG_ATTR_SUBS_TYPE_LOCATION					((uint32_t) 15)
+#define HM_CONFIG_ATTR_SUBS_TYPE_NODE						((uint32_t) 16)
+
 
 
 /***************************************************************************/
@@ -151,5 +154,21 @@
 #define HM_DEFAULT_UDP_COMM_PORT							((uint32_t) 0x8001)
 #define HM_DEFAULT_MCAST_COMM_PORT							((uint32_t) 0x8002)
 #define HM_DEFAULT_MCAST_GROUP								((uint32_t) 3)
+
+
+/***************************************************************************/
+/* Table Types															   */
+/***************************************************************************/
+#define HM_TABLE_TYPE_NODES									((uint32_t) 1)
+#define HM_TABLE_TYPE_PROCESS								((uint32_t) 2)
+#define HM_TABLE_TYPE_IF									((uint32_t) 3)
+#define HM_TABLE_TYPE_LOCATION								((uint32_t) 4)
+#define HM_TABLE_TYPE_GROUP									((uint32_t) 5)
+
+/***************************************************************************/
+/* Process Status														   */
+/***************************************************************************/
+#define HM_STATUS_DOWN									((uint32_t) 0)
+#define HM_STATUS_RUNNING									((uint32_t) 1)
 
 #endif /* SRC_HMDEF_H_ */

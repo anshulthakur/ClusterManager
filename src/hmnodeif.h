@@ -18,6 +18,7 @@
 #define HM_MSG_TYPE_REGISTER				((uint32_t) 5) /* Register for Notifications from HM*/
 #define HM_MSG_TYPE_UNREGISTER				((uint32_t) 6) /* UnRegister for Notifications from HM*/
 #define HM_MSG_TYPE_HA_UPDATE				((uint32_t) 7) /* Updates on HA roles */
+#define HM_MSG_TYPE_HA_NOTIFY				((uint32_t) 8) /* Notification Message */
 /***************************************************************************/
 
 /***************************************************************************/

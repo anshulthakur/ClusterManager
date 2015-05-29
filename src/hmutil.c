@@ -1544,3 +1544,47 @@ VOID avl3_verify_tree(HM_AVL3_TREE *tree,
   return;
 
 } /* avl3_verify_tree */
+
+/***************************************************************************/
+/* Name:	hm_avl3_gen_init 											   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	HM_AVL3_GEN_NODE											   */
+/* Purpose: Allocates and sets up a generic AVL3_NODE					   */
+/***************************************************************************/
+HM_AVL3_GEN_NODE * hm_avl3_gen_init(void *key, void *parent)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_AVL3_GEN_NODE *node = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(key != NULL);
+	TRACE_ASSERT(parent != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	node = (HM_AVL3_GEN_NODE *)malloc(sizeof(HM_AVL3_GEN_NODE));
+	if(node == NULL)
+	{
+		TRACE_ERROR(("Error allocating memory for node."));
+		goto EXIT_LABEL;
+	}
+	/***************************************************************************/
+	/* Have memory, fill values												   */
+	/***************************************************************************/
+	HM_AVL3_INIT_NODE(node->tree_node, node);
+	node->key = key;
+	node->parent = parent;
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return node;
+}/* hm_avl3_gen_init */

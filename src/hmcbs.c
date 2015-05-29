@@ -251,15 +251,16 @@ HM_NODE_CB * hm_alloc_node_cb(uint32_t local)
 		goto EXIT_LABEL;
 	}
 	node_cb->id = 0;
+	node_cb->db_ptr = NULL;
+
 	node_cb->index = 0;
+	HM_AVL3_INIT_NODE(node_cb->index_node, node_cb);
+
 	node_cb->group = 0;
 	node_cb->role = NODE_ROLE_PASSIVE;
 	memset(&node_cb->name, '\0', sizeof(node_cb->name));
 	node_cb->transport_cb = NULL;
 	node_cb->parent_location_cb = NULL;
-
-	HM_INIT_ROOT(node_cb->subscribers);
-	HM_INIT_ROOT(node_cb->subscriptions);
 
 	/* We don't need to specify the TREE_INFO right now*/
 	HM_AVL3_INIT_TREE(node_cb->process_tree, NULL);
@@ -269,10 +270,9 @@ HM_NODE_CB * hm_alloc_node_cb(uint32_t local)
 
 	node_cb->fsm_state = HM_NODE_FSM_STATE_NULL;
 
-	node_cb->keepalive_missed = 0;
 	node_cb->keepalive_period = HM_CONFIG_DEFAULT_NODE_TICK_TIME;
-
 	node_cb->timer_cb = NULL;
+	node_cb->keepalive_missed = 0;
 	/***************************************************************************/
 	/* Create a Timer														   */
 	/***************************************************************************/
@@ -358,14 +358,6 @@ int32_t hm_free_node_cb(HM_NODE_CB *node_cb)
 			goto EXIT_LABEL;
 		}
 	}
-	/***************************************************************************/
-	/* Empty the subscriber list											   */
-	/***************************************************************************/
-	//TODO
-	/***************************************************************************/
-	/* Empty the subscription list											   */
-	/***************************************************************************/
-	//TODO
 
 	/***************************************************************************/
 	/* Close any node keepalive timers										   */
@@ -412,3 +404,97 @@ int32_t hm_free_process_cb(HM_PROCESS_CB *proc_cb)
 	TRACE_EXIT();
 	return (ret_val);
 }/* hm_free_process_cb */
+
+
+/***************************************************************************/
+/* Name:	hm_alloc_subscription_cb 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	HM_SUBSCRIPTION_CB *									*/
+/* Purpose: Allocates a subscription CB			*/
+/***************************************************************************/
+HM_SUBSCRIPTION_CB * hm_alloc_subscription_cb()
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_SUBSCRIPTION_CB *subscription = NULL;
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	subscription = (HM_SUBSCRIPTION_CB *)malloc(sizeof(HM_SUBSCRIPTION_CB));
+	 if(subscription== NULL)
+	 {
+		 TRACE_ERROR(("Error creating subscription point."));
+		 goto EXIT_LABEL;
+	 }
+	 /***************************************************************************/
+	 /* Since this variable is accessed only internally, we can increment it    */
+	 /* as only a single thread will always access it.							*/
+	 /* Likewise, it may be decremented on failure.								*/
+	 /* Subscription points may not be removed, (currently) ever.				*/
+	 /***************************************************************************/
+	 subscription->id = 0;
+	 subscription->row_cb.void_cb = NULL;
+	 subscription->row_id = 0;
+	 HM_INIT_ROOT(subscription->subscribers_list);
+	 HM_AVL3_INIT_NODE(subscription->node, subscription);
+	 subscription->table_type = 0;
+	 subscription->value = 0;
+	 subscription->live = FALSE;
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return subscription;
+}/* hm_alloc_subscription_cb */
+
+/***************************************************************************/
+/* Name:	hm_free_subscription_cb 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	void									*/
+/* Purpose: Frees a subscription CB			*/
+/***************************************************************************/
+void hm_free_subscription_cb(HM_SUBSCRIPTION_CB *sub_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(sub_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(HM_AVL3_IN_TREE(sub_cb->node))
+	{
+		if(sub_cb->live)
+		{
+			TRACE_DETAIL(("Delete from active subscriptions tree"));
+			HM_AVL3_DELETE(LOCAL.active_subscriptions_tree, sub_cb->node);
+		}
+		else
+		{
+			TRACE_DETAIL(("Delete from pending subscriptions tree"));
+			HM_AVL3_DELETE(LOCAL.pending_subscriptions_tree, sub_cb->node);
+
+		}
+	}
+	free(sub_cb);
+	sub_cb = NULL;
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+}/* hm_free_subscription_cb */

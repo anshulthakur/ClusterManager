@@ -235,7 +235,7 @@ HM_TIMER_CB * hm_timer_create(uint32_t period,
 
     timer_cb->handle = (uint32_t)*(&timer_cb->timerID);
     TRACE_DETAIL(("Timer handle: %x", timer_cb->handle));
-    TRACE_DETAIL(("Memory: %x", timer_cb->timerID));
+    TRACE_DETAIL(("Memory: %x", (uint32_t)timer_cb->timerID));
     /***************************************************************************/
 	/* Insert the timer into global table									   */
 	/***************************************************************************/
@@ -343,7 +343,6 @@ int32_t hm_timer_stop(HM_TIMER_CB *timer_cb)
 	/***************************************************************************/
 	/* Variable Declarations												   */
 	/***************************************************************************/
-    struct itimerspec its;
 	int32_t ret_val = HM_OK;
 	/***************************************************************************/
 	/* Sanity Checks														   */
@@ -367,6 +366,7 @@ int32_t hm_timer_stop(HM_TIMER_CB *timer_cb)
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return ret_val;
 }/* hm_timer_stop */
 
 /**PROC+**********************************************************************/

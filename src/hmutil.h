@@ -64,7 +64,7 @@ void *avl3_prev(HM_AVL3_NODE *,
 void avl3_verify_tree(HM_AVL3_TREE *,
 				 	 const HM_AVL3_TREE_INFO *);
 
-
+HM_AVL3_GEN_NODE * hm_avl3_gen_init(void *, void *);
 /*****************************************************************************/
 /* AVL3 access macros.                                                       */
 /*****************************************************************************/
@@ -120,6 +120,7 @@ void avl3_verify_tree(HM_AVL3_TREE *,
                        (TARGET_TREE).root = (SRC_TREE).root;                  \
                        HM_AVL3_INIT_TREE((SRC_TREE), (TREE_INFO));
 
+#define HM_AVL3_GEN_INIT(KEY, PARENT)	hm_avl3_gen_init(KEY, PARENT)
 
 /*****************************************************************************/
 /* List Management                                                           */

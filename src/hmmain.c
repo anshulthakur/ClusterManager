@@ -151,7 +151,7 @@ EXIT_LABEL:
 
 /***************************************************************************/
 /* Name:	hm_init_local 									*/
-/* Parameters: Input - 	config_cb: Configuration structure read									*/
+/* Parameters: Input - 	config_cb: Configuration structure read			   */
 /*																		   */
 /* Return:	int32_t														   */
 /* Purpose: Initializes local data strcuture which houses all Global Data  */
@@ -165,6 +165,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	HM_CONFIG_NODE_CB *node_config_cb = NULL;
 	HM_NODE_CB *node_cb = NULL;
 	SOCKADDR_IN *sock_addr = NULL;
+	HM_CONFIG_SUBSCRIPTION_CB *subs = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -180,8 +181,10 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	/***************************************************************************/
 	/* Timer table */
 	HM_AVL3_INIT_TREE(global_timer_table, timer_table_by_handle);
+
 	/* Aggregate Nodes Tree	*/
 	HM_AVL3_INIT_TREE(LOCAL.locations_tree, locations_tree_by_hardware_id);
+	LOCAL.next_loc_tree_id = 1;
 
 	/* Aggregate Process Tree */
 	HM_AVL3_INIT_TREE(LOCAL.nodes_tree, nodes_tree_by_db_id);
@@ -205,13 +208,29 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	/* Notifications Queue */
 	HM_INIT_ROOT(LOCAL.notification_queue);
 
+	/* Wildcard Queue */
+	HM_INIT_ROOT(LOCAL.table_root_subscribers);
+
 	/***************************************************************************/
 	/* Fill in Local Location CB information								   */
 	/***************************************************************************/
 	LOCAL.local_location_cb.id = config_cb->instance_info.index;
+	LOCAL.local_location_cb.index = config_cb->instance_info.index;
+
+	TRACE_DETAIL(("Hardware Index: %d", LOCAL.local_location_cb.index));
+
 	LOCAL.transport_bitmask = 0;
 
 	LOCAL.local_location_cb.timer_cb = NULL;
+	LOCAL.node_keepalive_period = config_cb->instance_info.node.timer_val;
+	TRACE_INFO(("Node Keepalive Period: %d(ms)",LOCAL.node_keepalive_period));
+	LOCAL.node_kickout_value = config_cb->instance_info.node.threshold;
+	TRACE_INFO(("Node Keepalive Threshold: %d",LOCAL.node_kickout_value));
+
+	LOCAL.peer_keepalive_period = config_cb->instance_info.node.timer_val;
+	TRACE_INFO(("Peer Keepalive Period: %d(ms)",LOCAL.peer_keepalive_period));
+	LOCAL.peer_kickout_value = config_cb->instance_info.node.threshold;
+	TRACE_INFO(("Peer Keepalive Threshold: %d",LOCAL.peer_kickout_value));
 
 	/* TCP Info */
 	if(config_cb->instance_info.tcp != NULL)
@@ -310,6 +329,18 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	LOCAL.config_data = config_cb;
 
 	/***************************************************************************/
+	/* Add the location to global locations tree							   */
+	/***************************************************************************/
+	if(hm_global_location_add(&LOCAL.local_location_cb, HM_STATUS_RUNNING)!= HM_OK)
+	{
+		TRACE_ERROR(("Error initializing local location"));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+
+	TRACE_DETAIL(("ID returned: %d", LOCAL.local_location_cb.id));
+
+	/***************************************************************************/
 	/* Initialize the Node tree and fill it up								   */
 	/***************************************************************************/
 	HM_AVL3_INIT_TREE(LOCAL.nodes_tree, NULL);
@@ -323,8 +354,30 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 			/* Initialize a node (and it must also make entries to alter subscriptions)*/
 			/***************************************************************************/
 			TRACE_DETAIL(("Found node %s", node_config_cb->node_cb->name));
-			//TODO
-			//Add Node to tree
+			/***************************************************************************/
+			/* Add node to system													   */
+			/***************************************************************************/
+			if(hm_node_add(node_config_cb->node_cb, &LOCAL.local_location_cb) != HM_OK)
+			{
+				TRACE_ERROR(("Error adding node to system."));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+			/***************************************************************************/
+			/* Subscribe to its dependency list.									   */
+			/***************************************************************************/
+			TRACE_DETAIL(("Making subscriptions."));
+			for(subs = (HM_CONFIG_SUBSCRIPTION_CB *)HM_NEXT_IN_LIST(node_config_cb->subscriptions);
+				subs != NULL;
+				subs = (HM_CONFIG_SUBSCRIPTION_CB *)HM_NEXT_IN_LIST(subs->node))
+			{
+				if(hm_subscribe(subs->subs_type, subs->value, (void *)node_config_cb->node_cb) != HM_OK)
+				{
+					TRACE_ERROR(("Error creating subscriptions."));
+					ret_val = HM_ERR;
+					goto EXIT_LABEL;
+				}
+			}
 		}
 	}
 
@@ -332,6 +385,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	LOCAL.local_location_cb.keepalive_missed = 0;
 	LOCAL.local_location_cb.keepalive_period = LOCAL.peer_keepalive_period;
 
+EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -363,6 +417,10 @@ int32_t hm_init_transport()
 	TRACE_ENTRY();
 	/***************************************************************************/
 	/* Main Routine															   */
+	/* Allocate resources and pre-provision operations like binding and listen */
+	/* on designated sockets.												   */
+	/* Connection requests will be queued until we start polling. So, should   */
+	/* not be a problem.													   */
 	/***************************************************************************/
 	/***************************************************************************/
 	/* On writing to dead Sockets, do not panic.                               */
@@ -375,6 +433,9 @@ int32_t hm_init_transport()
 	/***************************************************************************/
 	FD_ZERO(&hm_tprt_conn_set);
 
+	/***************************************************************************/
+	/* TCP Connection Setup													   */
+	/***************************************************************************/
 	TRACE_DETAIL(("Check for TCP: %d",(1 & LOCAL.transport_bitmask >> HM_TRANSPORT_TCP_LISTEN)));
 	if((1 & LOCAL.transport_bitmask >> HM_TRANSPORT_TCP_LISTEN)== TRUE)
 	{
@@ -401,6 +462,9 @@ int32_t hm_init_transport()
 		LOCAL.local_location_cb.node_listen_cb = tprt_cb;
 	}
 
+	/***************************************************************************/
+	/* UDP Connection Setup													   */
+	/***************************************************************************/
 	TRACE_DETAIL(("Check for UDP: %d",(1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_UDP))));
 	if((1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_UDP))== TRUE)
 	{
@@ -426,6 +490,9 @@ int32_t hm_init_transport()
 		tprt_cb->sock_cb->tprt_cb = tprt_cb;
 	}
 
+	/***************************************************************************/
+	/* Multicast Connection Setup											   */
+	/***************************************************************************/
 	TRACE_DETAIL(("Check for Mcast: %d",(1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_MCAST))));
 	if((1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_MCAST))== TRUE)
 	{

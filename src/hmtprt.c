@@ -110,8 +110,7 @@ EXIT_LABEL:
 /* Operation: 											                     */
 /*                                                                           */
 /**PROC-**********************************************************************/
-HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type,
-								void * params )
+HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 {
 	/***************************************************************************/
 	/* Descriptor of the socket created. Default value denotes error condition */
