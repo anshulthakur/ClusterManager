@@ -487,7 +487,12 @@ VOID *avl3_find(HM_AVL3_TREE *tree,
                   tree_info->node_offset));
 
   node = tree->root;
-
+#ifdef I_WANT_TO_DEBUG
+  if(node== NULL)
+  {
+	  TRACE_DETAIL(("Tree is empty!"));
+  }
+#endif
   while (node != NULL)
   {
     /*************************************************************************/
@@ -846,6 +851,7 @@ VOID avl3_balance_tree(HM_AVL3_TREE *tree,
     /*************************************************************************/
     TRACE_INFO(("rebalance root node" ));
     avl3_rebalance(&tree->root);
+    TRACE_ASSERT(tree->root != NULL);
   }
 
   TRACE_EXIT();
@@ -1048,6 +1054,8 @@ VOID avl3_rotate_left(HM_AVL3_NODE **subtree)
                      (1 + MAX((*subtree)->right_height, (*subtree)->left_height));
 
   *subtree = right_son;
+
+  TRACE_ASSERT(*subtree != NULL);
 
   TRACE_EXIT();
 

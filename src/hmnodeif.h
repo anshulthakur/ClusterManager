@@ -38,6 +38,14 @@
 #define HM_HA_NODE_ROLE_ACTIVE				((uint32_t) 1) /* Node must become active */
 #define HM_HA_NODE_ROLE_PASSIVE				((uint32_t) 2) /* Node must become passive */
 /***************************************************************************/
+
+/***************************************************************************/
+/* Address Types														   */
+/***************************************************************************/
+#define HM_NOTIFY_ADDR_TYPE_TCP_v4			((uint32_t) 1)
+#define HM_NOTIFY_ADDR_TYPE_TCP_v6			((uint32_t) 2)
+
+
 /**STRUCT+********************************************************************/
 /* Structure: HM_MSG_HEADER													 */
 /*                                                                           */

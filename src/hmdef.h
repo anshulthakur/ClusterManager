@@ -65,12 +65,33 @@
 /* Group HM Node FSM States												   */
 /***************************************************************************/
 #define HM_NODE_FSM_STATE_NULL								((uint16_t) 0)
-#define HM_NODE_FSM_STATE_STARTING							((uint16_t) 1)
-#define HM_NODE_FSM_STATE_WAITING							((uint16_t) 2)
-#define HM_NODE_FSM_STATE_INIT								((uint16_t) 3)
-#define HM_NODE_FSM_STATE_ACTIVE							((uint16_t) 4)
-#define HM_NODE_FSM_STATE_FAILED							((uint16_t) 5)
+#define HM_NODE_FSM_STATE_WAITING							((uint16_t) 1)
+#define HM_NODE_FSM_STATE_ACTIVE							((uint16_t) 2)
+#define HM_NODE_FSM_STATE_FAILING							((uint16_t) 3)
+#define HM_NODE_FSM_STATE_FAILED							((uint16_t) 4)
 
+/***************************************************************************/
+/* Number of Node FSM States											   */
+/***************************************************************************/
+#define HM_NODE_FSM_NUM_STATES								((uint32_t) 5)
+
+/***************************************************************************/
+/* Node FSM Signals														   */
+/***************************************************************************/
+#define HM_NODE_FSM_CREATE									((uint32_t) 0)
+#define HM_NODE_FSM_INIT									((uint32_t) 1)
+#define HM_NODE_FSM_DATA									((uint32_t) 2)
+#define HM_NODE_FSM_TERM									((uint32_t) 3)
+#define HM_NODE_FSM_CLOSE									((uint32_t) 4)
+#define HM_NODE_FSM_TIMER_POP								((uint32_t) 5)
+#define HM_NODE_FSM_TIMEOUT									((uint32_t) 6)
+#define HM_NODE_FSM_FAILED									((uint32_t) 7)
+#define HM_NODE_FSM_ACTIVE									((uint32_t) 8)
+#define HM_NODE_FSM_NULL										0xFF
+/***************************************************************************/
+/* Number of Node FSM Signals											   */
+/***************************************************************************/
+#define HM_NODE_FSM_NUM_SIGNALS								((uint32_t) 9)
 
 /***************************************************************************/
 /* Group HM Peer FSM States												   */
@@ -81,6 +102,40 @@
 #define HM_PEER_FSM_STATE_ACTIVE							((uint16_t) 3)
 #define HM_PEER_FSM_STATE_FAILED							((uint16_t) 4)
 
+
+
+/***************************************************************************/
+/* FSM Paths															   */
+/***************************************************************************/
+#define ACT_NO   0
+#define FSM_ERR   0xFF
+
+#define ACT_A    1
+#define ACT_B    2
+#define ACT_C    3
+#define ACT_D    4
+#define ACT_E    5
+#define ACT_F    6
+#define ACT_G    7
+#define ACT_H    8
+#define ACT_I    9
+#define ACT_J    10
+#define ACT_K    11
+#define ACT_L    12
+#define ACT_M    13
+#define ACT_N    14
+#define ACT_O    15
+#define ACT_P    16
+#define ACT_Q    17
+#define ACT_R    18
+#define ACT_S    19
+#define ACT_T    20
+#define ACT_U    21
+#define ACT_V    22
+#define ACT_W    23
+#define ACT_X    24
+#define ACT_Y    25
+#define ACT_Z    26
 
 /***************************************************************************/
 /* Parsing utility 														   */
@@ -164,6 +219,13 @@
 #define HM_TABLE_TYPE_IF									((uint32_t) 3)
 #define HM_TABLE_TYPE_LOCATION								((uint32_t) 4)
 #define HM_TABLE_TYPE_GROUP									((uint32_t) 5)
+
+#define HM_TABLE_TYPE_NODES_LOCAL							((uint32_t) 6)
+#define HM_TABLE_TYPE_PROCESS_LOCAL							((uint32_t) 7)
+#define HM_TABLE_TYPE_IF_LOCAL								((uint32_t) 8)
+#define HM_TABLE_TYPE_LOCATION_LOCAL						((uint32_t) 9)
+
+
 
 /***************************************************************************/
 /* Process Status														   */

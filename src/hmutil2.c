@@ -19,7 +19,7 @@
 /* Return:	int32_t									*/
 /* Purpose: Sets the given time in ms on timer			*/
 /***************************************************************************/
-static int32_t hm_timer_set_timer(timer_t *timerID, int32_t period)
+static int32_t hm_timer_set_timer(timer_t timerID, int32_t period, int32_t repeat)
 {
 	int32_t rc = HM_OK;
     struct itimerspec its;
@@ -47,24 +47,23 @@ static int32_t hm_timer_set_timer(timer_t *timerID, int32_t period)
 
     TRACE_DETAIL(("Timer Interval Sec = %lu",(unsigned long )its.it_interval.tv_sec));
     TRACE_DETAIL(("Timer Interval nS = %lu", (unsigned long )its.it_interval.tv_nsec));
-
-#if 0
-    if(timer_cb->period/1000 == 0)
+    if(!repeat)
     {
-    	its.it_value.tv_sec = (time_t )0;
-    	its.it_value.tv_nsec =(long int ) (timer_cb->period * 1000000);
-
-    }
-    else if(expireMS/1000 > 0)
-    {
-    	its.it_value.tv_sec = (time_t )(expireMS/1000);
-    	its.it_value.tv_nsec = (long int )((expireMS%1000) * 1000000);
+    	TRACE_DETAIL(("Non repeating timer"));
+    	period = 0;
     }
 
-    printf("\nTimer Value Seconds = %lu\nTimer Value nS = %lu",
-    				(unsigned long )its.it_value.tv_sec,
-    				(unsigned long )its.it_value.tv_nsec);
-#endif
+	if(period/1000 == 0)
+	{
+		its.it_value.tv_sec = (time_t )0;
+		its.it_value.tv_nsec =(long int ) (period * 1000000);
+
+	}
+	else if(period/1000 > 0)
+	{
+		its.it_value.tv_sec = (time_t )(period/1000);
+		its.it_value.tv_nsec = (long int )((period%1000) * 1000000);
+	}
 
     if((timer_settime(timerID, 0, &its, NULL))!=0)
     {
@@ -116,8 +115,13 @@ VOID hm_base_timer_handler(int32_t sig, siginfo_t *si, void *uc )
 
 	/* Find the Node in global timer table using  '*tidp' value stored in tidp */
 	/* and invoke its callback.												   */
+	TRACE_DETAIL(("Timer value: 0x%x", *(uint32_t *)tidp));
+	if(global_timer_table.root == NULL)
+	{
+		TRACE_INFO(("Empty tree!"));
+	}
 	timer_cb = (HM_TIMER_CB *)HM_AVL3_FIND(global_timer_table,
-										&tidp,timer_table_by_handle);
+										tidp, timer_table_by_handle);
 	TRACE_ASSERT(timer_cb != NULL);
 	if(timer_cb ==NULL)
 	{
@@ -126,7 +130,7 @@ VOID hm_base_timer_handler(int32_t sig, siginfo_t *si, void *uc )
 		goto EXIT_LABEL;
 	}
 	TRACE_DETAIL(("Found CB. Invoke callback"));
-	timer_cb->callback((void *)timer_cb);
+	timer_cb->callback((void *)timer_cb->parent);
 
 	/***************************************************************************/
 	/* TODO: Do we need to re-arm the timer or will it keep repeating?		   */
@@ -163,10 +167,8 @@ HM_TIMER_CB * hm_timer_create(uint32_t period,
 	/***************************************************************************/
 	HM_TIMER_CB *timer_cb = NULL;
     struct sigevent         te;
-
-    struct sigaction        sa;
-    extern sigset_t mask;
     int32_t  sigNo = SIGRTMIN;
+
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -196,20 +198,8 @@ HM_TIMER_CB * hm_timer_create(uint32_t period,
 	timer_cb->running = FALSE;
 	timer_cb->period = period;
 
-    /* Set up signal handler. */
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = hm_base_timer_handler;
-
-    sigemptyset(&sa.sa_mask);
-    if (sigaction(sigNo, &sa, NULL) == -1)
-    {
-        TRACE_ERROR(("Failed to setup signal handling for timer"));
-        free(timer_cb);
-        timer_cb = NULL;
-        goto EXIT_LABEL;
-    }
-
     /* Block timer signal temporarily */
+
     TRACE_DETAIL(("Blocking signal %d", sigNo));
     sigemptyset(&mask);
     sigaddset(&mask, sigNo);
@@ -220,7 +210,6 @@ HM_TIMER_CB * hm_timer_create(uint32_t period,
         timer_cb = NULL;
         goto EXIT_LABEL;
 	}
-
     /* Set and enable alarm */
     te.sigev_notify = SIGEV_SIGNAL;
     te.sigev_signo = sigNo;
@@ -281,7 +270,7 @@ int32_t hm_timer_start(HM_TIMER_CB *timer_cb)
 	TRACE_ENTRY();
 	TRACE_ASSERT(timer_cb != NULL);
 
-	if(hm_timer_set_timer(&timer_cb->timerID, timer_cb->period)!= HM_OK)
+	if(hm_timer_set_timer(timer_cb->timerID, timer_cb->period, timer_cb->repeat)!= HM_OK)
 	{
 		TRACE_ERROR(("Error occurred while starting timer"));
 		ret_val = HM_ERR;
@@ -320,7 +309,7 @@ int32_t hm_timer_modify(HM_TIMER_CB *timer_cb, uint32_t period)
 	timer_cb->period = period;
 	if(timer_cb->running)
 	{
-		if(hm_timer_set_timer(&timer_cb->timerID, period)!= HM_OK)
+		if(hm_timer_set_timer(timer_cb->timerID, period, timer_cb->repeat)!= HM_OK)
 		{
 			TRACE_ERROR(("Error occurred while modifying timer"));
 			ret_val = HM_ERR;
@@ -355,7 +344,7 @@ int32_t hm_timer_stop(HM_TIMER_CB *timer_cb)
 	/***************************************************************************/
 	if(timer_cb->running)
 	{
-		if(hm_timer_set_timer(&timer_cb->timerID, 0)!= HM_OK)
+		if(hm_timer_set_timer(timer_cb->timerID, 0, FALSE)!= HM_OK)
 		{
 			TRACE_ERROR(("Error occurred while stopping timer"));
 			ret_val = HM_ERR;
@@ -403,7 +392,6 @@ VOID hm_timer_delete(HM_TIMER_CB *timer_cb)
 	TRACE_EXIT();
 	return ;
 }/* hm_timer_delete */
-
 
 /***************************************************************************/
 /* Stack functions														   */
@@ -598,10 +586,13 @@ int32_t hm_compare_ulong(void *key1, void *key2)
 
 	TRACE_ASSERT(aa != NULL);
 	TRACE_ASSERT(bb != NULL);
+
+	TRACE_DETAIL(("First: 0x%x", *aa));
+	TRACE_DETAIL(("Second: 0x%x", *bb));
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	if(*aa<*bb)
+	if(*aa>*bb)
 	{
 		ret_val = 1;
 	}
@@ -645,13 +636,13 @@ int32_t hm_compare_2_ulong(void *key1, void *key2)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	if(*a1<*b1)
+	if(*a1>*b1)
 	{
 		ret_val = 1;
 	}
 	else if(*a1==*b1)
 	{
-		if(*a2 < *b2)
+		if(*a2 > *b2)
 		{
 			ret_val = 1;
 		}
@@ -693,7 +684,7 @@ int32_t hm_aggregate_compare_node_id(void *key1, void *key2)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	if(node1->index < node2->index)
+	if(node1->index > node2->index)
 	{
 		ret_val = 1;
 	}
@@ -730,7 +721,7 @@ int32_t hm_aggregate_compare_pid(void *key1, void *key2)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	if(node1->pid < node2->pid)
+	if(node1->pid > node2->pid)
 	{
 		ret_val = 1;
 	}
@@ -767,7 +758,7 @@ int32_t hm_aggregate_compare_if_id(void *key1, void *key2)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	if(node1->if_type < node2->if_type)
+	if(node1->if_type > node2->if_type)
 	{
 		ret_val = 1;
 	}
@@ -781,3 +772,82 @@ int32_t hm_aggregate_compare_if_id(void *key1, void *key2)
 	TRACE_EXIT();
 	return ret_val;
 }/* hm_aggregate_compare_if_id */
+
+
+/***************************************************************************/
+/* Name:	hm_get_buffer 												   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	HM_MSG *													   */
+/* Purpose: Allocates and initializes a buffer to be used for IPS Comm.	   */
+/***************************************************************************/
+HM_MSG * hm_get_buffer(uint32_t size)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_MSG *msg = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(size>0);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	msg = (HM_MSG *)malloc(sizeof(HM_MSG) + size);
+	if(msg == NULL)
+	{
+		TRACE_ERROR(("Error allocating buffers for notification."));
+		goto EXIT_LABEL;
+	}
+	msg->msg = (char *)msg + sizeof(HM_MSG);
+
+	msg->msg_len = size;
+
+	HM_INIT_LQE(msg->node, msg);
+	/***************************************************************************/
+	/* Since it is allocated, at least one person is referencing it.		   */
+	/***************************************************************************/
+	msg->ref_count = 1;
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return msg;
+}/* hm_get_buffer */
+
+/***************************************************************************/
+/* Name:	hm_free_buffer 												   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t														   */
+/* Purpose: Frees the buffer or decrements its reference count if in use   */
+/***************************************************************************/
+int32_t hm_free_buffer(HM_MSG *msg)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(msg != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(--msg->ref_count == 0)
+	{
+		TRACE_DETAIL(("Freeing Buffer"));
+		free(msg);
+	}
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_free_buffer */

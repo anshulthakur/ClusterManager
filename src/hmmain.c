@@ -51,6 +51,19 @@ int32_t main(int32_t argc, char **argv)
         ret_val = HM_ERR;
         goto EXIT_LABEL;
     }
+    /***************************************************************************/
+	/* Setup signal handler for timers										   */
+	/***************************************************************************/
+    sa.sa_sigaction = hm_base_timer_handler;
+    sigemptyset(&sa.sa_mask);
+	if (sigaction(SIGRTMIN, &sa, NULL) == -1)
+	{
+		TRACE_ERROR(("Failed to setup signal handling for timers"));
+		goto EXIT_LABEL;
+	}
+
+	/* Timer table */
+	HM_AVL3_INIT_TREE(global_timer_table, timer_table_by_handle);
 
 	/***************************************************************************/
 	/* Initialize Logging													   */
@@ -130,6 +143,7 @@ int32_t main(int32_t argc, char **argv)
 
 	/***************************************************************************/
 	/* Start Hardware Location Layer										   */
+	/* Cluster Layer: Discovery and other routines							   */
 	/***************************************************************************/
 	ret_val = hm_init_location_layer();
 	if(ret_val != HM_OK)
@@ -139,6 +153,10 @@ int32_t main(int32_t argc, char **argv)
 		goto EXIT_LABEL;
 	}
 
+	/***************************************************************************/
+	/* Start Eternal Select Loop											   */
+	/***************************************************************************/
+	hm_run_main_thread();
 
 EXIT_LABEL:
 	/***************************************************************************/
@@ -163,7 +181,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	/***************************************************************************/
 	int32_t ret_val = HM_OK;
 	HM_CONFIG_NODE_CB *node_config_cb = NULL;
-	HM_NODE_CB *node_cb = NULL;
+
 	SOCKADDR_IN *sock_addr = NULL;
 	HM_CONFIG_SUBSCRIPTION_CB *subs = NULL;
 	/***************************************************************************/
@@ -179,9 +197,6 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	/***************************************************************************/
 	/* Initialize Trees														   */
 	/***************************************************************************/
-	/* Timer table */
-	HM_AVL3_INIT_TREE(global_timer_table, timer_table_by_handle);
-
 	/* Aggregate Nodes Tree	*/
 	HM_AVL3_INIT_TREE(LOCAL.locations_tree, locations_tree_by_hardware_id);
 	LOCAL.next_loc_tree_id = 1;
@@ -212,10 +227,16 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	HM_INIT_ROOT(LOCAL.table_root_subscribers);
 
 	/***************************************************************************/
+	/* Initialize the connection list										   */
+	/***************************************************************************/
+	HM_INIT_ROOT(LOCAL.conn_list);
+
+	/***************************************************************************/
 	/* Fill in Local Location CB information								   */
 	/***************************************************************************/
 	LOCAL.local_location_cb.id = config_cb->instance_info.index;
 	LOCAL.local_location_cb.index = config_cb->instance_info.index;
+	LOCAL.local_location_cb.table_type = HM_TABLE_TYPE_LOCATION_LOCAL;
 
 	TRACE_DETAIL(("Hardware Index: %d", LOCAL.local_location_cb.index));
 
@@ -385,6 +406,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	LOCAL.local_location_cb.keepalive_missed = 0;
 	LOCAL.local_location_cb.keepalive_period = LOCAL.peer_keepalive_period;
 
+	TRACE_ASSERT(global_timer_table.root != NULL);
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
@@ -532,6 +554,327 @@ EXIT_LABEL:
 	TRACE_EXIT();
 	return ret_val;
 }/* hm_init_transport */
+
+/***************************************************************************/
+/* Name:	hm_run_main_thread 											   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	void														   */
+/* Purpose: The main select loop of this program that monitors incoming    */
+/* requests and/or schedules the rest of things.						   */
+/***************************************************************************/
+void hm_run_main_thread()
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t nready; //Number of ready descriptors
+
+	HM_SOCKET_CB *sock_cb;
+	extern fd_set hm_tprt_conn_set;
+	extern int32_t max_fd;
+	struct timeval select_timeout;
+
+	fd_set read_set;
+
+	HM_MSG *buf = NULL;
+
+	HM_NODE_INIT_MSG *init_msg = NULL;
+	int32_t bytes_rcvd = HM_ERR;
+
+	HM_SUBSCRIBER node_cb;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Start Endless loop to process incoming data							   */
+	/***************************************************************************/
+	while(1)
+	{
+		/*start loop to check for incoming events till kingdom come! 			   */
+		/***************************************************************************/
+		/* Check if the signal has been blocked. If it has been, proceed with      */
+		/* select. Else, block it and unblock at the end of while. This is done to */
+		/* ensure that there are no concurrency problems arising from the          */
+		/* interrupt routines changing the values of variables being accessed by   */
+		/* ongoing routine/callback.											   */
+		/***************************************************************************/
+		select_timeout.tv_sec = 0;
+		select_timeout.tv_usec = /*300000*/0;
+
+		read_set = hm_tprt_conn_set;
+		/***************************************************************************/
+		/* Block the signal without seeing what was in previously.   			   */
+		/***************************************************************************/
+	    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+	    {
+			TRACE_PERROR(("Error blocking signals before querying descriptors."));
+	    }
+
+		/***************************************************************************/
+		/* Check for listen/read events											   */
+		/***************************************************************************/
+		nready = select(max_fd+1, &read_set, NULL, NULL, &select_timeout);
+		if(nready == 0)
+		{
+			/***************************************************************************/
+			/* No descriptors are ready												   */
+			/***************************************************************************/
+			continue;
+		}
+		else if(nready == -1)
+		{
+			TRACE_PERROR(("Error Occurred on select() call."));
+			continue;
+		}
+
+		/***************************************************************************/
+		/* Check for incoming connections										   */
+		/***************************************************************************/
+		if(FD_ISSET(LOCAL.local_location_cb.node_listen_cb->sock_cb->sock_fd, &read_set))
+		{
+			/***************************************************************************/
+			/* Accept the connection only if we have not exceeded top-load benchmark   */
+			/***************************************************************************/
+			TRACE_INFO(("Listen Port has requests."));
+
+			sock_cb = hm_tprt_accept_connection(
+								LOCAL.local_location_cb.node_listen_cb->sock_cb->sock_fd);
+			if(sock_cb == NULL)
+			{
+				TRACE_ERROR(("Error accepting connection request."));
+				goto EXIT_LABEL;
+			}
+			/***************************************************************************/
+			/* If select returned 1, and it was a listen socket, it makes sense to poll*/
+			/* again by breaking out and use select again.							   */
+			/***************************************************************************/
+			if(--nready <=0)
+			{
+				TRACE_DETAIL(("No more incoming requests."));
+				continue;
+			}
+		}//end select on listenfd
+		/***************************************************************************/
+		/* If Cluster port is also listen type TCP, then accept connection on it   */
+		/* NOTE: We must abstract this entire thing from the upper layers. They    */
+		/* don't need to know whether it is TCP or UDP or anything, they just need */
+		/* to know that they have a request and their level of PDU.				   */
+		/***************************************************************************/
+		if((LOCAL.local_location_cb.peer_listen_cb->type == HM_TRANSPORT_TCP_LISTEN)||
+				(LOCAL.local_location_cb.peer_listen_cb->type == HM_TRANSPORT_TCP_IPv6_LISTEN))
+		{
+			/***************************************************************************/
+			/* Accept the connection only if we have not exceeded top-load benchmark   */
+			/***************************************************************************/
+			TRACE_INFO(("Cluster Port has requests."));
+			sock_cb = hm_tprt_accept_connection(
+								LOCAL.local_location_cb.peer_listen_cb->sock_cb->sock_fd);
+			if(sock_cb == NULL)
+			{
+				TRACE_ERROR(("Error accepting connection request."));
+				goto EXIT_LABEL;
+			}
+			/***************************************************************************/
+			/* If select returned 1, and it was a listen socket, it makes sense to poll*/
+			/* again by breaking out and use select again.							   */
+			/***************************************************************************/
+			if(--nready <=0)
+			{
+				TRACE_DETAIL(("No more incoming requests."));
+				continue;
+			}
+		}
+		/***************************************************************************/
+		/* There are more read events waiting to be processed.					   */
+		/***************************************************************************/
+		for(sock_cb = (HM_SOCKET_CB *)HM_NEXT_IN_LIST(LOCAL.conn_list);
+				sock_cb != NULL;
+				sock_cb = HM_NEXT_IN_LIST(sock_cb->node))
+		{
+			if(FD_ISSET(sock_cb->sock_fd, &read_set))
+			{
+				/***************************************************************************/
+				/* The connection is valid and read event has occured here.			       */
+				/***************************************************************************/
+				TRACE_DETAIL(("FD %d has data",sock_cb->sock_fd));
+
+				/***************************************************************************/
+				/* If its parent transport CB has been set, then we can pass the message   */
+				/* notification to the upper layer. If not, then we are expecting an INIT  */
+				/* message.																   */
+				/***************************************************************************/
+				if(sock_cb->tprt_cb == NULL)
+				{
+					TRACE_DETAIL(("Socket is currently not associated with any Node."));
+					/***************************************************************************/
+					/* We'll need to receive the message into a random buffer which must be as */
+					/* large as at least the INIT message.									   */
+					/***************************************************************************/
+					buf = hm_get_buffer(sizeof(HM_NODE_INIT_MSG));
+					TRACE_ASSERT(buf != NULL);
+					if(buf == NULL)
+					{
+						TRACE_ERROR(("Error allocating buffer for incoming message."));
+						goto EXIT_LABEL;
+					}
+					/***************************************************************************/
+					/* First, receive the message header and verify that it is an INIT message */
+					/***************************************************************************/
+					if((bytes_rcvd = hm_tprt_recv_on_socket(	sock_cb->sock_fd,
+												HM_TRANSPORT_TCP_IN,
+												buf->msg,
+												sizeof(HM_MSG_HEADER)
+												))== HM_ERR)
+					{
+						TRACE_ERROR(("Error receiving message on socket."));
+						TRACE_ASSERT(FALSE);
+						//It is an error, but we'll still run (in release mode)
+						//FIXME
+						break;
+					}
+					if(bytes_rcvd >= sizeof(HM_MSG_HEADER))
+					{
+						init_msg = (HM_NODE_INIT_MSG *)buf->msg;
+						if((init_msg->hdr.msg_type != HM_MSG_TYPE_INIT) || (init_msg->hdr.request != TRUE))
+						{
+							TRACE_WARN(("Message type is not INIT request. Ignore."));
+							/***************************************************************************/
+							/* Receive the rest of the message and discard the buffer.				   */
+							/***************************************************************************/
+							if((bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+																	HM_TRANSPORT_TCP_IN,
+																	(BYTE *)buf->msg + bytes_rcvd,
+																	sizeof(HM_NODE_INIT_MSG)
+																	- sizeof(HM_MSG_HEADER)
+																	))== HM_ERR)
+							{
+								TRACE_ERROR(("Error receiving rest of data"));
+								TRACE_ASSERT(FALSE);
+								//TODO: Error handling? Exit or continue?
+							}
+							hm_free_buffer(buf);
+						}
+						else
+						{
+							/***************************************************************************/
+							/* It is an INIT request. Read the rest of the message and associate with  */
+							/* a node.																   */
+							/***************************************************************************/
+							TRACE_INFO(("INIT request received. Associate with a Node"));
+							if((bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+																		HM_TRANSPORT_TCP_IN,
+																		(BYTE *)buf->msg + bytes_rcvd,
+																		sizeof(HM_NODE_INIT_MSG)
+																		- sizeof(HM_MSG_HEADER)
+																		))== HM_ERR)
+							{
+								TRACE_ERROR(("Error receiving rest of data"));
+								TRACE_ASSERT(FALSE);
+								//TODO: Error handling? Exit or continue?
+							}
+							TRACE_INFO(("INIT Request from Node Index: %d, Group %d",
+													init_msg->index, init_msg->service_group_index));
+							/***************************************************************************/
+							/* Find a node with this index and group in current table				   */
+							/* NOTE: Since indexes are currently guaranteed to be unique, the lookup is*/
+							/* based on node index only, and group number checking is then done here   */
+							/* itself.																   */
+							/***************************************************************************/
+							//TODO
+							node_cb.proper_node_cb = (HM_NODE_CB *)HM_AVL3_FIND(
+															LOCAL.local_location_cb.node_tree,
+															&init_msg->index,
+															nodes_tree_by_node_id
+															);
+							if(node_cb.proper_node_cb == NULL)
+							{
+								TRACE_ERROR(("No such node found in Local CB"));
+								hm_free_buffer(buf);
+								/***************************************************************************/
+								/* Continue receiving on other sockets if any							   */
+								/***************************************************************************/
+								continue;
+							}
+							if(node_cb.proper_node_cb->group != init_msg->service_group_index)
+							{
+								TRACE_ERROR(("The Group index %d of node in system does not match with reported",
+										node_cb.proper_node_cb->group));
+								hm_free_buffer(buf);
+								/***************************************************************************/
+								/* Continue receiving on other sockets if any							   */
+								/***************************************************************************/
+								continue;
+							}
+							TRACE_ASSERT(node_cb.proper_node_cb->transport_cb != NULL);
+							/***************************************************************************/
+							/* Put message as the input buffer of the transport.					   */
+							/***************************************************************************/
+							node_cb.proper_node_cb->transport_cb->in_buffer = (char *)buf;
+
+							/***************************************************************************/
+							/* Fix pointers															   */
+							/***************************************************************************/
+							node_cb.proper_node_cb->transport_cb->sock_cb = sock_cb;
+							sock_cb->tprt_cb = node_cb.proper_node_cb->transport_cb;
+
+							/***************************************************************************/
+							/* Call into Node FSM signifying an INIT receive message.				   */
+							/***************************************************************************/
+							hm_node_fsm(HM_NODE_FSM_INIT, node_cb.proper_node_cb);
+
+							/***************************************************************************/
+							/* We no longer need this buffer. If someone else is using it, the ref_cnt */
+							/* would have increased and the other consumer can still use it.		   */
+							/***************************************************************************/
+							hm_free_buffer(buf);
+							//TODO
+						}
+					}
+				}
+				else
+				{
+					TRACE_DETAIL(("Socket associated with Transport of Location %d",
+													sock_cb->tprt_cb->location_cb->index));
+					/***************************************************************************/
+					/* Transport will have at least the space for a Message Header. Get bytes  */
+					/* into that buffer and then invoke the layer specific code.			   */
+					/***************************************************************************/
+
+				}
+
+				/***************************************************************************/
+				/* Read the incoming message. This FD is now processed.				 	   */
+				/***************************************************************************/
+				if(--nready <=0)
+				{
+					TRACE_DETAIL(("No more incoming requests."));
+					break;	//No more descriptors to process. Break out and poll again.
+				}// end if --nready <=0
+			}// end if FD_ISSET(sockfd, &rset)
+		}//end for
+
+		/***************************************************************************/
+		/* Unblock the signal.													   */
+		/***************************************************************************/
+	    if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
+	    {
+	    		TRACE_PERROR(("Error unblocking signals"));
+	    		//goto EXIT_LABEL;
+	    }
+	}//end while(1)
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return;
+}/* hm_run_main_thread */
 
 /***************************************************************************/
 /* Name:	hm_init_location_layer 									*/

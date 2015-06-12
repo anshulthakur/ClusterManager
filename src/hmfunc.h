@@ -14,7 +14,7 @@
 int32_t hm_init_local(HM_CONFIG_CB *);
 int32_t hm_init_transport();
 int32_t hm_init_location_layer();
-int32_t hm_parse_config(HM_CONFIG_CB *, char *);
+void hm_run_main_thread();
 void hm_interrupt_handler(int32_t , siginfo_t *, void *);
 void hm_terminate();
 
@@ -32,28 +32,48 @@ int32_t hm_free_node_cb(HM_NODE_CB *);
 int32_t hm_free_process_cb(HM_PROCESS_CB *);
 HM_SUBSCRIPTION_CB * hm_alloc_subscription_cb();
 void hm_free_subscription_cb(HM_SUBSCRIPTION_CB *);
+HM_NOTIFICATION_CB * hm_alloc_notify_cb();
+void hm_free_notify_cb(HM_NOTIFICATION_CB *);
 //HM_TRANSPORT_CB * hm_init_transport_cb(	uint32_t );
 
 /* hmlocmgmt.c */
 int32_t hm_init_location_cb(HM_LOCATION_CB *);
 
 /* hmnodemgmt.c */
+int32_t hm_node_fsm(uint32_t, HM_NODE_CB *);
 int32_t hm_node_add(HM_NODE_CB *, HM_LOCATION_CB *);
 int32_t hm_node_remove(HM_NODE_CB *);
 int32_t hm_node_keepalive_callback(void *);
 
 /* hmglobdb.c*/
 int32_t hm_global_location_add(HM_LOCATION_CB *, uint32_t);
+int32_t hm_global_location_update(HM_LOCATION_CB *);
 int32_t hm_global_location_remove(HM_GLOBAL_LOCATION_CB *);
 int32_t hm_global_node_add(HM_NODE_CB *);
+int32_t hm_global_node_update(HM_NODE_CB *);
 int32_t hm_global_node_remove(HM_NODE_CB *);
 HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t, uint32_t, void *);
 int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *);
 int32_t hm_subscribe(uint32_t, uint32_t , void *);
 int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *, HM_LIST_BLOCK *);
 
+/* hmnotify.c */
+int32_t hm_service_notify_queue();
+HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *);
+
+/* hmmsg.c */
+int32_t hm_receive_msg_hdr(char *);
+int32_t hm_receive_msg(char *);
+int32_t hm_node_send_init_rsp(HM_NODE_CB *);
+int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *);
+
 /* hmtprt.c */
+HM_SOCKET_CB * hm_tprt_accept_connection(int32_t);
 HM_SOCKET_CB * hm_tprt_open_connection(uint32_t, void *);
+int32_t hm_tprt_send_on_socket(struct sockaddr* ,int32_t ,
+						uint32_t, uint8_t *, uint32_t );
+int32_t hm_tprt_recv_on_socket(uint32_t , uint32_t ,
+							uint8_t * , uint32_t );
 
 /* hmutil.c */
 void avl3_balance_tree(HM_AVL3_TREE *, HM_AVL3_NODE *);
@@ -77,5 +97,7 @@ int32_t hm_compare_2_ulong(void *, void *);
 int32_t hm_aggregate_compare_node_id(void *, void *);
 int32_t hm_aggregate_compare_pid(void *, void *);
 int32_t hm_aggregate_compare_if_id(void *, void *);
+HM_MSG * hm_get_buffer(uint32_t);
+int32_t hm_free_buffer(HM_MSG *);
 
 #endif /* SRC_HMFUNC_H_ */

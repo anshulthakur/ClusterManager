@@ -69,9 +69,11 @@ HM_AVL3_TREE_INFO locations_tree_by_db_id = {
 	HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, index)	, /* key offset*/
 	HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, node)  /* node offset */
 };
+//TODO: Change to DB ID later
 HM_AVL3_TREE_INFO nodes_tree_by_db_id = {
-	hm_aggregate_compare_node_id, /* pointer to function*/
-	HM_OFFSETOF(HM_GLOBAL_NODE_CB, id)	, /* key offset*/
+	/* hm_aggregate_compare_node_id,*/ /* pointer to function*/
+	hm_compare_ulong,
+	HM_OFFSETOF(HM_GLOBAL_NODE_CB, index)	, /* key offset*/
 	HM_OFFSETOF(HM_GLOBAL_NODE_CB, node)  /* node offset */
 };
 HM_AVL3_TREE_INFO nodes_tree_by_node_id = {
@@ -137,11 +139,13 @@ HM_AVL3_TREE_INFO timer_table_by_handle = {
 	HM_OFFSETOF(HM_TIMER_CB, handle), /* key offset*/
 	HM_OFFSETOF(HM_TIMER_CB, node)  /* node offset */
 };
+
+int32_t *var;
 #else
 
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
-extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
+extern HM_AVL3_TREE_INFO node_process_tree_by_id;
 extern HM_AVL3_TREE_INFO locations_tree_by_hardware_id;
 extern HM_AVL3_TREE_INFO locations_tree_by_db_id;
 extern HM_AVL3_TREE_INFO nodes_tree_by_db_id;
@@ -160,6 +164,8 @@ extern int32_t  max_fd;
 extern fd_set hm_tprt_conn_set;
 extern HM_AVL3_TREE global_timer_table;
 extern HM_AVL3_TREE_INFO timer_table_by_handle;
+
+extern int32_t *var;
 #endif
 
 #endif /* SRC_HMGLOB_H_ */

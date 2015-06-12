@@ -373,8 +373,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						break;
 					case HM_CONFIG_ATTR_HB_SCOPE_CLUSTER:
 						TRACE_INFO(("Heartbeat scope is cluster"));
-						config_node->opaque = &hm_config->instance_info.node;
-						hm_config->instance_info.node.scope = HM_CONFIG_ATTR_HB_SCOPE_CLUSTER;
+						config_node->opaque = &hm_config->instance_info.cluster;
+						hm_config->instance_info.cluster.scope = HM_CONFIG_ATTR_HB_SCOPE_CLUSTER;
 						break;
 
 					default:

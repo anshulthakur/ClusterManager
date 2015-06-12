@@ -91,6 +91,8 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 		glob_cb->id = LOCAL.next_loc_tree_id++;
 		glob_cb->index =  loc_cb->index;
 		HM_AVL3_INIT_NODE(glob_cb->node, glob_cb);
+		glob_cb->sub_cb = NULL;
+		glob_cb->table_type = HM_TABLE_TYPE_LOCATION;
 	}
 	glob_cb->loc_cb = loc_cb;
 	glob_cb->status = status;
@@ -119,6 +121,7 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 			ret_val = HM_ERR;
 			goto EXIT_LABEL;
 		}
+		glob_cb->sub_cb = sub_cb;
 	}
 	/***************************************************************************/
 	/* Update pointers on Location CB too.									   */
@@ -176,6 +179,36 @@ EXIT_LABEL:
 	TRACE_EXIT();
 	return ret_val;
 }/* hm_global_location_add */
+
+/***************************************************************************/
+/* Name:	hm_global_location_update 									   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t														   */
+/* Purpose: Looks into the Location structure of the Location for updates  */
+/*			and perform updates.										   */
+/* All spectacular things happen here.									   */
+/***************************************************************************/
+int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_global_location_update */
 
 /***************************************************************************/
 /* Name:	hm_global_location_remove 									*/
@@ -242,7 +275,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 	/***************************************************************************/
 	insert_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
 											&node_cb->index,
-											nodes_tree_by_node_id);
+											nodes_tree_by_db_id);
 	if(insert_cb != NULL)
 	{
 		/***************************************************************************/
@@ -275,9 +308,10 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 
 		insert_cb->id = LOCAL.next_node_tree_id++;
 		HM_AVL3_INIT_NODE(insert_cb->node, insert_cb);
-
+		HM_INIT_ROOT(insert_cb->subscriptions);
 		insert_cb->index =  node_cb->index;
 		insert_cb->group_index = node_cb->group;
+		insert_cb->table_type = HM_TABLE_TYPE_NODES;
 	}
 
 	TRACE_DETAIL(("Node ID: %d", insert_cb->id));
@@ -291,7 +325,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 	if(!HM_AVL3_IN_TREE(insert_cb->node))
 	{
 		TRACE_DETAIL(("Inserting"));
-		if(HM_AVL3_INSERT(LOCAL.nodes_tree, insert_cb->node, nodes_tree_by_node_id) != TRUE)
+		if(HM_AVL3_INSERT(LOCAL.nodes_tree, insert_cb->node, nodes_tree_by_db_id) != TRUE)
 		{
 			TRACE_ERROR(("Error inserting into global trees."));
 			ret_val = HM_ERR;
@@ -309,6 +343,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 			ret_val = HM_ERR;
 			goto EXIT_LABEL;
 		}
+		insert_cb->sub_cb = sub_cb;
 	}
 	/***************************************************************************/
 	/* Update pointers on Location CB too.									   */
@@ -353,6 +388,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 			}
 		}
 	}
+
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
@@ -361,6 +397,128 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_global_node_add */
 
+/***************************************************************************/
+/* Name:	hm_global_node_update 										   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t														   */
+/* Purpose: Updates the node control block and notifies the rest.		   */
+/* All spectacular things happen here.									   */
+/***************************************************************************/
+int32_t hm_global_node_update(HM_NODE_CB *node_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	int32_t notify = FALSE;
+	HM_GLOBAL_NODE_CB *glob_cb = NULL;
+	HM_NOTIFICATION_CB *notify_cb = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(node_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Look into the node state in its FSM variable to determine if an update  */
+	/* is needed or not.													   */
+	/***************************************************************************/
+	switch(node_cb->fsm_state)
+	{
+	case HM_NODE_FSM_STATE_ACTIVE:
+		TRACE_DETAIL(("Node moved to active state. Send Notifications."));
+		notify = HM_NOTIFICATION_NODE_ACTIVE;
+		break;
+
+	case HM_NODE_FSM_STATE_FAILING:
+		TRACE_DETAIL(("Node is no longer active. Send Notifications."));
+		notify = HM_NOTIFICATION_NODE_INACTIVE;
+		break;
+
+	default:
+		TRACE_WARN(("Unknown state of Node %d", node_cb->fsm_state));
+		TRACE_ASSERT(FALSE);
+	}
+
+	if(!notify)
+	{
+		TRACE_DETAIL(("No updates."));
+		goto EXIT_LABEL;
+	}
+
+	/***************************************************************************/
+	/* We need to send updates. These work irrespective of previous state. This*/
+	/* means that the caller must ensure if a notification must be issued or   */
+	/* not. If old and new states are same ('Up', and 'Up' somehow), two same  */
+	/* notifications would be sent.											   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Find the node in DB.													   */
+	/***************************************************************************/
+	glob_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
+											&node_cb->id, nodes_tree_by_db_id);
+	if(glob_cb == NULL)
+	{
+		TRACE_ERROR(("No Global DB Entry found for this node. This shouldn't happen."));
+		TRACE_ASSERT(glob_cb != NULL);
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+
+	/***************************************************************************/
+	/* If subscription was not live, it is now.								   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Move this subscription node into the active subscriptions tree.		   */
+	/* And also notify subscribers.											   */
+	/***************************************************************************/
+	if(glob_cb->sub_cb->live == FALSE)
+	{
+		TRACE_DETAIL(("Subscription Now Active."));
+		HM_AVL3_DELETE(LOCAL.pending_subscriptions_tree, glob_cb->sub_cb->node);
+		if(HM_AVL3_INSERT(LOCAL.active_subscriptions_tree, glob_cb->sub_cb->node,
+														subs_tree_by_db_id)!= TRUE)
+		{
+			TRACE_ERROR(("Error activating subscription."));
+			goto EXIT_LABEL;
+		}
+
+		/***************************************************************************/
+		/* Mark the subscription as active.										   */
+		/***************************************************************************/
+		glob_cb->sub_cb->live = TRUE;
+	}
+
+	/***************************************************************************/
+	/* Allocate a Notification CB and Add that notification CB to Notify Queue */
+	/***************************************************************************/
+	notify_cb =  hm_alloc_notify_cb();
+	if(notify_cb == NULL)
+	{
+		TRACE_ERROR(("Error creating Notification CB"));
+		TRACE_ERROR(("Update could not be propagated."));
+		ret_val = HM_ERR;
+	}
+	notify_cb->node_cb.node_cb = glob_cb;
+	notify_cb->notification_type = notify;
+	/***************************************************************************/
+	/* Queue the notification CB 											   */
+	/***************************************************************************/
+	HM_INSERT_BEFORE(LOCAL.notification_queue ,notify_cb->node);
+
+	//FIXME: Move it to a separate thread later
+	hm_service_notify_queue();
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_global_node_update */
 
 /***************************************************************************/
 /* Name:	hm_global_node_remove 									*/
@@ -406,8 +564,6 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 	/***************************************************************************/
 	HM_SUBSCRIPTION_CB *tree_node = NULL;
 	HM_SUBSCRIPTION_CB *sub_cb = NULL;
-	int32_t ret_val = HM_OK;
-
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -431,9 +587,8 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 	{
 		TRACE_ERROR(("Error creating subscription point."));
 		/***************************************************************************/
-		/* Remove from global node tree											*/
+		/* Remove from global node tree											   */
 		/***************************************************************************/
-		ret_val = HM_ERR;
 		goto EXIT_LABEL;
 	}
 	 /***************************************************************************/
@@ -466,9 +621,19 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 											(tree_node->value == sub_cb->value))
 		{
 			TRACE_INFO(("Found a pending subscription."));
+
+#ifdef I_WANT_TO_DEBUG
+			if(tree_node->row_cb.void_cb != NULL)
+			{
+				TRACE_DETAIL(("Previous subscription point has a NON NULL row"));
+				TRACE_ASSERT(tree_node->row_id == sub_cb->row_id);
+				TRACE_ASSERT(tree_node->row_cb.void_cb == sub_cb->row_cb.void_cb);
+			}
+#endif
 			tree_node->row_cb.void_cb = sub_cb->row_cb.void_cb;
 			tree_node->row_id = sub_cb->row_id;
-
+			//TODO
+#if 0
 			/***************************************************************************/
 			/* Move this subscription node into the active subscriptions tree.		   */
 			/* And also notify subscribers.											   */
@@ -477,9 +642,9 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 			if(HM_AVL3_INSERT(LOCAL.active_subscriptions_tree, tree_node->node, subs_tree_by_db_id)!= TRUE)
 			{
 				TRACE_ERROR(("Error activating subscription."));
-				ret_val = HM_ERR;
 				goto EXIT_LABEL;
 			}
+
 			/***************************************************************************/
 			/* Mark the subscription as active.										   */
 			/***************************************************************************/
@@ -487,6 +652,7 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 
 			//TODO: Notify subscribers
 			TRACE_DETAIL(("Notifying Subscribers"));
+#endif
 			/***************************************************************************/
 			/* Found the node, no need to look any further							   */
 			/***************************************************************************/
@@ -503,8 +669,8 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 	if(HM_AVL3_INSERT(LOCAL.pending_subscriptions_tree, sub_cb->node, subs_tree_by_db_id) != TRUE)
 	{
 		TRACE_ERROR(("Error creating subscription point."));
-		ret_val = HM_ERR;
 		LOCAL.next_pending_tree_id -=1;
+		hm_free_subscription_cb(sub_cb);
 	}
 
 EXIT_LABEL:
@@ -562,6 +728,7 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 	/***************************************************************************/
 	HM_SUBSCRIBER_WILDCARD *subscriber;
 	HM_SUBSCRIPTION_CB *subscription = NULL;
+	HM_SUBSCRIBER global_cb;
 	HM_LIST_BLOCK *list_member = NULL;
 	int32_t ret_val = HM_OK;
 
@@ -607,6 +774,8 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 		||	value == 0)
 	{
 		TRACE_DETAIL(("Subscribe to all nodes."));
+		/* You can't really be a wildcard which does not have an entity yet */
+		TRACE_ASSERT(cb != NULL);
 		subscriber = (HM_SUBSCRIBER_WILDCARD *)malloc(sizeof(HM_SUBSCRIBER_WILDCARD));
 		if(subscriber==NULL)
 		{
@@ -618,6 +787,35 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 		subscriber->subs_type = subs_type;
 		subscriber->value = value;
 		subscriber->subscriber.void_cb = cb;
+		global_cb.void_cb= cb;
+		/***************************************************************************/
+		/* Determine its table type and accordingly, find its global table entry   */
+		/***************************************************************************/
+		if(cb != NULL)
+		{
+			TRACE_DETAIL(("Checking type %d", *(int32_t *)((char *)cb+ (uint32_t)(sizeof(int32_t)))));
+			switch(*(int32_t *)((char *)cb+ (uint32_t)(sizeof(int32_t))))
+			{
+			case HM_TABLE_TYPE_NODES_LOCAL:
+				TRACE_DETAIL(("Local Node Structure. Find its Global Entry."));
+				TRACE_DETAIL(("ID in Global Node Table %d", *(int32_t *)(global_cb.void_cb)));
+				subscriber->subscriber.void_cb = global_cb.proper_node_cb->db_ptr;
+				TRACE_DETAIL(("Subscriber type %d", *(int32_t *)(
+						(char *)subscriber->subscriber.void_cb+ (uint32_t)(sizeof(int32_t)))));
+				break;
+			case HM_TABLE_TYPE_LOCATION_LOCAL:
+				TRACE_DETAIL(("Local Location Structure. Find its Global Entry."));
+				subscriber->subscriber.void_cb = global_cb.proper_location_cb->db_ptr;
+				break;
+			case HM_TABLE_TYPE_PROCESS_LOCAL:
+				TRACE_DETAIL(("Local Process Structure. Find its Global Entry."));
+				subscriber->subscriber.void_cb = global_cb.proper_process_cb->db_ptr;
+				break;
+			default:
+				TRACE_WARN(("Unknown type of subscriber"));
+				TRACE_ASSERT((FALSE));
+			}
+		}
 
 		/***************************************************************************/
 		/* Insert to wildcard list.												   */
@@ -645,6 +843,14 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 				{
 					TRACE_DETAIL(("Found a node. Make subscription."));
 					/***************************************************************************/
+					/* Do not subscribe to itself											   */
+					/***************************************************************************/
+					if(subscription->row_cb.void_cb == subscriber->subscriber.void_cb)
+					{
+						TRACE_DETAIL(("Do not subscribe to itself!"));
+						continue;
+					}
+					/***************************************************************************/
 					/* Allocate Node.														   */
 					/***************************************************************************/
 					list_member = NULL;
@@ -656,7 +862,7 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 						goto EXIT_LABEL;
 					}
 					HM_INIT_LQE(list_member->node, list_member);
-					list_member->target = cb;
+					list_member->target = subscriber->subscriber.void_cb;
 					/***************************************************************************/
 					/* Insert into List														   */
 					/***************************************************************************/
@@ -682,6 +888,15 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 			{
 				if((subscriber->value == 0) || (subscriber->value == subscription->value))
 				{
+					/***************************************************************************/
+					/* Do not subscribe to itself											   */
+					/***************************************************************************/
+					if(subscription->row_cb.void_cb == subscriber->subscriber.void_cb)
+					{
+						TRACE_DETAIL(("Do not subscribe to itself!"));
+						continue;
+					}
+
 					TRACE_DETAIL(("Found a node. Make subscription."));
 					/***************************************************************************/
 					/* Allocate Node.														   */
@@ -695,7 +910,7 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 						goto EXIT_LABEL;
 					}
 					HM_INIT_LQE(list_member->node, list_member);
-					list_member->target = cb;
+					list_member->target = subscriber->subscriber.void_cb;
 					/***************************************************************************/
 					/* Insert into List														   */
 					/***************************************************************************/
@@ -810,6 +1025,10 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
 	/***************************************************************************/
 	HM_INSERT_BEFORE(subs_cb->subscribers_list, node->node);
 
+	/***************************************************************************/
+	/* Increment the subscribers count										   */
+	/***************************************************************************/
+	subs_cb->num_subscribers++;
 	/***************************************************************************/
 	/* If subscription is active, create a notification response to the subscr-*/
 	/* -iber. Other subscribers already know it. This one might need update.   */

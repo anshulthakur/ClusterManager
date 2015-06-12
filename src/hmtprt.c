@@ -94,8 +94,81 @@ EXIT_LABEL:
 	return sock_fd;
 }/* hm_open_socket */
 
+/***************************************************************************/
+/* Name:	hm_tprt_accept_connection 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	HM_SOCKET_CB *									*/
+/* Purpose: Accepts the connection into a SOCKET_CB and returns the CB			*/
+/***************************************************************************/
+HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_SOCKET_CB *sock_cb =NULL;
+	uint32_t client_len = sizeof(SOCKADDR);
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(sock_fd > 0);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	sock_cb = hm_alloc_sock_cb();
+	if(sock_cb == NULL)
+	{
+		TRACE_ERROR(("Error allocating resources for incoming connection request"));
+		goto EXIT_LABEL;
+	}
+	TRACE_DETAIL(("Socket: %d", sock_fd));
+	sock_cb->sock_fd = accept(sock_fd,
+			(SOCKADDR *)&(sock_cb->addr), (socklen_t *)&client_len);
+	if (sock_cb->sock_fd < 0)
+	{
+		if (errno != EWOULDBLOCK)
+		{
+			TRACE_PERROR(("Failed to accept local connection."));
+			hm_free_sock_cb(sock_cb);
+			sock_cb = NULL;
+			goto EXIT_LABEL;
+		}
+		TRACE_WARN(("No new connection requests"));
+	}
+
+	/***************************************************************************/
+	/* Add the descriptor to global descriptor set							   */
+	/***************************************************************************/
+	TRACE_DETAIL(("Add FD to set"));
+	FD_SET(sock_cb->sock_fd, &hm_tprt_conn_set);
+	if(max_fd < sock_cb->sock_fd)
+	{
+		TRACE_DETAIL(("Update maximum socket descriptor value to %d", sock_cb->sock_fd));
+		max_fd = sock_cb->sock_fd;
+	}
+	TRACE_DETAIL(("Add FD to set"));
+	FD_SET(sock_fd, &hm_tprt_conn_set);
+	/***************************************************************************/
+	/* We're going to INIT state. Connect has been received, but nothing else  */
+	/* has happened. Chances are, it has not been mapped on to a Transport CB  */
+	/***************************************************************************/
+	sock_cb->conn_state = HM_TPRT_CONN_INIT;
+	TRACE_DETAIL(("Connection Accepted on Socket %d. Wait for Messages.",
+													sock_cb->sock_fd));
+	HM_INSERT_BEFORE(LOCAL.conn_list, sock_cb->node);
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return (sock_cb);
+}/* hm_tprt_accept_connection */
+
 /**PROC+**********************************************************************/
-/* Name:     hm_tprt_create_connection 		                                 */
+/* Name:     hm_tprt_open_connection 		                                 */
 /*                                                                           */
 /* Purpose:   Creates a non-blocking socket and returns its descriptor.      */
 /*                                                                           */
@@ -288,6 +361,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 		ret_val = HM_ERR;
 		goto EXIT_LABEL;
 	}
+	TRACE_DETAIL(("Socket opened: %d", sock_fd));
 	/***************************************************************************/
 	/* Other specific options and processing.								   */
 	/***************************************************************************/
@@ -378,6 +452,10 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 	/* All went well. Set the sock_fd as that of sock_cb					   */
 	/***************************************************************************/
 	sock_cb->sock_fd = sock_fd;
+	/***************************************************************************/
+	/* Insert in Connection List											   */
+	/***************************************************************************/
+	HM_INSERT_BEFORE(LOCAL.conn_list, sock_cb->node);
 
 EXIT_LABEL:
 	if (ret_val == 0)
@@ -401,9 +479,9 @@ EXIT_LABEL:
 
 	TRACE_EXIT();
 	return (sock_cb);
-} /* hm_tprt_create_connection */
+} /* hm_tprt_open_connection */
 
-#if 0
+
 /**PROC+**********************************************************************/
 /* Name:     hm_tprt_send_on_socket	                                         */
 /*                                                                           */
@@ -435,49 +513,52 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 
 	TRACE_ENTRY();
 
-	printf("\n sock type %d", sock_type);
-	printf("\nAttempt to send %d bytes of data on socket %d",
-	    							length, sock_fd);
-	fflush(stdout);
+	TRACE_DETAIL(("Socket type %d", sock_type));
+	TRACE_DETAIL(("Attempt to send %d bytes of data on socket %d",
+	    							length, sock_fd));
+
 	buf = msg_buffer;
 
 	do
 	{
-		if(sock_type== HM_TRANSPORT_TCP_IO)
+		if((sock_type== HM_TRANSPORT_TCP_IN) || (sock_type==HM_TRANSPORT_TCP_OUT))
 		{
-			printf("\n data to be sent on TCP connection ");
+			TRACE_DETAIL(("data to be sent on TCP connection "));
 			bytes_sent = send(sock_fd,
 							  buf,
 							  (length - bytes_sent),
 							  0);
+
 		}
 
 		else if(sock_type==HM_TRANSPORT_UDP)
 		{
-			printf("\n data to be sent on UDP Ucast connection ");
+			TRACE_DETAIL(("Data to be sent on UDP Ucast connection "));
 			bytes_sent = sendto(sock_fd,
                                  buf,
                                  (length - bytes_sent),
                                  0,
                                  ip,
                                  sizeof(struct sockaddr_in));
+
 		}
 
 		else if(sock_type==HM_TRANSPORT_MCAST)
 		{
-			printf("\n data to be sent on UDP Mcast connection ");
+			TRACE_DETAIL(("Data to be sent on UDP Mcast connection "));
 
 			bytes_sent = sendto(sock_fd,
                                  buf,
                                  (length - bytes_sent),
                                  0,
-                                 (struct sockaddr *) &tprt_local.mcast_send_addr,
+                                 ip,
                                  sizeof(struct sockaddr_in));
+
         }
 
 		if(bytes_sent == length)
 		{
-			printf("\nMessage sent in full");
+			TRACE_DETAIL(("Message sent in full"));
 			buf = NULL;
 			success = TRUE;
 			break;
@@ -488,11 +569,7 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 			/* An error was returned - check for retryable socket error values.    */
 			/***********************************************************************/
 			os_error = errno;
-			printf("\nSend failed on socket %d, error %d",
-			    		sock_fd, os_error);
-
-			perror(" Error : ");
-			fflush(stdout);
+			TRACE_PERROR(("Send failed on socket %d.",sock_fd));
 
 			if ((os_error == EWOULDBLOCK) ||
 			          (os_error == ENOMEM) ||
@@ -502,12 +579,12 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 			    /* This seems to be a flow control condition - clear the bytes sent  */
 			    /* value to show that no data was written.                           */
 			    /*********************************************************************/
-			    printf("Resource shortage - try again");
+			    TRACE_WARN(("Resource shortage - try again"));
 			    bytes_sent = 0;
 			}
-			else if (os_error == Eint32_tR)
+			else if (os_error == EINTR)
 			{
-				printf("\nSend interrupted - loop round again");
+				TRACE_WARN(("Send interrupted - loop round again"));
 			    bytes_sent = 0;
 			}
 			else
@@ -515,7 +592,8 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 				/*********************************************************************/
 			    /* Socket failed so work source needs to be unregistered.            */
 			    /*********************************************************************/
-			    printf("\nSocket failed");
+			    TRACE_ERROR(("Socket failed"));
+			    success = HM_ERR;
 			    break;
 			}
 		}
@@ -528,7 +606,7 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 
 	if(total_bytes_sent == length)
 	{
-		printf("\nMessage sent in full");
+		TRACE_DETAIL(("Message sent in full"));
 		success = TRUE;
 	}
 
@@ -541,7 +619,7 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 /*                                                                           */
 /* Purpose:   Receives data from socket				                         */
 /*                                                                           */
-/* Returns:   int32_t total_read_bytes : Number of bytes read from socket.       */
+/* Returns:   int32_t total_read_bytes : Number of bytes read from socket.   */
 /*           				                                                 */
 /*                                                                           */
 /* Params:    IN 	: sock_fd - Socket on which data is to be received.      */
@@ -552,7 +630,7 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 /*                                                                           */
 /**PROC-**********************************************************************/
 
-uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
+int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 							BYTE * msg_buffer, uint32_t length)
 {
 	/***************************************************************************/
@@ -566,17 +644,18 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 	struct sockaddr *src_addr;
 	extern fd_set hm_tprt_conn_set;
 
-	TRACE_ENTRY("hm_tprt_recv_on_socket");
-	SOCKADDR_IN* ip_addr = (SOCKADDR_IN*)MALLOC(sizeof(SOCKADDR_IN));
-	src_addr = (SOCKADDR_IN *)MALLOC(sizeof(SOCKADDR_IN));
+	TRACE_ENTRY();
+
+	SOCKADDR_IN* ip_addr = (SOCKADDR_IN*)malloc(sizeof(SOCKADDR_IN));
+	src_addr = (SOCKADDR_IN *)malloc(sizeof(SOCKADDR_IN));
     /***************************************************************************/
 	/* Now try to receive data												   */
 	/***************************************************************************/
 	do
 	{
-		printf("\nTry to receive %d bytes on Socket %d", (length - bytes_rcvd), sock_fd);
+		TRACE_DETAIL(("Try to receive %d bytes on Socket %d", (length - bytes_rcvd), sock_fd));
 
-		if(conn_cb->sock_cb.sock_type==TCP_CONNECTION)
+		if((sock_type==HM_TRANSPORT_TCP_IN)|| (sock_type==HM_TRANSPORT_TCP_OUT))
 		{
 			bytes_rcvd = recv(sock_fd,
 							  buf,
@@ -584,7 +663,7 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 							  0);
 		}
 
-		else if(conn_cb->sock_cb.sock_type==UDP_UCAST_CONNECTION)
+		else if(sock_type==HM_TRANSPORT_UDP)
 		{
 			 bytes_rcvd = recvfrom(sock_fd,
                                       buf,
@@ -593,12 +672,15 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
                                        (struct sockaddr *)&src_addr	,
                                        (socklen_t *)sizeof(struct sockaddr_in));
 
-			 ip_addr=(SOCKADDR_IN *)src_addr;
-
-			 MEMCPY(&conn_cb->ip,&ip_addr,(sizeof(SOCKADDR_IN)));
+			 /***************************************************************************/
+			 /* Do we need to fetch the sender IP information too, from the socket?     */
+			 /* or will they tell it themselves?										*/
+			 /* In some upper layer structure?											*/
+			 /***************************************************************************/
+			 //FIXME: So far, they're not telling, so we need to get it here.
 		}
 
-		else if(conn_cb->sock_cb.sock_type==UDP_MCAST_CONNECTION)
+		else if(sock_type==HM_TRANSPORT_MCAST)
 		{
 			 bytes_rcvd = recvfrom(sock_fd,
                                      buf,
@@ -607,13 +689,12 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
                                       (struct sockaddr *)&src_addr,
                                       (socklen_t *) sizeof (struct sockaddr_in));
 
-			 ip_addr=(SOCKADDR_IN *)src_addr;
-			 MEMCPY(&conn_cb->ip,&ip_addr,(sizeof(SOCKADDR_IN)));
+			 //MEMCPY(&conn_cb->ip,&ip_addr,(sizeof(SOCKADDR_IN)));
 		}
 
 		if(bytes_rcvd == length)
 		{
-			printf("\nMessage received in full");
+			TRACE_DETAIL(("Message received in full"));
 			buf = NULL;
 			op_complete = TRUE;
 			total_bytes_rcvd +=bytes_rcvd;
@@ -624,9 +705,7 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 			/***********************************************************************/
 			/* An error was returned - check for retryable socket error values.    */
 			/***********************************************************************/
-			printf("\nRecv failed on socket");
-
-			perror(" Error : ");
+			TRACE_PERROR(("Recv failed on socket"));
 			os_error = errno;
 			if ((os_error == EWOULDBLOCK))
 			{
@@ -634,12 +713,12 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 			    /* This seems to be a flow control condition - clear the bytes sent  */
 			    /* value to show that no data was written.                           */
 			    /*********************************************************************/
-				printf("\nResource shortage - try again");
+				TRACE_WARN(("Resource shortage - try again"));
 			    bytes_rcvd = 0;
 			 }
 			else if (os_error == EINTR)
 			{
-				printf("\nSend interrupted - loop round again");
+				TRACE_WARN(("Receive interrupted - loop round again"));
 			    bytes_rcvd = 0;
 			}
 			else
@@ -647,7 +726,7 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 				/*********************************************************************/
 			    /* Socket failed so work source needs to be unregistered.            */
 			    /*********************************************************************/
-				printf("\nSocket failed");
+				TRACE_ERROR(("Socket failed"));
 				FD_CLR(sock_fd, &hm_tprt_conn_set);
 			    op_complete = TRUE;
 			    break;
@@ -655,9 +734,10 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 		}
 		else if(bytes_rcvd == 0)
 		{
-			printf("\nThe peer has disconnected");
+			TRACE_WARN(("The peer has disconnected"));
 			op_complete = TRUE;
 			FD_CLR(sock_fd, &hm_tprt_conn_set);
+			total_bytes_rcvd = HM_ERR;
 			break;
 		}
 		/***************************************************************************/
@@ -671,17 +751,17 @@ uint32_t hm_tprt_recv_on_socket(int32_t sock_fd,HM_TPRT_CONN_CB* conn_cb ,
 	{
 		if(total_bytes_rcvd == length)
 		{
-			printf("\nMessage received in full");
+			TRACE_DETAIL(("Message received in full"));
 			buf = NULL;
 		}
 		else
 		{
-			printf("\nSome error happened");
+			TRACE_WARN(("Some error happened"));
 			buf = NULL;
+			total_bytes_rcvd = HM_ERR;
 		}
 	}
 
 	TRACE_EXIT();
 	return (total_bytes_rcvd);
 } /* hm_tprt_recv_on_socket */
-#endif
