@@ -36,11 +36,11 @@
 /*|Create		|1	  A	|--- ERR|--- ERR|--- ERR|--- ERR|						*/
 /*|INIT			|--- ERR|2	  B |--- ERR|--- ERR|--- ERR|						*/
 /*|Data			|--- ERR|--- ERR|---  C |--- ERR|--- ERR|						*/
-/*|Terminate	|--- ERR|--- ERR| 3   D |--- ERR|--- ERR|						*/
-/*|Close 		|--- ERR|--- ERR|--- ERR|--- ERR| 0   H |						*/
+/*|Terminate	|--- ERR|--- ERR| 3   D |---  I |--- ERR|						*/
+/*|Close 		|--- ERR|--- ERR|--- ERR|--- ERR| 1  ---|						*/
 /*|TimerPop 	|--- ERR| 3   E | 2   F |--- ERR|--- ERR|						*/
 /*|TimeOut 		|--- ERR|--- ERR| 3   G |--- ERR|--- ERR|						*/
-/*|Failed		|--- ERR|--- ERR|--- ERR| 4   I |--- ERR|						*/
+/*|Failed		|--- ERR|--- ERR|--- ERR| 4   J |--- ERR|						*/
 /*|Active		|--- ERR|--- ERR|---  I |--- ERR|--- ERR|					    */
 /*-------------------------------------------------------						*/
 /*																				*/
@@ -87,6 +87,8 @@
 /* was grafted to compensate for the lack of foresight during FSM design.		*/
 /* While FSM Design, the path taken(the routine) must take into account the     */
 /* state of machine AT THAT time, and not the one it is transitioning into.	    */
+/* J. Failing complete:															*/
+/* Notifications have been sent. Release pending resources.					    */
 /*	 																			*/
 /********************************************************************************/
 
@@ -123,8 +125,8 @@ HM_TPRT_FSM_ENTRY hm_tprt_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STA
 	{									//Next State				Path
 /* HM_NODE_FSM_STATE_NULL	*/ 	 {	HM_NODE_FSM_STATE_NULL		,	FSM_ERR	},
 /* HM_NODE_FSM_STATE_WAITING */	 {	HM_NODE_FSM_STATE_WAITING	,	FSM_ERR	},
-/* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_FAILED	,	ACT_D	},
-/* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	FSM_ERR	},
+/* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	ACT_D	},
+/* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	ACT_I	},
 /* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_FAILED	,	FSM_ERR	}
 	},
 
@@ -134,7 +136,7 @@ HM_TPRT_FSM_ENTRY hm_tprt_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STA
 /* HM_NODE_FSM_STATE_WAITING */	 {	HM_NODE_FSM_STATE_WAITING	,	FSM_ERR	},
 /* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_ACTIVE	,	FSM_ERR	},
 /* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	FSM_ERR	},
-/* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_NULL		,	ACT_H	}
+/* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_WAITING	,	ACT_NO	}
 	},
 
 	//HM_NDOE_FSM_TIMER_POP
@@ -159,16 +161,16 @@ HM_TPRT_FSM_ENTRY hm_tprt_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STA
 /* HM_NODE_FSM_STATE_NULL	*/ 	 {	HM_NODE_FSM_STATE_NULL		,	FSM_ERR	},
 /* HM_NODE_FSM_STATE_WAITING */	 {	HM_NODE_FSM_STATE_WAITING	,	FSM_ERR	},
 /* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_FAILED	,	FSM_ERR	},
-/* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILED	,	ACT_I	},
+/* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILED	,	ACT_J	},
 /* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_FAILED	,	FSM_ERR	}
 	},
 	//HM_NODE_FSM_ACTIVE
 	{									//Next State				Path
-	/* HM_NODE_FSM_STATE_NULL	*/ 	 {	HM_NODE_FSM_STATE_NULL		,	FSM_ERR	},
-	/* HM_NODE_FSM_STATE_WAITING */	 {	HM_NODE_FSM_STATE_WAITING	,	FSM_ERR	},
-	/* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_ACTIVE	,	ACT_I	},
-	/* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	FSM_ERR	},
-	/* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_FAILED	,	FSM_ERR	}
+/* HM_NODE_FSM_STATE_NULL	*/ 	 {	HM_NODE_FSM_STATE_NULL		,	FSM_ERR	},
+/* HM_NODE_FSM_STATE_WAITING */	 {	HM_NODE_FSM_STATE_WAITING	,	FSM_ERR	},
+/* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_ACTIVE	,	ACT_I	},
+/* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	FSM_ERR	},
+/* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_FAILED	,	FSM_ERR	}
 	}
 };
 
@@ -192,6 +194,8 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 	uint32_t next_input = input_signal;
 	uint32_t action;
 	int32_t ret_val = HM_OK;;
+
+	HM_PROCESS_CB *proc_cb = NULL;
 
 	TRACE_ENTRY();
 
@@ -264,7 +268,17 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 			TRACE_DETAIL(("Act D"));
 			TRACE_DETAIL(("Releasing resources for the node."));
 			//TODO
-			//hm_transport_close_connection(node_cb->transport_cb);
+			//All processes on this node are now down. Mark them down (causes notifications)
+			for(proc_cb = (HM_PROCESS_CB *)HM_AVL3_FIRST(node_cb->process_tree,
+												node_process_tree_by_proc_type_and_pid);
+					proc_cb != NULL;
+					proc_cb = (HM_PROCESS_CB *)HM_AVL3_NEXT(proc_cb->node,
+											node_process_tree_by_proc_type_and_pid ))
+			{
+				proc_cb->running = FALSE;
+				hm_process_update(proc_cb);
+			}
+			next_input = HM_NODE_FSM_TERM;
 			break;
 
 		case ACT_E:
@@ -295,18 +309,29 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 			TRACE_DETAIL(("Act I"));
 			TRACE_DETAIL(("Node status changed. Notify subscribers."));
 			hm_global_node_update(node_cb);
+			if(node_cb->fsm_state == HM_NODE_FSM_STATE_FAILING)
+			{
+				next_input = HM_NODE_FSM_FAILED;
+			}
+			break;
+
+		case ACT_J:
+			TRACE_DETAIL(("Act I"));
+			TRACE_DETAIL(("Node has failed. Release resources."));
+			hm_tprt_close_connection(node_cb->transport_cb);
+			next_input = HM_NODE_FSM_CLOSE;
 			break;
 
 		case ACT_NO:
 			/***************************************************************************/
 			/* Do nothing. Just advance the state to next.							   */
 			/***************************************************************************/
-			TRACE_DETAIL(("\nAct NO"));
+			TRACE_DETAIL(("Act NO"));
 			break;
 
 		default:
-			TRACE_WARN(("\nInvalid FSM Branch Hit. Error!"));
-			TRACE_WARN(("\n Current State: %d\t Signal Received: %d", node_cb->fsm_state,input_signal));
+			TRACE_WARN(("Invalid FSM Branch Hit. Error!"));
+			TRACE_WARN(("Current State: %d: Signal Received: %d", node_cb->fsm_state,input_signal));
 			TRACE_ASSERT(FALSE);
 			break;
 		}//end switch

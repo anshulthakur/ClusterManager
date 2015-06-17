@@ -8,17 +8,54 @@
 
 #include <hmincl.h>
 
-int location_index = 0;
-int sock_fd = -1; /* Socket Descriptor */
+int32_t location_index = 0;
+int32_t sock_fd = -1; /* Socket Descriptor */
 
 HM_NODE_INIT_MSG init_msg;
+HM_REGISTER_MSG reg_msg;
+HM_KEEPALIVE_MSG keepalive_msg;
+HM_PROCESS_UPDATE_MSG proc_msg;
+HM_REGISTER_TLV_CB tlv;
+HM_UNREGISTER_MSG unreg_msg;
+HM_NOTIFICATION_MSG notify_msg;
+HM_HA_STATUS_UPDATE_MSG hm_msg;
 
-int main(int argc, char **argv)
+
+/* http://stackoverflow.com/questions/9571738/picking-random-number-between-two-points-in-c */
+static unsigned int random_num(unsigned int min, unsigned int max)
 {
-	int ret_val = HM_OK;
+    int32_t r;
+    const unsigned int range = 1 + max - min;
+    const unsigned int buckets = RAND_MAX / range;
+    const unsigned int limit = buckets * range;
+
+    /* Create equal size buckets all in a row, then fire randomly towards
+     * the buckets until you land in one of them. All buckets are equally
+     * likely. If you land off the end of the line of buckets, try again. */
+    do
+    {
+        r = rand();
+    } while (r >= limit);
+
+    return min + (r / buckets);
+}
+
+/***************************************************************************/
+/* MAIN FUNCTION														   */
+/***************************************************************************/
+int32_t main(int32_t argc, char **argv)
+{
+	int32_t ret_val = HM_OK;
 	SOCKADDR_IN addr;
 
-	int cmd_opt;
+	int32_t cmd_opt;
+	/* Randomly select a group for subscription */
+	int32_t subs_group = random_num(0, 4);
+	int32_t node[2] = {random_num(1,4), random_num(1,4)};
+
+	int32_t pct_type = 0x75010001;
+	int32_t pid = 0x00000034;
+
 	extern char *optarg;
 
 	while((cmd_opt = getopt(argc, argv, "l:")) != -1)
@@ -40,6 +77,10 @@ int main(int argc, char **argv)
 		TRACE_ERROR(("Did not find Location Index"));
 		goto EXIT_LABEL;
 	}
+
+	pid = pid | (location_index << 31);
+	TRACE_INFO(("PID Assigned: 0x%x", pid));
+
 	/***************************************************************************/
 	/* Setup address														   */
 	/***************************************************************************/
@@ -83,14 +124,14 @@ int main(int argc, char **argv)
 	init_msg.location_status = TRUE;
 	init_msg.service_group_index = location_index;
 
-	TRACE_INFO(("Sending message!"));
+	TRACE_INFO(("Sending INIT message!"));
 	ret_val = send(sock_fd, (char *)&init_msg, sizeof(init_msg), 0);
 	if(ret_val != sizeof(init_msg))
 	{
 		TRACE_PERROR(("Error sending complete message on socket!"));
 		goto EXIT_LABEL;
 	}
-	TRACE_INFO(("Message sent."));
+	TRACE_INFO(("INIT Message sent."));
 
 	ret_val = recv(sock_fd, (char *)&init_msg, sizeof(init_msg), 0);
 	if(ret_val != sizeof(init_msg))
@@ -103,6 +144,68 @@ int main(int argc, char **argv)
 	{
 		TRACE_INFO(("Hardware Index is %d", init_msg.hardware_num));
 	}
+
+	//TRACE_INFO(("Send Keepalive"));
+	//TODO: LATER
+
+	//Send Process UP Notification
+	proc_msg.hdr.msg_id = 1;
+	proc_msg.hdr.msg_len = sizeof(proc_msg);
+	proc_msg.hdr.msg_type = HM_MSG_TYPE_PROCESS_CREATE;
+	proc_msg.hdr.request = TRUE;
+	proc_msg.hdr.response_ok = FALSE;
+
+	proc_msg.if_offset = 0;
+	snprintf(proc_msg.name, sizeof(proc_msg.name), "TEST");
+	proc_msg.pid = pid;
+	proc_msg.proc_type = pct_type;
+
+	TRACE_INFO(("Sending PROCESS_CREATED message!"));
+	ret_val = send(sock_fd, (char *)&proc_msg, sizeof(proc_msg), 0);
+	if(ret_val != sizeof(proc_msg))
+	{
+		TRACE_PERROR(("Error sending complete message on socket!"));
+		goto EXIT_LABEL;
+	}
+	TRACE_INFO(("PROCESS_CREATED Message sent."));
+
+	ret_val = recv(sock_fd, (char *)&proc_msg, sizeof(proc_msg), 0);
+	if(ret_val != sizeof(proc_msg))
+	{
+		TRACE_WARN(("Partial Message Received!"));
+	}
+	TRACE_INFO(("Message response received"));
+
+	if(proc_msg.hdr.response_ok == TRUE)
+	{
+		TRACE_INFO(("Process Create Notification OK"));
+	}
+
+	//Send REGISTER for Group
+//	TRACE_INFO(("Sending Register for Group %d", subs_group));
+	reg_msg.hdr.msg_id = 1;
+	reg_msg.hdr.msg_len = sizeof(reg_msg);
+	reg_msg.hdr.msg_type = HM_MSG_TYPE_REGISTER;
+	reg_msg.hdr.request = TRUE;
+	reg_msg.hdr.response_ok = FALSE;
+
+	reg_msg.num_register = subs_group;
+	//Receive REGISTER Response
+
+	//Send Unregister
+
+	//Receive Unregister Response
+
+	//Send REGISTER for Nodes
+//	TRACE_INFO(("Sending Register for Nodes %d, %d", node[0], node[1]));
+
+	//Receive REGISTER Response
+
+	//Send Unregister
+
+	//Receive Unregister Response
+
+
 
 	while(1)
 	{

@@ -820,6 +820,61 @@ EXIT_LABEL:
 }/* hm_get_buffer */
 
 /***************************************************************************/
+/* Name:	hm_grow_buffer 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	HM_MSG *									*/
+/* Purpose: Increases the capacity of the buffer to new value			*/
+/***************************************************************************/
+HM_MSG * hm_grow_buffer(HM_MSG *buf, uint32_t size)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_MSG *msg = NULL;
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(buf != NULL);
+	TRACE_ASSERT(size > buf->msg_len);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	msg = (HM_MSG *)realloc(buf, sizeof(HM_MSG) + size);
+	if(msg == NULL)
+	{
+		TRACE_ERROR(("Error allocating buffers for notification."));
+		goto EXIT_LABEL;
+	}
+	msg->msg = (char *)msg + sizeof(HM_MSG);
+
+	/***************************************************************************/
+	/* New size																   */
+	/***************************************************************************/
+	msg->msg_len = size;
+
+	/***************************************************************************/
+	/* Fix pointers in sibling members of list								   */
+	/***************************************************************************/
+	if(HM_IN_LIST(msg->node))
+	{
+		TRACE_DETAIL(("Fixing sibling pointers"));
+		msg->node.prev->next = msg->node.self;
+		msg->node.next->prev = msg->node.self;
+	}
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return msg;
+}/* hm_grow_buffer */
+
+/***************************************************************************/
 /* Name:	hm_free_buffer 												   */
 /* Parameters: Input - 													   */
 /*			   Input/Output -											   */

@@ -108,6 +108,10 @@ HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
 	/***************************************************************************/
 	HM_SOCKET_CB *sock_cb =NULL;
 	uint32_t client_len = sizeof(SOCKADDR);
+#ifdef I_WANT_TO_DEBUG
+	char address[128];
+	HM_SOCKADDR_UNION *addr = NULL;
+#endif
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -137,7 +141,15 @@ HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
 		}
 		TRACE_WARN(("No new connection requests"));
 	}
-
+#ifdef I_WANT_TO_DEBUG
+	/***************************************************************************/
+	/* Accepted Connection. Its parameters are enumerated.					   */
+	/***************************************************************************/
+	addr = (HM_SOCKADDR_UNION *)&sock_cb->addr;
+	TRACE_INFO(("New Connection from %s:%d",
+			inet_ntop(AF_INET, &addr->in_addr.sin_addr, address, client_len),
+			ntohs(addr->in_addr.sin_port)));
+#endif
 	/***************************************************************************/
 	/* Add the descriptor to global descriptor set							   */
 	/***************************************************************************/
@@ -509,7 +521,6 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 	int32_t success = FALSE;
 	BYTE *buf = NULL;
 	int32_t os_error;
-	struct sockaddr_in addr;
 
 	TRACE_ENTRY();
 
@@ -645,9 +656,10 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 	extern fd_set hm_tprt_conn_set;
 
 	TRACE_ENTRY();
-
+/*
 	SOCKADDR_IN* ip_addr = (SOCKADDR_IN*)malloc(sizeof(SOCKADDR_IN));
 	src_addr = (SOCKADDR_IN *)malloc(sizeof(SOCKADDR_IN));
+*/
     /***************************************************************************/
 	/* Now try to receive data												   */
 	/***************************************************************************/
@@ -729,6 +741,7 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 				TRACE_ERROR(("Socket failed"));
 				FD_CLR(sock_fd, &hm_tprt_conn_set);
 			    op_complete = TRUE;
+			    bytes_rcvd = 0;
 			    break;
 			}
 		}
@@ -758,10 +771,120 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 		{
 			TRACE_WARN(("Some error happened"));
 			buf = NULL;
-			total_bytes_rcvd = HM_ERR;
+			total_bytes_rcvd = bytes_rcvd;
 		}
 	}
 
 	TRACE_EXIT();
 	return (total_bytes_rcvd);
 } /* hm_tprt_recv_on_socket */
+
+
+/***************************************************************************/
+/* Name:	hm_tprt_close_connection 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Closes connection on the given transport CB			*/
+/***************************************************************************/
+int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	HM_MSG *msg = NULL;
+
+	HM_LIST_BLOCK *block = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(tprt_cb != NULL);
+
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Empty the outgoing buffers queue. Don't try to send them, just drop.	   */
+	/***************************************************************************/
+	TRACE_DETAIL(("Emptying pending queue."));
+	for(block = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(tprt_cb->pending);
+			block != NULL;
+		block = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(tprt_cb->pending))
+	{
+		msg = (HM_MSG *)block->target;
+		/***************************************************************************/
+		/* Remove from list.													   */
+		/***************************************************************************/
+		HM_REMOVE_FROM_LIST(block->node);
+		TRACE_DETAIL(("Freeing Message!"));
+		hm_free_buffer(msg);
+		free(block);
+		block = NULL;
+	}
+
+	if(tprt_cb->in_buffer != NULL)
+	{
+		TRACE_DETAIL(("Transport has data in its input buffers. Freeing!"));
+		hm_free_buffer((HM_MSG *)tprt_cb->in_buffer);
+		tprt_cb->in_buffer = NULL;
+	}
+	/***************************************************************************/
+	/* Transport Types may differ. Default is Socket Based Transport. So, we're*/
+	/* currently only implementing the default case.						   */
+	/***************************************************************************/
+	switch(tprt_cb->type)
+	{
+	default:
+		TRACE_DETAIL(("Closing socket connections"));
+		hm_close_sock_connection(tprt_cb->sock_cb);
+		tprt_cb->sock_cb = NULL;
+	}
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return(ret_val);
+}/* hm_tprt_close_connection */
+
+/***************************************************************************/
+/* Name:	hm_close_sock_connection 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	void 									*/
+/* Purpose: Closes a socket connection and releases its resources			*/
+/***************************************************************************/
+void  hm_close_sock_connection(HM_SOCKET_CB *sock_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(sock_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	if(sock_cb->sock_fd > 0)
+	{
+		TRACE_INFO(("Closing socket"));
+		close(sock_cb->sock_fd);
+		sock_cb->sock_fd = -1;
+	}
+	HM_REMOVE_FROM_LIST(sock_cb->node);
+	sock_cb->tprt_cb = NULL;
+
+	hm_free_sock_cb(sock_cb);
+	sock_cb = NULL;
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return;
+}/* hm_close_sock_connection */

@@ -738,7 +738,7 @@ void hm_run_main_thread()
 						//FIXME
 						break;
 					}
-					if(bytes_rcvd >= sizeof(HM_MSG_HEADER))
+					if(bytes_rcvd == sizeof(HM_MSG_HEADER))
 					{
 						init_msg = (HM_NODE_INIT_MSG *)buf->msg;
 						if((init_msg->hdr.msg_type != HM_MSG_TYPE_INIT) || (init_msg->hdr.request != TRUE))
@@ -845,7 +845,36 @@ void hm_run_main_thread()
 					/* Transport will have at least the space for a Message Header. Get bytes  */
 					/* into that buffer and then invoke the layer specific code.			   */
 					/***************************************************************************/
+					/***************************************************************************/
+					/* We'll need to receive the message into a random buffer which must be as */
+					/* large as at least the INIT message.									   */
+					/***************************************************************************/
+					sock_cb->tprt_cb->in_buffer = (char *)&sock_cb->tprt_cb->header;
+					/***************************************************************************/
+					/* First, receive the message header and verify that it is an INIT message */
+					/***************************************************************************/
+					bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+												HM_TRANSPORT_TCP_IN,
+												sock_cb->tprt_cb->in_buffer,
+												sizeof(HM_MSG_HEADER)
+												);
+					if(bytes_rcvd != sizeof(HM_MSG_HEADER))
+					{
+						TRACE_DETAIL(("Message Length of %d was expected, %d was received",
+										sizeof(HM_MSG_HEADER), bytes_rcvd));
+						hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
+						//TODO: Quit or Continue?
+					}
+					else
+					{
+						//TODO
+						//Pass to message router to handle message accordingly
+						hm_route_incoming_message(sock_cb);
+						//Based on the type of message, process it.
+						//PROC_CREATE/DESTROY handled by Process layer
 
+					}
+					/* Don't need to free the buffer, because it is a statically allocated memory */
 				}
 
 				/***************************************************************************/

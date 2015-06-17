@@ -145,16 +145,131 @@ int32_t hm_service_notify_queue()
 			/* Have message, update reference count									   */
 			/***************************************************************************/
 			notify_cb->ref_count = affected_node.node_cb->sub_cb->num_subscribers;
-			msg->ref_count = notify_cb->ref_count; /* This is more important */
-
 			/***************************************************************************/
 			/* We are ready to send this message to various subscribers				   */
 			/***************************************************************************/
+			for(list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(
+									affected_node.node_cb->sub_cb->subscribers_list);
+					list_member != NULL;
+				list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(list_member->node))
+			{
 
+				//TODO
+				/***************************************************************************/
+				/* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
+				/* will be notified.													   */
+				/* Later, this must be improved (by using switch case on the table_type    */
+				/* field, to allow location to node, or node to locations subs.			   */
+				/***************************************************************************/
+				subscriber.node_cb = (HM_GLOBAL_NODE_CB *)list_member->target;
+
+				TRACE_ASSERT(subscriber.node_cb != NULL);
+				TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+
+				/***************************************************************************/
+				/* Append the message to the outgoing message queue on the transport of the*/
+				/* node.																   */
+				/***************************************************************************/
+				if(subscriber.node_cb->node_cb->transport_cb != NULL)
+				{
+					block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+					if(block == NULL)
+					{
+						TRACE_ASSERT(FALSE);
+						TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
+						ret_val = HM_ERR;
+						goto EXIT_LABEL;
+					}
+					HM_INIT_LQE(block->node, block);
+
+					block->target = msg;
+
+					HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+					msg->ref_count++; /* This is more important */
+					hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+				}
+				else
+				{
+					TRACE_INFO(("Subscribers are inactive. No notifications!"));
+				}
+			}
 			break;
 
 		case HM_NOTIFICATION_PROCESS_CREATED:
-			TRACE_INFO(("Process Created"));
+			TRACE_INFO(("Process 0x%x Created on Node %d of Location %d",
+					affected_node.process_cb->pid,
+					affected_node.process_cb->proc_cb->parent_node_cb->index,
+					affected_node.process_cb->proc_cb->parent_node_cb->parent_location_cb->index));
+			if(affected_node.process_cb->sub_cb->num_subscribers == 0)
+			{
+				TRACE_DETAIL(("No subscriber!"));
+				break;
+				//TODO: We still need to send a cluster update
+			}
+			else
+			{
+				TRACE_DETAIL(("Number of subscribers: %d",
+						affected_node.process_cb->sub_cb->num_subscribers));
+			}
+			msg = hm_build_notify_message(notify_cb);
+			if(msg == NULL)
+			{
+				TRACE_ERROR(("Error building Notification."));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+			/***************************************************************************/
+			/* Have message, update reference count									   */
+			/***************************************************************************/
+			notify_cb->ref_count = affected_node.node_cb->sub_cb->num_subscribers;
+			/***************************************************************************/
+			/* We are ready to send this message to various subscribers				   */
+			/***************************************************************************/
+			for(list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(
+									affected_node.node_cb->sub_cb->subscribers_list);
+					list_member != NULL;
+				list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(list_member->node))
+			{
+
+				//TODO
+				/***************************************************************************/
+				/* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
+				/* will be notified.													   */
+				/* Later, this must be improved (by using switch case on the table_type    */
+				/* field, to allow location to node, or node to locations subs.			   */
+				/***************************************************************************/
+				subscriber.node_cb = (HM_GLOBAL_NODE_CB *)list_member->target;
+
+				TRACE_ASSERT(subscriber.node_cb != NULL);
+				TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+
+				/***************************************************************************/
+				/* Append the message to the outgoing message queue on the transport of the*/
+				/* node.																   */
+				/***************************************************************************/
+				if(subscriber.node_cb->node_cb->transport_cb != NULL)
+				{
+					block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+					if(block == NULL)
+					{
+						TRACE_ASSERT(FALSE);
+						TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
+						ret_val = HM_ERR;
+						goto EXIT_LABEL;
+					}
+					HM_INIT_LQE(block->node, block);
+
+					block->target = msg;
+
+					HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+					msg->ref_count++; /* This is more important */
+					hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+				}
+				else
+				{
+					TRACE_INFO(("Subscribers are inactive. No notifications!"));
+				}
+			}
 			break;
 		case HM_NOTIFICATION_PROCESS_DESTROYED:
 			TRACE_INFO(("Process Destroyed"));
@@ -246,6 +361,7 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->type = HM_NOTIFY_TYPE_NODE_UP;
 		notify_msg->id = 0;
 		notify_msg->if_id = 0;
+		notify_msg->proc_type = 0;
 		addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->transport_cb->sock_cb->addr);
 		if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN)
 		{
@@ -281,6 +397,7 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->type = HM_NOTIFY_TYPE_NODE_DOWN;
 		notify_msg->id = 0;
 		notify_msg->if_id = 0;
+		notify_msg->proc_type = 0;
 		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb != NULL);
 		addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->transport_cb->sock_cb->addr);
 		if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN)
@@ -316,11 +433,79 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->type = HM_NOTIFY_TYPE_PROC_AVAILABLE;
 		notify_msg->id = affected_node.process_cb->pid;
 		notify_msg->if_id = 0;
+		notify_msg->proc_type = affected_node.process_cb->type;
+		TRACE_ASSERT(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb != NULL);
+		addr = (HM_SOCKADDR_UNION *)&(
+				affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->sock_cb->addr);
+		if(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->type
+							== HM_TRANSPORT_TCP_IN)
+		{
+			TRACE_DETAIL(("Node has IPv4 type of connection."));
+			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
+			memcpy(notify_msg->addr_info.addr,
+					&addr->in_addr.sin_addr.s_addr,
+				sizeof(struct in_addr));
+			notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
+		}
+		else if(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->type
+							== HM_TRANSPORT_TCP_IPv6_IN)
+		{
+			TRACE_DETAIL(("Node has IPv6 type of connection"));
+			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v6;
+			memcpy(notify_msg->addr_info.addr,
+				&addr->in6_addr.sin6_addr,
+				sizeof(struct in6_addr));
+			notify_msg->addr_info.port = (uint32_t)addr->in6_addr.sin6_port;
+		}
+		else
+		{
+			TRACE_WARN(("Unknown Transport Type"));
+		}
+		notify_msg->addr_info.group = affected_node.process_cb->proc_cb->parent_node_cb->group;
+		notify_msg->addr_info.hw_index =
+					affected_node.process_cb->proc_cb->parent_node_cb->parent_location_cb->index;
+		notify_msg->addr_info.node_id = affected_node.process_cb->proc_cb->parent_node_cb->index;
+
 		break;
 	case HM_NOTIFICATION_PROCESS_DESTROYED:
 		TRACE_INFO(("Process Destroyed"));
 		notify_msg->type = HM_NOTIFY_TYPE_PROC_GONE;
+		notify_msg->id = affected_node.process_cb->pid;
+		notify_msg->if_id = 0;
+		notify_msg->proc_type = affected_node.process_cb->type;
+		TRACE_ASSERT(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb != NULL);
+		addr = (HM_SOCKADDR_UNION *)&(
+				affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->sock_cb->addr);
+		if(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->type
+							== HM_TRANSPORT_TCP_IN)
+		{
+			TRACE_DETAIL(("Node has IPv4 type of connection."));
+			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
+			memcpy(notify_msg->addr_info.addr,
+					&addr->in_addr.sin_addr.s_addr,
+				sizeof(struct in_addr));
+			notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
+		}
+		else if(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->type
+							== HM_TRANSPORT_TCP_IPv6_IN)
+		{
+			TRACE_DETAIL(("Node has IPv6 type of connection"));
+			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v6;
+			memcpy(notify_msg->addr_info.addr,
+				&addr->in6_addr.sin6_addr,
+				sizeof(struct in6_addr));
+			notify_msg->addr_info.port = (uint32_t)addr->in6_addr.sin6_port;
+		}
+		else
+		{
+			TRACE_WARN(("Unknown Transport Type"));
+		}
+		notify_msg->addr_info.group = affected_node.process_cb->proc_cb->parent_node_cb->group;
+		notify_msg->addr_info.hw_index =
+					affected_node.process_cb->proc_cb->parent_node_cb->parent_location_cb->index;
+		notify_msg->addr_info.node_id = affected_node.process_cb->proc_cb->parent_node_cb->index;
 		break;
+
 	case HM_NOTIFICATION_INTERFACE_ADDED:
 		TRACE_INFO(("Interface Added"));
 		break;

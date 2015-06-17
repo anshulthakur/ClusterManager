@@ -551,6 +551,341 @@ int32_t hm_global_node_remove(HM_NODE_CB *node_cb)
 
 
 /***************************************************************************/
+/* Name:	hm_global_process_add 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Adds a Process to Global Tables			*/
+/***************************************************************************/
+int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_GLOBAL_PROCESS_CB *insert_cb = NULL, *temp_cb = NULL;
+	int32_t ret_val = HM_OK;
+	HM_SUBSCRIPTION_CB *sub_cb = NULL;
+	HM_SUBSCRIBER_WILDCARD *greedy = NULL;
+	HM_LIST_BLOCK *list_member = NULL;
+
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(proc_cb!= NULL);
+
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Allocate a global location CB										   */
+	/*																		   */
+	/* Owing to a composite comapre function, we first allocate a Global Proc  */
+	/* CB and fill in the keys for comparison.								   */
+	/***************************************************************************/
+	temp_cb = (HM_GLOBAL_PROCESS_CB *)malloc(sizeof(HM_GLOBAL_PROCESS_CB));
+	TRACE_ASSERT(temp_cb != NULL);
+	if(temp_cb==NULL)
+	{
+		TRACE_ERROR(("Error allocating resources for Location Entry."));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+	temp_cb->pid =  proc_cb->pid;
+	temp_cb->node_index = proc_cb->parent_node_cb->index;
+	temp_cb->type = proc_cb->type;
+
+	/***************************************************************************/
+	/* First search for a node with same Process ID. If not found, grant the CB*/
+	/* a new ID, and insert it in the tree.									   */
+	/*																		   */
+	/* We need to insert the node by its proc_type, node_id and PID for unique-*/
+	/* -ness constraint. As such db_id is of no use here.					   */
+	/***************************************************************************/
+	insert_cb = (HM_GLOBAL_PROCESS_CB *)HM_AVL3_FIND(LOCAL.process_tree,
+											temp_cb,
+											global_process_tree_by_id);
+	if(insert_cb != NULL)
+	{
+		/***************************************************************************/
+		/* Same node found.														   */
+		/***************************************************************************/
+		TRACE_ERROR(("Same process found. Validate"));
+		if(insert_cb->status == temp_cb->proc_cb->running)
+		{
+			TRACE_ERROR(("Previous and current Running Statuses are same. Must not happen."));
+			free(temp_cb);
+			temp_cb = NULL;
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+	}
+	else
+	{
+		TRACE_DETAIL(("New Process Node."));
+		insert_cb = temp_cb;
+		temp_cb = NULL;
+
+		/***************************************************************************/
+		/* Now fill in the rest													   */
+		/***************************************************************************/
+		insert_cb->id = LOCAL.next_node_tree_id++;
+
+		HM_AVL3_INIT_NODE(insert_cb->node, insert_cb);
+		HM_INIT_ROOT(insert_cb->subscriptions);
+		insert_cb->table_type = HM_TABLE_TYPE_PROCESS;
+
+	}
+	insert_cb->proc_cb = proc_cb;
+	insert_cb->status = proc_cb->running;
+
+	TRACE_DETAIL(("Process CB DB ID: %d", insert_cb->id));
+
+	/***************************************************************************/
+	/* Try inserting it into the tree										   */
+	/***************************************************************************/
+	if(!HM_AVL3_IN_TREE(insert_cb->node))
+	{
+		TRACE_DETAIL(("Inserting"));
+		if(HM_AVL3_INSERT(LOCAL.process_tree, insert_cb->node, global_process_tree_by_id) != TRUE)
+		{
+			TRACE_ERROR(("Error inserting into global trees."));
+			ret_val = HM_ERR;
+			free(insert_cb);
+			insert_cb = NULL;
+			goto EXIT_LABEL;
+		}
+		/***************************************************************************/
+		/* Create a subscription entry											   */
+		/* This process is subscribe-able for PCT_Type.							   */
+		/* Since type is not used in Key, many Processes can have same PCT_Type	   */
+		/***************************************************************************/
+		if((sub_cb = hm_create_subscription_entry(HM_TABLE_TYPE_PROCESS, insert_cb->type,
+														 (void *)insert_cb))== NULL)
+		{
+			TRACE_ERROR(("Error creating subscription."));
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+		insert_cb->sub_cb = sub_cb;
+	}
+	/***************************************************************************/
+	/* Update pointers on Location CB too.									   */
+	/***************************************************************************/
+	proc_cb->id = insert_cb->id;
+	proc_cb->db_ptr = (void *)insert_cb;
+
+	/***************************************************************************/
+	/* Find out if there is some greedy (wildcard) subscriber.				   */
+	/* If present, subscribe to this location implicitly.					   */
+	/***************************************************************************/
+	for(greedy = (HM_SUBSCRIBER_WILDCARD *)HM_NEXT_IN_LIST(LOCAL.table_root_subscribers);
+			greedy != NULL;
+			greedy = (HM_SUBSCRIBER_WILDCARD *)HM_NEXT_IN_LIST(greedy->node))
+	{
+		if((greedy->subs_type == HM_CONFIG_ATTR_SUBS_TYPE_PROC) &&
+				((greedy->value == 0)||(greedy->value==proc_cb->type)))
+		{
+			TRACE_DETAIL(("Found wildcard subscriber."));
+			/***************************************************************************/
+			/* Allocate Node														   */
+			/***************************************************************************/
+			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
+			if(list_member == NULL)
+			{
+				TRACE_ERROR(("Error allocating resources for Subscriber list element."));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+			HM_INIT_LQE(list_member->node, list_member);
+			list_member->target = greedy->subscriber.node_cb;
+
+			if(hm_subscription_insert(sub_cb, list_member) != HM_OK)
+			{
+				TRACE_ERROR(("Error inserting subscription to its entity"));
+				ret_val = HM_ERR;
+				hm_free_subscription_cb(sub_cb);
+				free(list_member);
+				sub_cb = NULL;
+				list_member = NULL;
+				goto EXIT_LABEL;
+			}
+		}
+	}
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return(ret_val);
+}/* hm_global_process_add */
+
+/***************************************************************************/
+/* Name:	hm_global_process_update 									   */
+/* Parameters: Input - 													   */
+/*			   Input/Output -											   */
+/* Return:	int32_t														   */
+/* Purpose: Updates the status and does notification triggers of processes */
+/***************************************************************************/
+int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	int32_t notify = FALSE;
+	HM_GLOBAL_PROCESS_CB *glob_cb = NULL;
+	HM_NOTIFICATION_CB *notify_cb = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(proc_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Look into the node state in its FSM variable to determine if an update  */
+	/* is needed or not.													   */
+	/***************************************************************************/
+	if(proc_cb->running)
+	{
+		TRACE_DETAIL(("Process active. Send Notifications."));
+		notify = HM_NOTIFICATION_PROCESS_CREATED;
+	}
+	else
+	{
+		TRACE_DETAIL(("Process is no longer active. Send Notifications."));
+		notify = HM_NOTIFICATION_PROCESS_DESTROYED;
+	}
+
+	if(!notify)
+	{
+		TRACE_DETAIL(("No updates."));
+		goto EXIT_LABEL;
+	}
+
+	/***************************************************************************/
+	/* We need to send updates. These work irrespective of previous state. This*/
+	/* means that the caller must ensure if a notification must be issued or   */
+	/* not. If old and new states are same ('Up', and 'Up' somehow), two same  */
+	/* notifications would be sent.											   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Find the process in DB.												   */
+	/* The funny problem with not creating a custom key here (that is made from*/
+	/* the shuffling of values in proc_cb to make it resemble HM_GLOBAL_PROC_CB*/
+	/* and for every update, I don't want to make a temporary variable.		   */
+	/* Also, since this isn't exactly DB, I have a pointer which MUST NOT be   */
+	/* NULL in the absence of any programmatic errors.						   */
+	/***************************************************************************/
+	/*
+	glob_cb = (HM_GLOBAL_PROCESS_CB *)HM_AVL3_FIND(LOCAL.process_tree,
+											proc_cb,
+											global_process_tree_by_id);
+	if(glob_cb == NULL)
+	{
+		TRACE_ERROR(("No Global DB Entry found for this node. This shouldn't happen."));
+		TRACE_ASSERT(glob_cb != NULL);
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+	*/
+	glob_cb = (HM_GLOBAL_PROCESS_CB *)proc_cb->db_ptr;
+	TRACE_ASSERT(glob_cb != NULL);
+	if(glob_cb == NULL)
+	{
+		TRACE_ERROR(("Global Table pointer is NULL. ERROR!"));
+		/***************************************************************************/
+		/* TERMINAL ERROR! ABORT! ABORT! ABORT!									   */
+		/***************************************************************************/
+		goto EXIT_LABEL;
+	}
+	TRACE_DETAIL(("Found CB Type: 0x%x, Node: %d, PID: 0x%x", glob_cb->type,
+															  glob_cb->node_index,
+															  glob_cb->pid));
+	/***************************************************************************/
+	/* If subscription was not live, it is now.								   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Move this subscription node into the active subscriptions tree.		   */
+	/* And also notify subscribers.											   */
+	/***************************************************************************/
+	if(glob_cb->sub_cb->live == FALSE)
+	{
+		TRACE_DETAIL(("Subscription Now Active."));
+		HM_AVL3_DELETE(LOCAL.pending_subscriptions_tree, glob_cb->sub_cb->node);
+		if(HM_AVL3_INSERT(LOCAL.active_subscriptions_tree, glob_cb->sub_cb->node,
+														subs_tree_by_db_id)!= TRUE)
+		{
+			TRACE_ERROR(("Error activating subscription."));
+			goto EXIT_LABEL;
+		}
+
+		/***************************************************************************/
+		/* Mark the subscription as active.										   */
+		/***************************************************************************/
+		glob_cb->sub_cb->live = TRUE;
+	}
+
+	/***************************************************************************/
+	/* Allocate a Notification CB and Add that notification CB to Notify Queue */
+	/***************************************************************************/
+	notify_cb =  hm_alloc_notify_cb();
+	if(notify_cb == NULL)
+	{
+		TRACE_ERROR(("Error creating Notification CB"));
+		TRACE_ERROR(("Update could not be propagated."));
+		ret_val = HM_ERR;
+	}
+	notify_cb->node_cb.node_cb = glob_cb;
+	notify_cb->notification_type = notify;
+	/***************************************************************************/
+	/* Queue the notification CB 											   */
+	/***************************************************************************/
+	HM_INSERT_BEFORE(LOCAL.notification_queue ,notify_cb->node);
+
+	//FIXME: Move it to a separate thread later
+	hm_service_notify_queue();
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return (ret_val);
+}/* hm_global_process_update */
+
+/***************************************************************************/
+/* Name:	hm_global_process_remove 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Removes the node from global DBs			*/
+/***************************************************************************/
+int32_t hm_global_process_remove(HM_PROCESS_CB *proc_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_global_process_remove */
+
+/***************************************************************************/
 /* Name:	hm_create_subscription_entry 								   */
 /* Parameters: Input - 													   */
 /*			   Input/Output -											   */
@@ -1048,3 +1383,62 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_subscription_insert */
 
+
+/***************************************************************************/
+/* Name:	hm_compare_proc_tree_keys 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Compare function for Global Process Tree Exact insertion			*/
+/***************************************************************************/
+int32_t hm_compare_proc_tree_keys(void *key1, void *key2)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_GLOBAL_PROCESS_CB *proc1 = NULL, *proc2 = NULL;
+	int32_t ret_val = -1;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(key1 != NULL);
+	TRACE_ASSERT(key2 != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	proc1 = (HM_GLOBAL_PROCESS_CB *)key1;
+	proc2 = (HM_GLOBAL_PROCESS_CB *)key2;
+
+	TRACE_DETAIL(("[1:] %x %d %d",proc1->type, proc1->node_index, proc1->pid));
+	TRACE_DETAIL(("[2:] %x %d %d",proc2->type, proc2->node_index, proc2->pid));
+
+	if(proc1->type > proc2->type)
+	{
+		ret_val = 1;
+	}
+	else if(proc1->type == proc2->type)
+	{
+		if(proc1->node_index > proc2->node_index)
+		{
+			ret_val = 1;
+		}
+		else if(proc1->node_index == proc2->node_index)
+		{
+			if(proc1->pid > proc2->pid)
+			{
+				ret_val = 1;
+			}
+			else if(proc1->pid == proc2->pid)
+			{
+				ret_val = 0;
+			}
+		}
+	}
+
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_compare_proc_tree_keys */

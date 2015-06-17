@@ -226,6 +226,11 @@ void hm_free_sock_cb(HM_SOCKET_CB *sock_cb)
 	{
 		HM_REMOVE_FROM_LIST(sock_cb->node);
 	}
+	if(sock_cb->sock_fd != -1)
+	{
+		TRACE_WARN(("Socket was not closed."));
+		close(sock_cb->sock_fd);
+	}
 
 	free(sock_cb);
 	sock_cb = NULL;
@@ -389,6 +394,55 @@ EXIT_LABEL:
 	return (ret_val);
 }/* hm_free_node_cb */
 
+/***************************************************************************/
+/* Name:	hm_alloc_process_cb 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	HM_PROCESS_CB *									*/
+/* Purpose: Allocates a Process Control Block			*/
+/***************************************************************************/
+HM_PROCESS_CB * hm_alloc_process_cb()
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_PROCESS_CB *proc_cb = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	proc_cb = (HM_PROCESS_CB *)malloc(sizeof(HM_PROCESS_CB));
+	if(proc_cb == NULL)
+	{
+		TRACE_ERROR(("Error allocating memory for Process Control Block"));
+		goto EXIT_LABEL;
+	}
+	proc_cb->db_ptr = NULL;
+	proc_cb->id = 0;
+	proc_cb->table_type = HM_TABLE_TYPE_PROCESS_LOCAL;
+
+	proc_cb->type = 0;
+	proc_cb->pid = 0;
+	memset(proc_cb->name, '\0', sizeof(proc_cb->name));
+	proc_cb->parent_node_cb = NULL;
+	HM_AVL3_INIT_NODE(proc_cb->node, proc_cb);
+	HM_INIT_ROOT(proc_cb->interfaces_list);
+	proc_cb->running = FALSE;
+
+	proc_cb->role = NODE_ROLE_PASSIVE;
+	proc_cb->partner = NULL;
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return(proc_cb);
+}/* hm_alloc_process_cb */
 
 /***************************************************************************/
 /* Name:	hm_free_process_cb 									*/
@@ -407,10 +461,26 @@ int32_t hm_free_process_cb(HM_PROCESS_CB *proc_cb)
 	/* Sanity Checks														   */
 	/***************************************************************************/
 	TRACE_ENTRY();
+
+	TRACE_ASSERT(proc_cb != NULL);
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+	/***************************************************************************/
+	/* Empty the interfaces list											   */
+	/***************************************************************************/
+	HM_EMPTY_LIST(proc_cb->interfaces_list);
 
+	/***************************************************************************/
+	/* Remove from Nodes tree												   */
+	/***************************************************************************/
+	if(proc_cb->node.parent != NULL)
+	{
+		TRACE_DETAIL(("Removing from Tree"));
+		HM_AVL3_DELETE(proc_cb->parent_node_cb->interface_tree, proc_cb->node);
+	}
+
+	free(proc_cb);
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
