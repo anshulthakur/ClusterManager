@@ -56,8 +56,8 @@ HM_AVL3_TREE_INFO node_process_tree_by_proc_type_and_pid = {
 };
 HM_AVL3_TREE_INFO global_process_tree_by_id = {
 	hm_compare_proc_tree_keys, /* pointer to function*/
-	HM_OFFSETOF(HM_PROCESS_CB, id)	, /* key offset*/
-	HM_OFFSETOF(HM_PROCESS_CB, node)  /* node offset */
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /* key offset*/
+	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /* node offset */
 };
 HM_AVL3_TREE_INFO locations_tree_by_hardware_id = {
 	hm_compare_ulong, /* pointer to function*/

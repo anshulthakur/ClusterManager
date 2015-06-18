@@ -63,6 +63,9 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	/***************************************************************************/
 	/* Allocate Memory to receive the rest of Register TLVs					   */
 	/***************************************************************************/
+	TRACE_DETAIL(("Need extra memory for %d registers.[%d/block]",
+								reg->num_register,sizeof(HM_REGISTER_TLV_CB) ));
+
 	msg_size = msg_size + (reg->num_register * sizeof(HM_REGISTER_TLV_CB));
 	msg = hm_grow_buffer(msg, msg_size);
 	if(msg == NULL)
@@ -81,7 +84,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
 										HM_TRANSPORT_TCP_IN,
 										tprt_cb->in_buffer,
-										(reg->num_register + sizeof(HM_REGISTER_TLV_CB))
+										(reg->num_register * sizeof(HM_REGISTER_TLV_CB))
 										);
 	if(bytes_rcvd < (reg->num_register + sizeof(HM_REGISTER_TLV_CB)))
 	{

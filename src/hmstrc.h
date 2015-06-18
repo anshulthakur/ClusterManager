@@ -209,6 +209,12 @@ typedef struct hm_list_block
 	HM_LQE node;
 
 	void * target;
+
+	/***************************************************************************/
+	/* Opaque data for freestyle saving.									   */
+	/* Currently used in Notifications to mark as sent.						   */
+	/***************************************************************************/
+	void *opaque;
 } HM_LIST_BLOCK ;
 /**STRUCT-********************************************************************/
 
@@ -1081,7 +1087,6 @@ typedef struct hm_global_interface_cb
 
 } HM_GLOBAL_INTERFACE_CB ;
 /**STRUCT-********************************************************************/
-
 
 /**STRUCT+********************************************************************/
 /* Structure: HM_SUBSCRIPTION_CB											 */

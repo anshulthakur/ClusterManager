@@ -26,6 +26,8 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 
 	HM_SUBSCRIPTION_CB *sub_cb = NULL;
 	HM_LIST_BLOCK *list_member = NULL;
+
+	uint32_t *processed = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -144,7 +146,7 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 			/***************************************************************************/
 			/* Allocate Node														   */
 			/***************************************************************************/
-			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
+			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK) + sizeof(uint32_t));
 			if(list_member == NULL)
 			{
 				TRACE_ERROR(("Error allocating resources for Subscriber list element."));
@@ -153,6 +155,9 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 			}
 			HM_INIT_LQE(list_member->node, list_member);
 			list_member->target = greedy->subscriber.node_cb;
+			list_member->opaque = (void *)((char *)list_member + sizeof(HM_LIST_BLOCK));
+			processed = (uint32_t *)list_member->opaque;
+			*processed = FALSE;
 
 			if(hm_subscription_insert(sub_cb, list_member) != HM_OK)
 			{
@@ -257,6 +262,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 	HM_SUBSCRIPTION_CB *sub_cb = NULL;
 	HM_SUBSCRIBER_WILDCARD *greedy = NULL;
 	HM_LIST_BLOCK *list_member = NULL;
+	uint32_t *processed = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -366,7 +372,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 			/***************************************************************************/
 			/* Allocate Node														   */
 			/***************************************************************************/
-			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
+			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK) +sizeof(uint32_t));
 			if(list_member == NULL)
 			{
 				TRACE_ERROR(("Error allocating resources for Subscriber list element."));
@@ -375,7 +381,9 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 			}
 			HM_INIT_LQE(list_member->node, list_member);
 			list_member->target = greedy->subscriber.node_cb;
-
+			list_member->opaque = (void *)((char *)list_member + sizeof(HM_LIST_BLOCK));
+			processed = (uint32_t *)list_member->opaque;
+			*processed = FALSE;
 			if(hm_subscription_insert(sub_cb, list_member) != HM_OK)
 			{
 				TRACE_ERROR(("Error inserting subscription to its entity"));
@@ -492,7 +500,7 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb)
 		/***************************************************************************/
 		glob_cb->sub_cb->live = TRUE;
 	}
-
+	glob_cb->status = node_cb->fsm_state;
 	/***************************************************************************/
 	/* Allocate a Notification CB and Add that notification CB to Notify Queue */
 	/***************************************************************************/
@@ -567,7 +575,7 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
 	HM_SUBSCRIPTION_CB *sub_cb = NULL;
 	HM_SUBSCRIBER_WILDCARD *greedy = NULL;
 	HM_LIST_BLOCK *list_member = NULL;
-
+	uint32_t *processed = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -646,7 +654,7 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
 	/***************************************************************************/
 	if(!HM_AVL3_IN_TREE(insert_cb->node))
 	{
-		TRACE_DETAIL(("Inserting"));
+		TRACE_DETAIL(("Inserting %p with node at %p", insert_cb, &insert_cb->node));
 		if(HM_AVL3_INSERT(LOCAL.process_tree, insert_cb->node, global_process_tree_by_id) != TRUE)
 		{
 			TRACE_ERROR(("Error inserting into global trees."));
@@ -690,7 +698,7 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
 			/***************************************************************************/
 			/* Allocate Node														   */
 			/***************************************************************************/
-			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
+			list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK)+sizeof(uint32_t));
 			if(list_member == NULL)
 			{
 				TRACE_ERROR(("Error allocating resources for Subscriber list element."));
@@ -699,6 +707,9 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
 			}
 			HM_INIT_LQE(list_member->node, list_member);
 			list_member->target = greedy->subscriber.node_cb;
+			list_member->opaque = (void *)((char *)list_member + sizeof(HM_LIST_BLOCK));
+			processed = (uint32_t *)list_member->opaque;
+			*processed = FALSE;
 
 			if(hm_subscription_insert(sub_cb, list_member) != HM_OK)
 			{
@@ -839,7 +850,7 @@ int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb)
 		TRACE_ERROR(("Update could not be propagated."));
 		ret_val = HM_ERR;
 	}
-	notify_cb->node_cb.node_cb = glob_cb;
+	notify_cb->node_cb.process_cb = glob_cb;
 	notify_cb->notification_type = notify;
 	/***************************************************************************/
 	/* Queue the notification CB 											   */
@@ -1061,14 +1072,17 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 	/***************************************************************************/
 	/* Variable Declarations												   */
 	/***************************************************************************/
-	HM_SUBSCRIBER_WILDCARD *subscriber;
+	HM_SUBSCRIBER_WILDCARD *subscriber, *looper = NULL;
 	HM_SUBSCRIPTION_CB *subscription = NULL;
 	HM_SUBSCRIBER global_cb;
 	HM_LIST_BLOCK *list_member = NULL;
 	int32_t ret_val = HM_OK;
 
+	int32_t exists = FALSE;
 	int32_t table_type;
 	int32_t keys[2];
+
+	uint32_t *processed = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -1156,106 +1170,143 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 		/* Insert to wildcard list.												   */
 		/***************************************************************************/
 		TRACE_DETAIL(("Add to greedy list."));
-		HM_INSERT_BEFORE(LOCAL.table_root_subscribers, subscriber->node);
-
 		/***************************************************************************/
-		/* Insert it as a subscriber to every existing node right now.			   */
+		/* First check if the node is subscribed already, and if it is, then is it */
+		/* subscribed to the same table for a wildcard or same value?			   */
 		/***************************************************************************/
-		//TODO: It is not going to work this way. To implement partial matching, we
-		// need different kind of trees.
-		/*
-		 * Right now, we can traverse and check each node for type
-		 */
-		for(subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIRST(LOCAL.active_subscriptions_tree,
-														subs_tree_by_db_id );
-				subscription != NULL;
-				subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_NEXT(subscription->node,
-														subs_tree_by_db_id))
+		for(looper = (HM_SUBSCRIBER_WILDCARD *)HM_NEXT_IN_LIST(LOCAL.table_root_subscribers);
+			looper != NULL;
+			looper = (HM_SUBSCRIBER_WILDCARD *)HM_NEXT_IN_LIST(looper->node))
 		{
-			if(subscription->table_type == table_type)
+			if(looper->subscriber.void_cb == subscriber->subscriber.void_cb)
 			{
-				if((subscriber->value == 0) || (subscriber->value == subscription->value))
+				TRACE_DETAIL(("Subscription in Wildcard exists. Check exactness of rule"));
+				if(looper->subs_type == subscriber->subs_type)
 				{
-					TRACE_DETAIL(("Found a node. Make subscription."));
-					/***************************************************************************/
-					/* Do not subscribe to itself											   */
-					/***************************************************************************/
-					if(subscription->row_cb.void_cb == subscriber->subscriber.void_cb)
+					TRACE_DETAIL(("Subscription Type also matches. Check value!"));
+					if((looper->value == 0) || (looper->value == subscriber->value))
 					{
-						TRACE_DETAIL(("Do not subscribe to itself!"));
-						continue;
-					}
-					/***************************************************************************/
-					/* Allocate Node.														   */
-					/***************************************************************************/
-					list_member = NULL;
-					list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
-					if(list_member == NULL)
-					{
-						TRACE_ERROR(("Error allocating resources for Subscriber list element."));
-						ret_val = HM_ERR;
-						goto EXIT_LABEL;
-					}
-					HM_INIT_LQE(list_member->node, list_member);
-					list_member->target = subscriber->subscriber.void_cb;
-					/***************************************************************************/
-					/* Insert into List														   */
-					/***************************************************************************/
-					if(hm_subscription_insert(subscription, list_member) != HM_OK)
-					{
-						TRACE_ERROR(("Error inserting subscription to its entity"));
-						ret_val = HM_ERR;
-						free(list_member);
-						list_member = NULL;
-						goto EXIT_LABEL;
+						TRACE_WARN(("Subscriber is re-subscribing to same values."));
+						/***************************************************************************/
+						/* Nothing needs to be done. Everything is already set up.				   */
+						/***************************************************************************/
+						exists = TRUE;
+						break;
 					}
 				}
 			}
 		}
-		for(subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIRST(LOCAL.pending_subscriptions_tree,
-																subs_tree_by_db_id );
-						subscription != NULL;
-						subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_NEXT(subscription->node,
-																subs_tree_by_db_id))
+		if(!exists)
 		{
-			TRACE_DETAIL(("Types: Node: %d Current Value: %d",subscription->table_type, subs_type));
-			if(subscription->table_type == table_type)
+			TRACE_DETAIL(("New subscription."));
+			HM_INSERT_BEFORE(LOCAL.table_root_subscribers, subscriber->node);
+			/***************************************************************************/
+			/* Insert it as a subscriber to every existing node right now.			   */
+			/***************************************************************************/
+			//TODO: It is not going to work this way. To implement partial matching, we
+			// need different kind of trees.
+			/*
+			 * Right now, we can traverse and check each node for type
+			 */
+			for(subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIRST(LOCAL.active_subscriptions_tree,
+															subs_tree_by_db_id );
+					subscription != NULL;
+					subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_NEXT(subscription->node,
+															subs_tree_by_db_id))
 			{
-				if((subscriber->value == 0) || (subscriber->value == subscription->value))
+				if(subscription->table_type == table_type)
 				{
-					/***************************************************************************/
-					/* Do not subscribe to itself											   */
-					/***************************************************************************/
-					if(subscription->row_cb.void_cb == subscriber->subscriber.void_cb)
+					if((subscriber->value == 0) || (subscriber->value == subscription->value))
 					{
-						TRACE_DETAIL(("Do not subscribe to itself!"));
-						continue;
-					}
-
-					TRACE_DETAIL(("Found a node. Make subscription."));
-					/***************************************************************************/
-					/* Allocate Node.														   */
-					/***************************************************************************/
-					list_member = NULL;
-					list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
-					if(list_member == NULL)
-					{
-						TRACE_ERROR(("Error allocating resources for Subscriber list element."));
-						ret_val = HM_ERR;
-						goto EXIT_LABEL;
-					}
-					HM_INIT_LQE(list_member->node, list_member);
-					list_member->target = subscriber->subscriber.void_cb;
-					/***************************************************************************/
-					/* Insert into List														   */
-					/***************************************************************************/
-					if(hm_subscription_insert(subscription, list_member) != HM_OK)
-					{
-						TRACE_ERROR(("Error inserting subscription to its entity"));
-						ret_val = HM_ERR;
-						free(list_member);
+						TRACE_DETAIL(("Found a node. Make subscription."));
+						/***************************************************************************/
+						/* Do not subscribe to itself											   */
+						/***************************************************************************/
+						if(subscription->row_cb.void_cb == subscriber->subscriber.void_cb)
+						{
+							TRACE_DETAIL(("Do not subscribe to itself!"));
+							continue;
+						}
+						/***************************************************************************/
+						/* Allocate Node.														   */
+						/***************************************************************************/
 						list_member = NULL;
-						goto EXIT_LABEL;
+						list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK)+ sizeof(uint32_t));
+						if(list_member == NULL)
+						{
+							TRACE_ERROR(("Error allocating resources for Subscriber list element."));
+							ret_val = HM_ERR;
+							goto EXIT_LABEL;
+						}
+						HM_INIT_LQE(list_member->node, list_member);
+						list_member->target = subscriber->subscriber.void_cb;
+						list_member->opaque = (void *)((char *)list_member + sizeof(HM_LIST_BLOCK));
+						processed = (uint32_t *)list_member->opaque;
+						*processed = FALSE;
+						/***************************************************************************/
+						/* Insert into List														   */
+						/***************************************************************************/
+						if(hm_subscription_insert(subscription, list_member) != HM_OK)
+						{
+							TRACE_ERROR(("Error inserting subscription to its entity"));
+							/* It isn't a critical error. Could be caused by a duplicate entry */
+							ret_val = HM_OK;
+							free(list_member);
+							list_member = NULL;
+							goto EXIT_LABEL;
+						}
+					}
+				}
+			}
+			for(subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIRST(LOCAL.pending_subscriptions_tree,
+																	subs_tree_by_db_id );
+							subscription != NULL;
+							subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_NEXT(subscription->node,
+																	subs_tree_by_db_id))
+			{
+				TRACE_DETAIL(("Types: Node: %d Current Value: %d",subscription->table_type, subs_type));
+				if(subscription->table_type == table_type)
+				{
+					if((subscriber->value == 0) || (subscriber->value == subscription->value))
+					{
+						/***************************************************************************/
+						/* Do not subscribe to itself											   */
+						/***************************************************************************/
+						if(subscription->row_cb.void_cb == subscriber->subscriber.void_cb)
+						{
+							TRACE_DETAIL(("Do not subscribe to itself!"));
+							continue;
+						}
+
+						TRACE_DETAIL(("Found a node. Make subscription."));
+						/***************************************************************************/
+						/* Allocate Node.														   */
+						/***************************************************************************/
+						list_member = NULL;
+						list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK)+sizeof(uint32_t));
+						if(list_member == NULL)
+						{
+							TRACE_ERROR(("Error allocating resources for Subscriber list element."));
+							ret_val = HM_ERR;
+							goto EXIT_LABEL;
+						}
+						HM_INIT_LQE(list_member->node, list_member);
+						list_member->target = subscriber->subscriber.void_cb;
+						list_member->opaque = (void *)((char *)list_member + sizeof(HM_LIST_BLOCK));
+						processed = (uint32_t *)list_member->opaque;
+						*processed = FALSE;
+						/***************************************************************************/
+						/* Insert into List														   */
+						/***************************************************************************/
+						if(hm_subscription_insert(subscription, list_member) != HM_OK)
+						{
+							TRACE_WARN(("Error inserting subscription to its entity"));
+							/* It isn't a critical error. Could be caused by a duplicate entry */
+							ret_val = HM_OK;
+							free(list_member);
+							list_member = NULL;
+							goto EXIT_LABEL;
+						}
 					}
 				}
 			}
@@ -1274,7 +1325,7 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 		/***************************************************************************/
 		/* Allocate Node														   */
 		/***************************************************************************/
-		list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK));
+		list_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK) + sizeof(uint32_t));
 		if(list_member == NULL)
 		{
 			TRACE_ERROR(("Error allocating resources for Subscriber list element."));
@@ -1283,6 +1334,9 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 		}
 		HM_INIT_LQE(list_member->node, list_member);
 		list_member->target = cb;
+		list_member->opaque = (void *)((char *)list_member + sizeof(HM_LIST_BLOCK));
+		processed = (uint32_t *)list_member->opaque;
+		*processed = FALSE;
 
 		subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIND(LOCAL.active_subscriptions_tree,
 															keys,
@@ -1348,6 +1402,13 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
 	/* Variable Declarations												   */
 	/***************************************************************************/
 	int32_t ret_val = HM_OK;
+	int32_t exists = FALSE;
+	HM_LIST_BLOCK *looper = NULL;
+
+	int32_t notify_type;
+	int32_t notify = FALSE;
+
+	HM_NOTIFICATION_CB *notify_cb = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -1358,21 +1419,89 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	HM_INSERT_BEFORE(subs_cb->subscribers_list, node->node);
-
 	/***************************************************************************/
-	/* Increment the subscribers count										   */
+	/* Loop through the subscribers to find if it is already subscribed		   */
 	/***************************************************************************/
-	subs_cb->num_subscribers++;
-	/***************************************************************************/
-	/* If subscription is active, create a notification response to the subscr-*/
-	/* -iber. Other subscribers already know it. This one might need update.   */
-	/***************************************************************************/
-	if(subs_cb->live)
+	for(looper = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(subs_cb->subscribers_list);
+			looper != NULL;
+			looper = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(looper->node))
 	{
-		//TODO
-		TRACE_DETAIL(("Send Notification to Subscriber."));
+		if(looper->target == node->target)
+		{
+			TRACE_WARN(("Duplicate Subscription!"));
+			exists = TRUE;
+			ret_val = HM_ERR;
+			break;
+		}
+	}
+	if(!exists)
+	{
+		HM_INSERT_BEFORE(subs_cb->subscribers_list, node->node);
 
+		/***************************************************************************/
+		/* Increment the subscribers count										   */
+		/***************************************************************************/
+		subs_cb->num_subscribers++;
+		/***************************************************************************/
+		/* If subscription is active, create a notification response to the subscr-*/
+		/* -iber. Other subscribers already know it. This one might need update.   */
+		/***************************************************************************/
+		if(subs_cb->live)
+		{
+			//TODO
+			switch(GET_TABLE_TYPE(subs_cb->row_cb.void_cb))
+			{
+			case HM_TABLE_TYPE_NODES:
+				if(subs_cb->row_cb.node_cb->status == HM_NODE_FSM_STATE_ACTIVE)
+				{
+					notify_type = HM_NOTIFICATION_NODE_ACTIVE;
+					notify = TRUE;
+				}
+				break;
+			case HM_TABLE_TYPE_PROCESS:
+				if(subs_cb->row_cb.process_cb->status == TRUE)
+				{
+					notify_type = HM_NOTIFICATION_PROCESS_CREATED;
+					notify = TRUE;
+				}
+				break;
+
+			default:
+				TRACE_ERROR(("Unsupported Table Type: %d", GET_TABLE_TYPE(subs_cb->row_cb.void_cb)));
+				TRACE_ASSERT(FALSE);
+
+			}
+			if(notify)
+			{
+				TRACE_DETAIL(("Send Notification to Subscriber."));
+
+				/***************************************************************************/
+				/* Allocate a Notification CB and Add that notification CB to Notify Queue */
+				/***************************************************************************/
+				notify_cb =  hm_alloc_notify_cb();
+				if(notify_cb == NULL)
+				{
+					TRACE_ERROR(("Error creating Notification CB"));
+					TRACE_ERROR(("Update could not be propagated."));
+					ret_val = HM_ERR;
+				}
+
+				notify_cb->node_cb.void_cb = subs_cb->row_cb.void_cb;
+				notify_cb->notification_type = notify_type;
+
+				/***************************************************************************/
+				/* Queue the notification CB 											   */
+				/***************************************************************************/
+				HM_INSERT_BEFORE(LOCAL.notification_queue ,notify_cb->node);
+
+				//FIXME: Move it to a separate thread later
+				hm_service_notify_queue();
+			}
+			else
+			{
+				TRACE_DETAIL(("Not sending notifications"));
+			}
+		}
 	}
 
 EXIT_LABEL:
@@ -1410,8 +1539,8 @@ int32_t hm_compare_proc_tree_keys(void *key1, void *key2)
 	proc1 = (HM_GLOBAL_PROCESS_CB *)key1;
 	proc2 = (HM_GLOBAL_PROCESS_CB *)key2;
 
-	TRACE_DETAIL(("[1:] %x %d %d",proc1->type, proc1->node_index, proc1->pid));
-	TRACE_DETAIL(("[2:] %x %d %d",proc2->type, proc2->node_index, proc2->pid));
+	TRACE_DETAIL(("[1:] 0x%x %d 0x%x",proc1->type, proc1->node_index, proc1->pid));
+	TRACE_DETAIL(("[2:] 0x%x %d 0x%x",proc2->type, proc2->node_index, proc2->pid));
 
 	if(proc1->type > proc2->type)
 	{

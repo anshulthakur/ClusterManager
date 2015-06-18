@@ -13,12 +13,15 @@ DEF := -DI_WANT_TO_DEBUG
 
 RM := rm -rf
 
+OUT_PATH := ../../Debug
+
+
 all: tester
 
 tester: $(OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'	
-	gcc  -o "tester" $(OBJS) $(LIBS)
+	gcc  -o $(OUT_PATH)/tester $(OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -30,5 +33,5 @@ tester: $(OBJS)
 	@echo ' '	
 
 clean:
-	-$(RM) $(OBJS) tester
+	-$(RM) $(OBJS) $(OUT_PATH)/tester
 	-@echo ' '	

@@ -26,6 +26,7 @@ int32_t hm_service_notify_queue()
 	HM_SUBSCRIBER affected_node, subscriber;
 	HM_MSG *msg = NULL;
 	int32_t ret_val = HM_OK;
+	uint32_t *processed = NULL;
 	HM_LIST_BLOCK *list_member = NULL, *block = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
@@ -79,6 +80,13 @@ int32_t hm_service_notify_queue()
 			{
 
 				//TODO
+				processed = (uint32_t *)list_member->opaque;
+				TRACE_ASSERT(processed != NULL);
+				if( *processed == TRUE)
+				{
+					TRACE_DETAIL(("Subscriber has been serviced!"));
+					continue;
+				}
 				/***************************************************************************/
 				/* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
 				/* will be notified.													   */
@@ -111,6 +119,11 @@ int32_t hm_service_notify_queue()
 					HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
 					msg->ref_count++; /* This is more important */
 					hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+					/***************************************************************************/
+					/* Mark the Node as serviced.											   */
+					/***************************************************************************/
+					processed = (uint32_t *)list_member->opaque;
+					*processed = TRUE;
 				}
 				else
 				{
@@ -155,6 +168,13 @@ int32_t hm_service_notify_queue()
 			{
 
 				//TODO
+				processed = (uint32_t *)list_member->opaque;
+				TRACE_ASSERT(processed != NULL);
+				if( *processed == TRUE)
+				{
+					TRACE_DETAIL(("Subscriber has been serviced!"));
+					continue;
+				}
 				/***************************************************************************/
 				/* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
 				/* will be notified.													   */
@@ -187,6 +207,10 @@ int32_t hm_service_notify_queue()
 					HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
 					msg->ref_count++; /* This is more important */
 					hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+					/***************************************************************************/
+					/* Mark the Node as serviced.											   */
+					/***************************************************************************/
+					*processed = TRUE;
 				}
 				else
 				{
@@ -232,6 +256,13 @@ int32_t hm_service_notify_queue()
 			{
 
 				//TODO
+				processed = (uint32_t *)list_member->opaque;
+				TRACE_ASSERT(processed != NULL);
+				if( *processed == TRUE)
+				{
+					TRACE_DETAIL(("Subscriber has been serviced!"));
+					continue;
+				}
 				/***************************************************************************/
 				/* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
 				/* will be notified.													   */
@@ -264,6 +295,7 @@ int32_t hm_service_notify_queue()
 					HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
 					msg->ref_count++; /* This is more important */
 					hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+					*processed = TRUE;
 				}
 				else
 				{

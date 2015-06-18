@@ -21,6 +21,8 @@
 #define HM_OK 				((int16_t)0)
 #define HM_ERR 				((int16_t)-1)
 
+#define GET_TABLE_TYPE(row_cb)  (*(uint32_t *)((char *)row_cb + sizeof(uint32_t)))
+
 /***************************************************************************/
 /* To address to Memory Addresses										   */
 /***************************************************************************/
