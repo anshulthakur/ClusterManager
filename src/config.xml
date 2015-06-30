@@ -28,19 +28,19 @@
 <hm_instance_info>
     <index>1</index>
     <heartbeat scope="node">
-        <period resolution="ms">5000</period>
+        <period resolution="ms">60000</period>
         <threshold>3</threshold>
     </heartbeat>
     <heartbeat scope="cluster">
         <period resolution="ms">10000</period>
         <threshold>1</threshold>
     </heartbeat>
-    <address type="local">
+    <address type="local" scope="node">
         <ip version="4" type="tcp">127.0.0.1</ip>
         <port>4999</port>
     </address>
-    <address type="local">
-        <ip version="4" type="udp">127.0.0.1</ip>
+    <address type="local" scope="cluster">
+        <ip version="4" type="tcp">127.0.0.1</ip>
         <port>5496</port>
     </address>
     <address type="local">

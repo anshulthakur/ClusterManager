@@ -8,7 +8,6 @@
  */
 
 #include <hmincl.h>
-
 /***************************************************************************/
 /* Name:	hm_open_socket 									*/
 /* Parameters: Input - 										*/
@@ -16,7 +15,7 @@
 /* Return:	int32_t									*/
 /* Purpose: Opens a non-blocking socket			*/
 /***************************************************************************/
-static int32_t hm_open_socket(struct addrinfo *res)
+static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t *lenp)
 {
 	/***************************************************************************/
 	/* Variable Declarations												   */
@@ -33,14 +32,21 @@ static int32_t hm_open_socket(struct addrinfo *res)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (sock_fd < 0)
+	do{
+		sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (sock_fd >= 0)
+		{
+			TRACE_DETAIL(("Got socket."));
+			break;
+		}
+	}while((res = res->ai_next) != NULL);
+
+	if(res == NULL)
 	{
-		TRACE_PERROR(("Error opening socket."));
+		TRACE_PERROR(("Error opening socket!"));
 		sock_fd = -1;
 		goto EXIT_LABEL;
 	}
-
 	/***************************************************************************/
 	/* Socket Opened. Now set its options		   						       */
 	/***************************************************************************/
@@ -85,6 +91,17 @@ static int32_t hm_open_socket(struct addrinfo *res)
 	}
 	TRACE_DETAIL(("Add FD to set"));
 	FD_SET(sock_fd, &hm_tprt_conn_set);
+
+	*saptr = malloc(res->ai_addrlen);
+	if(*saptr == NULL)
+	{
+		TRACE_ERROR(("Error allocating memory for address structure."));
+		close(sock_fd);
+		sock_fd = -1;
+		goto EXIT_LABEL;
+	}
+	memcpy(*saptr, res->ai_addr, res->ai_addrlen);
+	*lenp = res->ai_addrlen;
 
 EXIT_LABEL:
 	/***************************************************************************/
@@ -160,13 +177,13 @@ HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
 		TRACE_DETAIL(("Update maximum socket descriptor value to %d", sock_cb->sock_fd));
 		max_fd = sock_cb->sock_fd;
 	}
-	TRACE_DETAIL(("Add FD to set"));
-	FD_SET(sock_fd, &hm_tprt_conn_set);
 	/***************************************************************************/
 	/* We're going to INIT state. Connect has been received, but nothing else  */
 	/* has happened. Chances are, it has not been mapped on to a Transport CB  */
 	/***************************************************************************/
 	sock_cb->conn_state = HM_TPRT_CONN_INIT;
+
+	sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
 	TRACE_DETAIL(("Connection Accepted on Socket %d. Wait for Messages.",
 													sock_cb->sock_fd));
 	HM_INSERT_BEFORE(LOCAL.conn_list, sock_cb->node);
@@ -202,15 +219,23 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 	/***************************************************************************/
 	int32_t sock_fd = -1;
 	int32_t val;
-	int32_t option_val;
+	int32_t option_val = 1;
+
+	socklen_t length;
 
 	HM_SOCKET_CB *sock_cb = NULL;
+
+	HM_INET_ADDRESS *address = params;
+	struct ip_mreq mreq;
+	char mcast_addr[129];
+	int32_t mcast_group = HM_MCAST_BASE_ADDRESS; /* Base value */
 
 	char target[128], service[128];
 
 	int32_t ret_val;
 
 	struct addrinfo hints, *res, *ressave;
+	HM_SOCKADDR_UNION *mcast_cast = NULL, *addr = NULL;
 
 	TRACE_ENTRY();
 
@@ -245,6 +270,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;
+		hints.ai_flags = AI_NUMERICHOST|AI_NUMERICSERV;
 		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
 		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
 		break;
@@ -270,6 +296,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_DGRAM;
 		hints.ai_protocol = IPPROTO_UDP;
+		hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
 		inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
 		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
 		break;
@@ -318,6 +345,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 		TRACE_INFO(("IPv6 Multicast Socket"));
 		hints.ai_family = AF_INET6;
 		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
 		inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
 		snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
 		break;
@@ -353,27 +381,44 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 	/***************************************************************************/
 	TRACE_DETAIL(("AI_FAMILY: %d", hints.ai_family));
 	TRACE_DETAIL(("Target: %s:%s", target, service));
-	if((ret_val = getaddrinfo(target, service, &hints, &res)) !=0)
+	if((conn_type != HM_TRANSPORT_MCAST)&&(conn_type != HM_TRANSPORT_MCAST_IPv6))
 	{
-		TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_val);
-		ret_val = HM_ERR;
-		goto EXIT_LABEL;
+		TRACE_DETAIL(("Unicast Address"));
+		if((ret_val = getaddrinfo(target, service, &hints, &res)) !=0)
+		{
+			TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_val);
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+		ressave = res;
+		/***************************************************************************/
+		/* Right now, we are only expecting a single address in response.		   */
+		/* Set appropriate socket options depending on the type of socket.		   */
+		/***************************************************************************/
+		TRACE_DETAIL(("Opening Socket"));
+		sock_fd = hm_open_socket(res, (SOCKADDR **)&addr, &length);
 	}
-
-	ressave = res;
-	/***************************************************************************/
-	/* Right now, we are only expecting a single address in response.		   */
-	/* Set appropriate socket options depending on the type of socket.		   */
-	/***************************************************************************/
-	TRACE_DETAIL(("Opening Socket"));
-	sock_fd = hm_open_socket(res);
+	else
+	{
+		TRACE_DETAIL(("Multicast Address"));
+		if((ret_val = getaddrinfo(NULL, service, &hints, &res)) !=0)
+		{
+			TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_val);
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+		TRACE_DETAIL(("Opening Socket"));
+		sock_fd = hm_open_socket(res, (SOCKADDR **)&addr, &length);
+	}
 	if(sock_fd == -1)
 	{
 		TRACE_ERROR(("Error opening socket"));
 		ret_val = HM_ERR;
 		goto EXIT_LABEL;
 	}
+
 	TRACE_DETAIL(("Socket opened: %d", sock_fd));
+	TRACE_ASSERT(addr != NULL);
 	/***************************************************************************/
 	/* Other specific options and processing.								   */
 	/***************************************************************************/
@@ -399,7 +444,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 		/* Bind to address														   */
 		/***************************************************************************/
 		TRACE_DETAIL(("Binding to address"));
-		if(bind(sock_fd, res->ai_addr, res->ai_addrlen) != 0)
+		if(bind(sock_fd, &addr->sock_addr, length) != 0)
 		{
 			TRACE_PERROR(("Error binding to port"));
 			close(sock_fd);
@@ -415,45 +460,131 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 			sock_fd = -1;
 			goto EXIT_LABEL;
 		}
+		sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
 		break;
 
 	case HM_TRANSPORT_TCP_OUT:
 		TRACE_INFO(("Trying to connect"));
-		if(connect(sock_fd, res->ai_addr, res->ai_addrlen)!=0)
+		if((val = connect(sock_fd, &addr->sock_addr, length))!=0)
 		{
-			TRACE_PERROR(("Connect failed on socket %d", sock_fd));
-			close(sock_fd);
-			sock_fd = -1;
-			goto EXIT_LABEL;
+			if(errno == EINPROGRESS)
+			{
+				TRACE_DETAIL(("Connect will complete asynchronously."));
+				FD_SET(sock_fd, &hm_tprt_write_set);
+				sock_cb->conn_state = HM_TPRT_CONN_INIT;
+			}
+			else
+			{
+				TRACE_PERROR(("Connect failed on socket %d", sock_fd));
+				FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
+				close(sock_fd);
+				sock_fd = -1;
+				goto EXIT_LABEL;
+			}
 		}
+		else
+		{
+			TRACE_DETAIL(("Connect succeeded!"));
+			/* Directly move connection to active state */
+			sock_cb->conn_state = HM_TPRT_CONN_ACTIVE;
+		}
+		//TODO: Add socket to write_set and poll on write_set too.
+		sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
+		FD_SET(sock_fd, &hm_tprt_write_set);
 		break;
+
 	case HM_TRANSPORT_UDP:
 		/***************************************************************************/
 		/* Bind to address														   */
 		/***************************************************************************/
 		TRACE_DETAIL(("Binding to address"));
-		if(bind(sock_fd, res->ai_addr, res->ai_addrlen) != 0)
+		if(bind(sock_fd, &addr->sock_addr, length) != 0)
 		{
 			TRACE_PERROR(("Error binding to port"));
 			close(sock_fd);
 			sock_fd = -1;
 			goto EXIT_LABEL;
 		}
+		sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_UDP;
         break;
 
 	case HM_TRANSPORT_MCAST:
 		/***************************************************************************/
 		/* Bind to address														   */
 		/***************************************************************************/
-		TRACE_DETAIL(("Binding to address"));
-		if(bind(sock_fd, res->ai_addr, res->ai_addrlen) != 0)
+		if(bind(sock_fd, &addr->sock_addr, length) != 0)
 		{
 			TRACE_PERROR(("Error binding to port"));
 			close(sock_fd);
 			sock_fd = -1;
 			goto EXIT_LABEL;
 		}
-		//TODO: Join multicast group
+		sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_UDP;
+
+#ifdef I_WANT_TO_DEBUG
+		{
+		int i;
+		char address_value[128];
+		HM_SOCKADDR_UNION addr;
+		socklen_t addrlen = sizeof(addr);
+
+		i = getsockname(sock_fd, &addr.sock_addr,  &addrlen);
+		inet_ntop(addr.in_addr.sin_family,
+					&addr.in_addr.sin_addr,
+						address_value, sizeof(address_value));
+		TRACE_INFO(("Address value: %s:%d",address_value,
+									ntohs(addr.in_addr.sin_port)));
+		TRACE_INFO(("Family: %d", addr.in_addr.sin_family));
+		}
+#endif
+
+		snprintf(mcast_addr, sizeof(mcast_addr), "224.0.0.%d", mcast_group+address->mcast_group);
+		TRACE_DETAIL(("Multicast Group Address: %s", mcast_addr));
+		/***************************************************************************/
+		/* Convert to network representation.									   */
+		/***************************************************************************/
+		inet_pton(res->ai_family, mcast_addr, &mreq.imr_multiaddr.s_addr);
+		mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+		if(setsockopt(sock_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == -1)
+		{
+			TRACE_PERROR(("Error joining Multicast Group"));
+			close(sock_fd);
+			sock_fd = -1;
+			goto EXIT_LABEL;
+		}
+
+		TRACE_INFO(("Joined Multicast Group %d.", address->mcast_group));
+		TRACE_INFO(("Update Global Multicast Address Destination"));
+		/***************************************************************************/
+		/* Also update the Multicast sending address in LOCAL					   */
+		/* This is a quickfix.													   */
+		/* FIXME															   	   */
+		/***************************************************************************/
+		TRACE_ASSERT(LOCAL.mcast_addr != NULL);
+		LOCAL.mcast_addr->address.mcast_group = address->mcast_group;
+		//IPv4 Specific
+		mcast_cast = (HM_SOCKADDR_UNION *)&LOCAL.mcast_addr->address.address;
+		inet_pton(res->ai_family, mcast_addr,
+				((SOCKADDR_IN *)&mcast_cast->in_addr.sin_addr));
+		mcast_cast->in_addr.sin_port = ((SOCKADDR_IN*)res->ai_addr)->sin_port;
+		mcast_cast->in_addr.sin_family = res->ai_family;
+
+#ifdef I_WANT_TO_DEBUG
+		{
+		char address_value[128];
+		inet_ntop(res->ai_family,
+				((SOCKADDR_IN *)&mcast_cast->in_addr.sin_addr),
+				address_value, sizeof(address_value));
+		TRACE_INFO(("Multicast Address value: %s:%d",address_value,
+									ntohs(mcast_cast->in_addr.sin_port)));
+		TRACE_INFO(("Family: %d", res->ai_family));
+		}
+#endif
+
+		LOCAL.mcast_addr->sock_cb = sock_cb;
+		LOCAL.mcast_addr->location_cb = &LOCAL.local_location_cb;
+
 		break;
 
 	default:
@@ -521,6 +652,9 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 	int32_t success = FALSE;
 	BYTE *buf = NULL;
 	int32_t os_error;
+#ifdef I_WANT_TO_DEBUG
+	char temp[129];
+#endif
 
 	TRACE_ENTRY();
 
@@ -550,20 +684,43 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
                                  (length - bytes_sent),
                                  0,
                                  ip,
-                                 sizeof(struct sockaddr_in));
+                                 sizeof(struct sockaddr));
 
 		}
 
 		else if(sock_type==HM_TRANSPORT_MCAST)
 		{
 			TRACE_DETAIL(("Data to be sent on UDP Mcast connection "));
+#ifdef I_WANT_TO_DEBUG
+		{
+		int i;
+		char address_value[128];
+		HM_SOCKADDR_UNION addr;
+		socklen_t addrlen = sizeof(addr);
+
+		i = getsockname(sock_fd, &addr.sock_addr,  &addrlen);
+		inet_ntop(addr.in_addr.sin_family,
+					&addr.in_addr.sin_addr,
+						address_value, sizeof(address_value));
+		TRACE_INFO(("Address value: %s:%d",address_value,
+									ntohs(addr.in_addr.sin_port)));
+		TRACE_INFO(("Family: %d", addr.in_addr.sin_family));
+		}
+
+		TRACE_DETAIL(("Send to %s:%d",
+				inet_ntop(((SOCKADDR_IN *)ip)->sin_family,
+					&((SOCKADDR_IN *)ip)->sin_addr,
+					temp, sizeof(temp)),
+					ntohs(((SOCKADDR_IN *)ip)->sin_port)));
+		TRACE_DETAIL(("Family: %d",((SOCKADDR_IN *)ip)->sin_family));
+#endif
 
 			bytes_sent = sendto(sock_fd,
                                  buf,
                                  (length - bytes_sent),
                                  0,
                                  ip,
-                                 sizeof(struct sockaddr_in));
+                                 sizeof(struct sockaddr));
 
         }
 
@@ -642,7 +799,7 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 /**PROC-**********************************************************************/
 
 int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
-							BYTE * msg_buffer, uint32_t length)
+							BYTE * msg_buffer, uint32_t length, SOCKADDR **src_addr)
 {
 	/***************************************************************************/
 	/* Local variables														   */
@@ -652,58 +809,64 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 	int32_t os_error;
 	int32_t op_complete = FALSE;
 	BYTE *buf = msg_buffer;
-	struct sockaddr *src_addr;
+
+	SOCKADDR_IN * ip_addr = NULL;
 	extern fd_set hm_tprt_conn_set;
 
+	socklen_t len = sizeof(SOCKADDR);
+
 	TRACE_ENTRY();
-/*
-	SOCKADDR_IN* ip_addr = (SOCKADDR_IN*)malloc(sizeof(SOCKADDR_IN));
-	src_addr = (SOCKADDR_IN *)malloc(sizeof(SOCKADDR_IN));
-*/
+
+	TRACE_ASSERT(msg_buffer != NULL);
+
     /***************************************************************************/
 	/* Now try to receive data												   */
 	/***************************************************************************/
+	*src_addr = NULL;
 	do
 	{
 		TRACE_DETAIL(("Try to receive %d bytes on Socket %d", (length - bytes_rcvd), sock_fd));
 
-		if((sock_type==HM_TRANSPORT_TCP_IN)|| (sock_type==HM_TRANSPORT_TCP_OUT))
+		if(sock_type==HM_TRANSPORT_SOCK_TYPE_TCP)
 		{
+			TRACE_DETAIL(("TCP Socket"));
 			bytes_rcvd = recv(sock_fd,
 							  buf,
 							  (length - bytes_rcvd),
 							  0);
 		}
 
-		else if(sock_type==HM_TRANSPORT_UDP)
+		else if(sock_type==HM_TRANSPORT_SOCK_TYPE_UDP)
 		{
-			 bytes_rcvd = recvfrom(sock_fd,
+			TRACE_DETAIL(("UDP Socket"));
+			ip_addr = (SOCKADDR_IN*)malloc(sizeof(SOCKADDR_IN));
+			if(ip_addr == NULL)
+			{
+				TRACE_ERROR(("Error allocating memory for incoming Address"));
+				op_complete = TRUE;
+			    bytes_rcvd = 0;
+			    break;
+			}
+			bytes_rcvd = recvfrom(sock_fd,
                                       buf,
                                       (length - bytes_rcvd),
                                        0,
-                                       (struct sockaddr *)&src_addr	,
-                                       (socklen_t *)sizeof(struct sockaddr_in));
-
+                                       (struct sockaddr *)ip_addr	,
+                                       &len);
 			 /***************************************************************************/
 			 /* Do we need to fetch the sender IP information too, from the socket?     */
 			 /* or will they tell it themselves?										*/
 			 /* In some upper layer structure?											*/
 			 /***************************************************************************/
 			 //FIXME: So far, they're not telling, so we need to get it here.
+			{
+				char net_addr[128];
+				int32_t length = 128;
+				inet_ntop(AF_INET, &ip_addr->sin_addr, net_addr, length);
+				TRACE_DETAIL(("%s:%d", net_addr, ntohs(ip_addr->sin_port)));
+
+			}
 		}
-
-		else if(sock_type==HM_TRANSPORT_MCAST)
-		{
-			 bytes_rcvd = recvfrom(sock_fd,
-                                     buf,
-                                     (length - bytes_rcvd),
-                                      0,
-                                      (struct sockaddr *)&src_addr,
-                                      (socklen_t *) sizeof (struct sockaddr_in));
-
-			 //MEMCPY(&conn_cb->ip,&ip_addr,(sizeof(SOCKADDR_IN)));
-		}
-
 		if(bytes_rcvd == length)
 		{
 			TRACE_DETAIL(("Message received in full"));
@@ -753,6 +916,12 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 			total_bytes_rcvd = HM_ERR;
 			break;
 		}
+		else
+		{
+			TRACE_INFO(("%d bytes received. Returning.", bytes_rcvd));
+			op_complete = TRUE;
+			break;
+		}
 		/***************************************************************************/
 		/* Advance current pointer to remaining part of data					   */
 		/***************************************************************************/
@@ -776,6 +945,7 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 	}
 
 	TRACE_EXIT();
+	*src_addr = ip_addr;
 	return (total_bytes_rcvd);
 } /* hm_tprt_recv_on_socket */
 
@@ -838,9 +1008,16 @@ int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
 	switch(tprt_cb->type)
 	{
 	default:
-		TRACE_DETAIL(("Closing socket connections"));
-		hm_close_sock_connection(tprt_cb->sock_cb);
-		tprt_cb->sock_cb = NULL;
+		/***************************************************************************/
+		/* It is possible that the socket connection was torn down before, or never*/
+		/* existed in the first place.											   */
+		/***************************************************************************/
+		if(tprt_cb->sock_cb != NULL)
+		{
+			TRACE_DETAIL(("Closing socket connections"));
+			hm_close_sock_connection(tprt_cb->sock_cb);
+			tprt_cb->sock_cb = NULL;
+		}
 	}
 	/***************************************************************************/
 	/* Exit Level Checks													   */

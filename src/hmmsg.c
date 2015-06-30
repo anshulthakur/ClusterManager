@@ -21,8 +21,10 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	/***************************************************************************/
 	HM_REGISTER_MSG *reg = NULL;
 	int32_t ret_val = HM_OK, bytes_rcvd = 0, i;
-	HM_LIST_BLOCK *block = NULL;
+
 	int32_t msg_size = sizeof(HM_REGISTER_MSG);
+
+	SOCKADDR *udp_sender;
 
 	HM_REGISTER_TLV_CB *tlv = NULL;
 	/***************************************************************************/
@@ -82,11 +84,11 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	reg = (HM_REGISTER_MSG *)msg->msg;
 	tprt_cb->in_buffer = (char *)msg->msg+ sizeof(HM_REGISTER_MSG);
 	bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
-										HM_TRANSPORT_TCP_IN,
+										tprt_cb->sock_cb->sock_type,
 										tprt_cb->in_buffer,
-										(reg->num_register * sizeof(HM_REGISTER_TLV_CB))
-										);
-	if(bytes_rcvd < (reg->num_register + sizeof(HM_REGISTER_TLV_CB)))
+										(reg->num_register * sizeof(HM_REGISTER_TLV_CB)),
+										&udp_sender);
+	if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB)))
 	{
 		TRACE_WARN(("Bytes received (%d) less than expected %d",
 								bytes_rcvd, sizeof(HM_REGISTER_MSG)));
@@ -99,7 +101,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	for(i=0; i< reg->num_register; i++)
 	{
 		tlv = (HM_REGISTER_TLV_CB *)tprt_cb->in_buffer + i;
-		if(hm_subscribe(tlv->type, tlv->id, (void *)tprt_cb->node_cb) != HM_OK)
+		if(hm_subscribe(reg->type, tlv->id, (void *)tprt_cb->node_cb) != HM_OK)
 		{
 			TRACE_ERROR(("Error creating subscriptions."));
 			ret_val = HM_ERR;
@@ -118,28 +120,9 @@ EXIT_LABEL:
 	if(ret_val == HM_OK)
 	{
 		TRACE_DETAIL(("Send Response"));
-		/***************************************************************************/
-		/* Message created. Now, add it to outgoing queue and try to send		   */
-		/***************************************************************************/
-		block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-		if(block == NULL)
-		{
-			TRACE_ASSERT(FALSE);
-			TRACE_ERROR(("Error allocating memory for Register response queuing!"));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		HM_INIT_LQE(block->node, block);
-
-		block->target = msg;
-		/***************************************************************************/
-		/* INIT Response should be the first thing that is sent on this queue. So, */
-		/* add it to the head, not the tail.								       */
-		/***************************************************************************/
-		HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+		ret_val = hm_queue_on_transport(msg, tprt_cb);
 		tprt_cb->in_buffer = NULL;
 
-		ret_val = hm_tprt_process_outgoing_queue(tprt_cb);
 	}
 	/***************************************************************************/
 	/* Exit Level Checks													   */
@@ -162,7 +145,7 @@ int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	/***************************************************************************/
 	HM_LIST_BLOCK *block = NULL;
 	HM_PROCESS_UPDATE_MSG *proc_msg = NULL;
-	int32_t ret_val = HM_OK, i=0;
+	int32_t ret_val = HM_OK;
 
 	int32_t key[2];
 
@@ -259,33 +242,14 @@ EXIT_LABEL:
 	if(ret_val == HM_OK)
 	{
 		TRACE_DETAIL(("Send Response"));
-		/***************************************************************************/
-		/* Message created. Now, add it to outgoing queue and try to send		   */
-		/***************************************************************************/
-		block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-		if(block == NULL)
-		{
-			TRACE_ASSERT(FALSE);
-			TRACE_ERROR(("Error allocating memory for Register response queuing!"));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		HM_INIT_LQE(block->node, block);
-
-		block->target = msg;
-		/***************************************************************************/
-		/* INIT Response should be the first thing that is sent on this queue. So, */
-		/* add it to the head, not the tail.								       */
-		/***************************************************************************/
-		HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+		ret_val = hm_queue_on_transport(msg,tprt_cb);
 		tprt_cb->in_buffer = NULL;
-
-		ret_val = hm_tprt_process_outgoing_queue(tprt_cb);
 	}
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return ret_val;
 }/* hm_recv_proc_update */
 
 /***************************************************************************/
@@ -306,6 +270,8 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 	HM_MSG *msg_buf = NULL;
 	int32_t ret_val = HM_OK;
 	int32_t size = 0;
+
+	SOCKADDR *udp_sender;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -316,110 +282,128 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	msg_hdr = sock_cb->tprt_cb->in_buffer;
 
-	/***************************************************************************/
-	/* Depending on the incoming message type, allocate Buffers for receiving  */
-	/* the message.															   */
-	/***************************************************************************/
-	switch(msg_hdr->msg_type)
+	if(sock_cb->tprt_cb->in_bytes == sizeof(HM_PEER_MSG_HEADER))
 	{
-	case HM_MSG_TYPE_KEEPALIVE:
-		TRACE_DETAIL(("Keepalive Message."));
-		/***************************************************************************/
-		/* Received Keepalive. Validate and Decrement Keepalive Ticks 			   */
-		/* KEEPALIVE is just a header.											   */
-		/***************************************************************************/
-		sock_cb->tprt_cb->node_cb->keepalive_missed--;
-		sock_cb->tprt_cb->in_buffer = NULL;
-		break;
-
-	case HM_MSG_TYPE_REGISTER:
-		TRACE_DETAIL(("Registration Message received."));
-		msg_buf = hm_get_buffer(sizeof(HM_REGISTER_MSG));
-		if(msg_buf == NULL)
+		TRACE_DETAIL(("Message received from a peer."));
+		if(hm_receive_cluster_message(sock_cb)!= HM_OK)
 		{
-			TRACE_ERROR(("Error allocating buffers for Incoming Message."));
-			ret_val =HM_ERR;
-			goto EXIT_LABEL;
+			TRACE_ERROR(("Error occurred while handling cluster message."));
+			ret_val = HM_ERR;
 		}
-		/***************************************************************************/
-		/* Got Buffer. Set incoming buffer pointer to it and receive.			   */
-		/***************************************************************************/
-		/* First copy the header from in_buffer									   */
-		memcpy(msg_buf->msg, sock_cb->tprt_cb->in_buffer, sizeof(HM_MSG_HEADER));
-		/* Now align the in_buffer pointer to it and receive message			   */
-		sock_cb->tprt_cb->in_buffer = (char *)((char *)msg_buf->msg + sizeof(HM_MSG_HEADER));
-		size  = sizeof(HM_REGISTER_MSG)-sizeof(HM_MSG_HEADER);
-		bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-											HM_TRANSPORT_TCP_IN,
-											sock_cb->tprt_cb->in_buffer,
-											size
-											);
-		if(bytes_rcvd < size)
-		{
-			TRACE_WARN(("Bytes received (%d) less than expected %d",
-									bytes_rcvd, size));
-			hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
-			goto EXIT_LABEL;
-		}
-		if(hm_recv_register(msg_buf, sock_cb->tprt_cb)!= HM_OK)
-		{
-			TRACE_ERROR(("Error occurred while REGISTER Processing."));
-			TRACE_ASSERT(FALSE);
-			goto EXIT_LABEL;
-		}
-		break;
-
-	case HM_MSG_TYPE_UNREGISTER:
-		TRACE_DETAIL(("Received Unregister Message"));
-		//TODO
-		break;
-
-	case HM_MSG_TYPE_PROCESS_CREATE:
-		TRACE_DETAIL(("Received Process Creation Message"));
-		msg_buf = hm_get_buffer(sizeof(HM_PROCESS_UPDATE_MSG));
-		if(msg_buf == NULL)
-		{
-			TRACE_ERROR(("Error allocating buffers for Incoming Message."));
-			ret_val =HM_ERR;
-			goto EXIT_LABEL;
-		}
-		/***************************************************************************/
-		/* Got Buffer. Set incoming buffer pointer to it and receive.			   */
-		/***************************************************************************/
-		/* First copy the header from in_buffer									   */
-		memcpy(msg_buf->msg, sock_cb->tprt_cb->in_buffer, sizeof(HM_MSG_HEADER));
-		/* Now align the in_buffer pointer to it and receive message			   */
-		sock_cb->tprt_cb->in_buffer = (char *)((char *)msg_buf->msg + sizeof(HM_MSG_HEADER));
-		size  = sizeof(HM_PROCESS_UPDATE_MSG)-sizeof(HM_MSG_HEADER);
-		bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-											HM_TRANSPORT_TCP_IN,
-											sock_cb->tprt_cb->in_buffer,
-											size
-											);
-		if(bytes_rcvd < size)
-		{
-			TRACE_WARN(("Bytes received (%d) less than expected %d",
-									bytes_rcvd, size));
-			hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
-			goto EXIT_LABEL;
-		}
-		if(hm_recv_proc_update(msg_buf, sock_cb->tprt_cb)!= HM_OK)
-		{
-			TRACE_ERROR(("Error occurred while REGISTER Processing."));
-			TRACE_ASSERT(FALSE);
-			goto EXIT_LABEL;
-		}
-		break;
-	case HM_MSG_TYPE_PROCESS_DESTROY:
-		TRACE_DETAIL(("Received Process Destruction Message"));
-		//TODO
-		break;
-	default:
-		TRACE_WARN(("Unknown Message Type"));
-		TRACE_ASSERT(FALSE);
 	}
+	else if(sock_cb->tprt_cb->in_bytes == sizeof(HM_MSG_HEADER))
+	{
+		TRACE_DETAIL(("Message from a Node"));
+		msg_hdr = (HM_MSG_HEADER *)sock_cb->tprt_cb->in_buffer;
+
+		/***************************************************************************/
+		/* Depending on the incoming message type, allocate Buffers for receiving  */
+		/* the message.															   */
+		/***************************************************************************/
+		switch(msg_hdr->msg_type)
+		{
+		case HM_MSG_TYPE_KEEPALIVE:
+			TRACE_DETAIL(("Keepalive Message."));
+			/***************************************************************************/
+			/* Received Keepalive. Validate and Decrement Keepalive Ticks 			   */
+			/* KEEPALIVE is just a header.											   */
+			/***************************************************************************/
+			if(sock_cb->tprt_cb->node_cb->keepalive_missed > 0)
+			{
+				sock_cb->tprt_cb->node_cb->keepalive_missed--;
+			}
+			sock_cb->tprt_cb->in_buffer = NULL;
+			break;
+
+		case HM_MSG_TYPE_REGISTER:
+			TRACE_DETAIL(("Registration Message received."));
+			msg_buf = hm_get_buffer(sizeof(HM_REGISTER_MSG));
+			if(msg_buf == NULL)
+			{
+				TRACE_ERROR(("Error allocating buffers for Incoming Message."));
+				ret_val =HM_ERR;
+				goto EXIT_LABEL;
+			}
+			/***************************************************************************/
+			/* Got Buffer. Set incoming buffer pointer to it and receive.			   */
+			/***************************************************************************/
+			/* First copy the header from in_buffer									   */
+			memcpy(msg_buf->msg, sock_cb->tprt_cb->in_buffer, sizeof(HM_MSG_HEADER));
+			/* Now align the in_buffer pointer to it and receive message			   */
+			sock_cb->tprt_cb->in_buffer = (char *)((char *)msg_buf->msg + sizeof(HM_MSG_HEADER));
+			size  = sizeof(HM_REGISTER_MSG)-sizeof(HM_MSG_HEADER);
+			bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+												sock_cb->sock_type,
+												sock_cb->tprt_cb->in_buffer,
+												size,
+												&udp_sender
+												);
+			if(bytes_rcvd < size)
+			{
+				TRACE_WARN(("Bytes received (%d) less than expected %d",
+										bytes_rcvd, size));
+				hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
+				goto EXIT_LABEL;
+			}
+			if(hm_recv_register(msg_buf, sock_cb->tprt_cb)!= HM_OK)
+			{
+				TRACE_ERROR(("Error occurred while REGISTER Processing."));
+				TRACE_ASSERT(FALSE);
+				goto EXIT_LABEL;
+			}
+			break;
+
+		case HM_MSG_TYPE_UNREGISTER:
+			TRACE_DETAIL(("Received Unregister Message"));
+			//TODO
+			break;
+
+		case HM_MSG_TYPE_PROCESS_CREATE:
+			TRACE_DETAIL(("Received Process Creation Message"));
+			msg_buf = hm_get_buffer(sizeof(HM_PROCESS_UPDATE_MSG));
+			if(msg_buf == NULL)
+			{
+				TRACE_ERROR(("Error allocating buffers for Incoming Message."));
+				ret_val =HM_ERR;
+				goto EXIT_LABEL;
+			}
+			/***************************************************************************/
+			/* Got Buffer. Set incoming buffer pointer to it and receive.			   */
+			/***************************************************************************/
+			/* First copy the header from in_buffer									   */
+			memcpy(msg_buf->msg, sock_cb->tprt_cb->in_buffer, sizeof(HM_MSG_HEADER));
+			/* Now align the in_buffer pointer to it and receive message			   */
+			sock_cb->tprt_cb->in_buffer = (char *)((char *)msg_buf->msg + sizeof(HM_MSG_HEADER));
+			size  = sizeof(HM_PROCESS_UPDATE_MSG)-sizeof(HM_MSG_HEADER);
+			bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+												sock_cb->sock_type,
+												sock_cb->tprt_cb->in_buffer,
+												size,
+												&udp_sender);
+			if(bytes_rcvd < size)
+			{
+				TRACE_WARN(("Bytes received (%d) less than expected %d",
+										bytes_rcvd, size));
+				hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
+				goto EXIT_LABEL;
+			}
+			if(hm_recv_proc_update(msg_buf, sock_cb->tprt_cb)!= HM_OK)
+			{
+				TRACE_ERROR(("Error occurred while REGISTER Processing."));
+				TRACE_ASSERT(FALSE);
+				goto EXIT_LABEL;
+			}
+			break;
+		case HM_MSG_TYPE_PROCESS_DESTROY:
+			TRACE_DETAIL(("Received Process Destruction Message"));
+			//TODO
+			break;
+		default:
+			TRACE_WARN(("Unknown Message Type"));
+			TRACE_ASSERT(FALSE);
+		}
+	}//end else
 
 EXIT_LABEL:
 	/***************************************************************************/
@@ -540,7 +524,6 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
 	HM_MSG *msg = NULL;
 	HM_NODE_INIT_MSG *init_msg = NULL;
 
-	HM_LIST_BLOCK *block = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -574,27 +557,11 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
 	init_msg->keepalive_period = node_cb->keepalive_period;
 
 	/***************************************************************************/
-	/* Message created. Now, add it to outgoing queue and try to send		   */
+	/* Made message, now queue on transport and send if possible			   */
 	/***************************************************************************/
-	block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-	if(block == NULL)
-	{
-		TRACE_ASSERT(FALSE);
-		TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
-		ret_val = HM_ERR;
-		goto EXIT_LABEL;
-	}
-	HM_INIT_LQE(block->node, block);
-
-	block->target = msg;
-	/***************************************************************************/
-	/* INIT Response should be the first thing that is sent on this queue. So, */
-	/* add it to the head, not the tail.								       */
-	/***************************************************************************/
-	HM_INSERT_AFTER(node_cb->transport_cb->pending, block->node);
+	ret_val = hm_queue_on_transport(msg, node_cb->transport_cb);
 	node_cb->transport_cb->in_buffer = NULL;
 
-	ret_val = hm_tprt_process_outgoing_queue(node_cb->transport_cb);
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
@@ -605,6 +572,63 @@ EXIT_LABEL:
 
 }/* hm_node_send_init_rsp */
 
+/***************************************************************************/
+/* Name:	hm_queue_on_transport 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Queue the message on the given transport			*/
+/***************************************************************************/
+int32_t hm_queue_on_transport(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	HM_LIST_BLOCK *block = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	TRACE_ASSERT(msg != NULL);
+	TRACE_ASSERT(tprt_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	/***************************************************************************/
+	/* Message created. Now, add it to outgoing queue and try to send		   */
+	/***************************************************************************/
+	block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+	if(block == NULL)
+	{
+		TRACE_ASSERT(FALSE);
+		TRACE_ERROR(("Error allocating memory for Register response queuing!"));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+	HM_INIT_LQE(block->node, block);
+
+	block->target = msg;
+	msg->ref_count++;
+	/***************************************************************************/
+	/* INIT Response should be the first thing that is sent on this queue. So, */
+	/* add it to the head, not the tail.								       */
+	/***************************************************************************/
+	HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+	tprt_cb->in_buffer = NULL;
+
+	/***************************************************************************/
+	/* Try to send															   */
+	/***************************************************************************/
+	ret_val = hm_tprt_process_outgoing_queue(tprt_cb);
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return ret_val;
+}/* hm_queue_on_transport */
 
 /***************************************************************************/
 /* Name:	hm_tprt_process_outgoing_queue 								   */
@@ -628,7 +652,7 @@ int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *tprt_cb)
 	/***************************************************************************/
 	TRACE_ENTRY();
 
-	TRACE_ASSERT(tprt_cb);
+	TRACE_ASSERT(tprt_cb != NULL);
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
@@ -642,8 +666,23 @@ int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *tprt_cb)
 			block != NULL;)
 	{
 		msg = (HM_MSG *)block->target;
-		if(hm_tprt_send_on_socket(NULL, tprt_cb->sock_cb->sock_fd, tprt_cb->type,
-				msg->msg, msg->msg_len) == HM_ERR)
+		/***************************************************************************/
+		/* For TCP, this is a no-brainer. We do not actually need to send the SOCK-*/
+		/* -ADDR structure. For UDP and Multicast, we do.						   */
+		/* Even in case of Multicast, it isn't problematic, since the sender addr  */
+		/* always stays the same.												   */
+		/* For UDP, however, the case is different. Because, we can use the same   */
+		/* port and socket for communicating with different hosts. Thus the address*/
+		/* passed to the lower API must be of destination. 						   */
+		/* But considering that Unicast UDP is meant only for Peers, each peer will*/
+		/* have a separate TRANSPORT_CB and consequently, the address will be diff-*/
+		/*-erent. The reverse-relation from sock_cb to tprt_cb will be obviously   */
+		/* wrong should someone try to use it in case of UDP, since it would point */
+		/* to the Transport of Local Location. But forward path stays correct.	   */
+		/***************************************************************************/
+		if(hm_tprt_send_on_socket((SOCKADDR *)&tprt_cb->address.address,
+							tprt_cb->sock_cb->sock_fd, tprt_cb->type,
+							msg->msg, msg->msg_len) == HM_ERR)
 		{
 			TRACE_ERROR(("Could not send on socket."));
 		}

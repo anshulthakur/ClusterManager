@@ -245,13 +245,13 @@ int32_t hm_service_notify_queue()
 			/***************************************************************************/
 			/* Have message, update reference count									   */
 			/***************************************************************************/
-			notify_cb->ref_count = affected_node.node_cb->sub_cb->num_subscribers;
+			notify_cb->ref_count = affected_node.process_cb->sub_cb->num_subscribers;
 			/***************************************************************************/
 			/* We are ready to send this message to various subscribers				   */
 			/***************************************************************************/
-			for(list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(
-									affected_node.node_cb->sub_cb->subscribers_list);
-					list_member != NULL;
+			for(list_member =(HM_LIST_BLOCK *)HM_NEXT_IN_LIST(
+									affected_node.process_cb->sub_cb->subscribers_list);
+				list_member != NULL;
 				list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(list_member->node))
 			{
 
@@ -312,6 +312,15 @@ int32_t hm_service_notify_queue()
 		case HM_NOTIFICATION_INTERFACE_DELETE:
 			TRACE_INFO(("Interface Deleted"));
 			break;
+
+		case HM_NOTIFICATION_LOCATION_ACTIVE:
+			TRACE_INFO(("Location Active"));
+
+			break;
+		case HM_NOTIFICATION_LOCATION_INACTIVE:
+			TRACE_INFO(("Location Inactive"));
+			break;
+
 		default:
 			TRACE_WARN(("Unknown Notification Type"));
 			TRACE_ASSERT(FALSE);
@@ -403,6 +412,15 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 					&addr->in_addr.sin_addr.s_addr,
 				sizeof(struct in_addr));
 			notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
+#ifdef I_WANT_TO_DEBUG
+		{
+		char address_value[128];
+		inet_ntop(addr->in_addr.sin_family,
+				  notify_msg->addr_info.addr,
+				  address_value, sizeof(address_value));
+		TRACE_INFO(("IP Address filled: %s:%d",address_value, notify_msg->addr_info.port));
+		}
+#endif
 		}
 		else if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IPv6_IN)
 		{
@@ -551,7 +569,6 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 
 	notify_msg->id = 0;
 	notify_msg->if_id = 0;
-	notify_msg->type = HM_NOTIFY_TYPE_NODE_UP;
 
 EXIT_LABEL:
 	/***************************************************************************/

@@ -70,7 +70,7 @@ HM_AVL3_GEN_NODE * hm_avl3_gen_init(void *, void *);
 /*****************************************************************************/
 /* AVL3 access macros.                                                       */
 /*****************************************************************************/
-#define HM_AVL3_INIT_TREE(TREE, TREE_INFO)                                       \
+#define HM_AVL3_INIT_TREE(TREE, TREE_INFO)                                    \
   (TREE).first = NULL;                                                        \
   (TREE).last = NULL;                                                         \
   (TREE).root = NULL;
@@ -238,5 +238,38 @@ VOID hm_timer_delete(HM_TIMER_CB *);
 #define HM_TIMER_MODIFY(CB, NEW_PERIOD) hm_timer_modify(CB, NEW_PERIOD);
 #define HM_TIMER_STOP(CB) hm_timer_stop(CB)
 #define HM_TIMER_DELETE(CB) hm_timer_delete(CB)
+
+
+/***************************************************************************/
+/* Byte Buffer Operations												   */
+/***************************************************************************/
+#ifdef BIG_ENDIAN
+#define HM_PUT_LONG(into, from)                             \
+             (into)[0] = (uint8_t)((from) >> 24);           \
+             (into)[1] = (uint8_t)(((from) >> 16) & 0xFF);  \
+             (into)[2] = (uint8_t)(((from) >> 8)  & 0xFF);  \
+             (into)[3] = (uint8_t)((from) & 0xFF)
+
+#define HM_GET_LONG(into, from)                                         \
+  (into) = (uint32_t)(((uint32_t)((uint8_t *)(from))[0] << 24) |      \
+                    ((uint32_t)((uint8_t *)(from))[1] << 16) |      \
+                    ((uint32_t)((uint8_t *)(from))[2] << 8)  |      \
+                    ((uint32_t)((uint8_t *)(from))[3]))
+#else
+//FIXME
+#define HM_PUT_LONG(into, from)                             \
+             (into)[3] = (uint8_t)((from) >> 24);           \
+             (into)[2] = (uint8_t)(((from) >> 16) & 0xFF);  \
+             (into)[1] = (uint8_t)(((from) >> 8)  & 0xFF);  \
+             (into)[0] = (uint8_t)((from) & 0xFF)
+
+#define HM_GET_LONG(into, from)                                         \
+  (into) = (uint32_t)(((uint32_t)((uint8_t *)(from))[0] << 24) |      \
+                    ((uint32_t)((uint8_t *)(from))[1] << 16) |      \
+                    ((uint32_t)((uint8_t *)(from))[2] << 8)  |      \
+                    ((uint32_t)((uint8_t *)(from))[3]))
+
+#endif
+
 
 #endif /* SRC_HMUTIL_H_ */

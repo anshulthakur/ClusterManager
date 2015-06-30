@@ -3,4 +3,7 @@
 *.swp
 .cproject
 .project
+/Debug/HardwareManager
+*.d
+/Debug/tester
 /Debug/

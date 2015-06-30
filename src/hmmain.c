@@ -184,6 +184,8 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 
 	SOCKADDR_IN *sock_addr = NULL;
 	HM_CONFIG_SUBSCRIPTION_CB *subs = NULL;
+
+	HM_TRANSPORT_CB *tprt_cb = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -241,8 +243,15 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	TRACE_DETAIL(("Hardware Index: %d", LOCAL.local_location_cb.index));
 
 	LOCAL.transport_bitmask = 0;
+	LOCAL.mcast_addr = NULL;
+
+	LOCAL.local_location_cb.node_listen_cb = NULL;
+	LOCAL.local_location_cb.peer_broadcast_cb = NULL;
+	LOCAL.local_location_cb.peer_listen_cb = NULL;
+
 
 	LOCAL.local_location_cb.timer_cb = NULL;
+
 	LOCAL.node_keepalive_period = config_cb->instance_info.node.timer_val;
 	TRACE_INFO(("Node Keepalive Period: %d(ms)",LOCAL.node_keepalive_period));
 	LOCAL.node_kickout_value = config_cb->instance_info.node.threshold;
@@ -254,14 +263,24 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	TRACE_INFO(("Peer Keepalive Threshold: %d",LOCAL.peer_kickout_value));
 
 	/* TCP Info */
-	if(config_cb->instance_info.tcp != NULL)
+	if(config_cb->instance_info.node_addr != NULL)
 	{
-		TRACE_DETAIL(("TCP Information is provided."));
-		memcpy(	&LOCAL.local_location_cb.tcp_addr,
-				&(config_cb->instance_info.tcp->address),
+		TRACE_DETAIL(("Transport Information for Local Nodes is provided."));
+		tprt_cb = hm_alloc_transport_cb(config_cb->instance_info.node_addr->address.type);
+		if(tprt_cb == NULL)
+		{
+			TRACE_ERROR(("Error allocating Transport structures for nodes."));
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+		tprt_cb->location_cb = &LOCAL.local_location_cb;
+		LOCAL.local_location_cb.node_listen_cb = tprt_cb;
+
+		memcpy(	&LOCAL.local_location_cb.node_listen_cb->address,
+				&(config_cb->instance_info.node_addr->address),
 				sizeof(HM_INET_ADDRESS));
-		sock_addr = (SOCKADDR_IN *)&LOCAL.local_location_cb.tcp_addr.address;
-		TRACE_DETAIL(("Address Type: %d", LOCAL.local_location_cb.tcp_addr.type));
+		sock_addr = (SOCKADDR_IN *)&LOCAL.local_location_cb.node_listen_cb->address.address;
+		TRACE_DETAIL(("Address Type: %d", LOCAL.local_location_cb.node_listen_cb->address.type));
 #ifdef I_WANT_TO_DEBUG
 		{
 			char tmp[100];
@@ -276,17 +295,27 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 		LOCAL.transport_bitmask = (LOCAL.transport_bitmask | (1 << HM_TRANSPORT_TCP_LISTEN));
 		TRACE_DETAIL(("0x%x", LOCAL.transport_bitmask));
 	}
-	LOCAL.local_location_cb.node_listen_cb = NULL;
 
-	/* UDP Info */
-	if(config_cb->instance_info.udp != NULL)
+	tprt_cb = NULL;
+	/* Cluster Info */
+	if(config_cb->instance_info.cluster_addr != NULL)
 	{
-		TRACE_DETAIL(("UDP Information is provided."));
-		memcpy(	&LOCAL.local_location_cb.udp_addr,
-				&(config_cb->instance_info.udp->address),
+		TRACE_DETAIL(("Cluster Communication Information is provided."));
+		tprt_cb = hm_alloc_transport_cb(config_cb->instance_info.cluster_addr->address.type);
+		if(tprt_cb == NULL)
+		{
+			TRACE_ERROR(("Error allocating Transport structures for cluster peers."));
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+		tprt_cb->location_cb = &LOCAL.local_location_cb;
+		LOCAL.local_location_cb.peer_listen_cb = tprt_cb;
+
+		memcpy(	&LOCAL.local_location_cb.peer_listen_cb->address,
+				&(config_cb->instance_info.cluster_addr->address),
 				sizeof(HM_INET_ADDRESS));
-		sock_addr = (SOCKADDR_IN *)&LOCAL.local_location_cb.udp_addr.address;
-		TRACE_DETAIL(("Address Type: %d", LOCAL.local_location_cb.udp_addr.type));
+		sock_addr = (SOCKADDR_IN *)&LOCAL.local_location_cb.peer_listen_cb->address.address;
+		TRACE_DETAIL(("Address Type: %d", LOCAL.local_location_cb.peer_listen_cb->address.type));
 #ifdef I_WANT_TO_DEBUG
 		{
 			char tmp[100];
@@ -299,17 +328,27 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 		LOCAL.transport_bitmask = (LOCAL.transport_bitmask | (1 << HM_TRANSPORT_UDP));
 		TRACE_DETAIL(("0x%x", LOCAL.transport_bitmask));
 	}
-	LOCAL.local_location_cb.peer_listen_cb = NULL;
+	tprt_cb = NULL;
 
 	/* Multicast Info */
 	if(config_cb->instance_info.mcast != NULL)
 	{
 		TRACE_DETAIL(("Multicast Information is provided."));
-		memcpy(	&LOCAL.local_location_cb.mcast_addr,
+		tprt_cb = hm_alloc_transport_cb(config_cb->instance_info.mcast->address.type);
+		if(tprt_cb == NULL)
+		{
+			TRACE_ERROR(("Error allocating Transport structures for listening."));
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
+		tprt_cb->location_cb = &LOCAL.local_location_cb;
+		LOCAL.local_location_cb.peer_broadcast_cb = tprt_cb;
+
+		memcpy(	&LOCAL.local_location_cb.peer_broadcast_cb->address,
 				&(config_cb->instance_info.mcast->address),
 				sizeof(HM_INET_ADDRESS));
-		sock_addr = (SOCKADDR_IN *)&LOCAL.local_location_cb.mcast_addr.address;
-		TRACE_DETAIL(("Address Type: %d", LOCAL.local_location_cb.mcast_addr.type));
+		sock_addr = (SOCKADDR_IN *)&LOCAL.local_location_cb.peer_broadcast_cb->address.address;
+		TRACE_DETAIL(("Address Type: %d", LOCAL.local_location_cb.peer_broadcast_cb->address.type));
 #ifdef I_WANT_TO_DEBUG
 		{
 			char tmp[100];
@@ -318,13 +357,23 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 		}
 #endif
 		TRACE_DETAIL(("Port: %d", sock_addr->sin_port));
-		LOCAL.local_location_cb.mcast_addr.mcast_group = config_cb->instance_info.mcast_group;
-		TRACE_DETAIL(("Multicast Group: %d", LOCAL.local_location_cb.mcast_addr.mcast_group));
+		LOCAL.local_location_cb.peer_broadcast_cb->address.mcast_group =
+													config_cb->instance_info.mcast_group;
+		TRACE_DETAIL(("Multicast Group: %d",
+						LOCAL.local_location_cb.peer_broadcast_cb->address.mcast_group));
 		TRACE_DETAIL(("Set Multicast in transport bitmask"));
 		LOCAL.transport_bitmask = (LOCAL.transport_bitmask | (1 << HM_TRANSPORT_MCAST));
 		TRACE_DETAIL(("0x%x", LOCAL.transport_bitmask));
+
+		LOCAL.mcast_addr = hm_alloc_transport_cb(config_cb->instance_info.mcast->address.type);
+		if(LOCAL.mcast_addr == NULL)
+		{
+			TRACE_ERROR(("Error allocating memory for Multicast Address."));
+			ret_val = HM_ERR;
+			goto EXIT_LABEL;
+		}
 	}
-	LOCAL.local_location_cb.peer_broadcast_cb = NULL;
+	tprt_cb = NULL;
 
 	if(HM_NEXT_IN_LIST(config_cb->instance_info.addresses) != NULL)
 	{
@@ -348,6 +397,11 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 	TRACE_INFO(("Peer Kickout Value: %d", LOCAL.peer_kickout_value));
 
 	LOCAL.config_data = config_cb;
+
+	/***************************************************************************/
+	/* Initialize Node Tree													   */
+	/***************************************************************************/
+	HM_AVL3_INIT_TREE(LOCAL.local_location_cb.node_tree, NULL);
 
 	/***************************************************************************/
 	/* Add the location to global locations tree							   */
@@ -402,7 +456,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 		}
 	}
 
-	LOCAL.local_location_cb.fsm_state = HM_PEER_FSM_STATE_NULL;
+	LOCAL.local_location_cb.fsm_state = HM_PEER_FSM_STATE_ACTIVE;
 	LOCAL.local_location_cb.keepalive_missed = 0;
 	LOCAL.local_location_cb.keepalive_period = LOCAL.peer_keepalive_period;
 
@@ -456,88 +510,74 @@ int32_t hm_init_transport()
 	FD_ZERO(&hm_tprt_conn_set);
 
 	/***************************************************************************/
-	/* TCP Connection Setup													   */
+	/* Local Nodes Connection Setup											   */
 	/***************************************************************************/
-	TRACE_DETAIL(("Check for TCP: %d",(1 & LOCAL.transport_bitmask >> HM_TRANSPORT_TCP_LISTEN)));
-	if((1 & LOCAL.transport_bitmask >> HM_TRANSPORT_TCP_LISTEN)== TRUE)
+	if(LOCAL.local_location_cb.node_listen_cb != NULL)
 	{
-		TRACE_INFO(("Start TCP IPv4 Listener"));
-		tprt_cb = hm_alloc_transport_cb(HM_TRANSPORT_TCP_LISTEN);
-		if(tprt_cb == NULL)
-		{
-			TRACE_ERROR(("Error allocating Transport structures for listening."));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		tprt_cb->location_cb = &LOCAL.local_location_cb;
+		TRACE_INFO(("Start Transport for Local Nodes"));
 
+		tprt_cb = LOCAL.local_location_cb.node_listen_cb;
 		tprt_cb->sock_cb =
-				hm_tprt_open_connection(tprt_cb->type, (void *)&LOCAL.local_location_cb.tcp_addr);
+				hm_tprt_open_connection(tprt_cb->type,
+								(void *)&LOCAL.local_location_cb.node_listen_cb->address);
 		if(tprt_cb->sock_cb == NULL)
 		{
 			TRACE_ERROR(("Error initializing Listen socket"));
 			ret_val = HM_ERR;
 			goto EXIT_LABEL;
 		}
-
 		tprt_cb->sock_cb->tprt_cb = tprt_cb;
-		LOCAL.local_location_cb.node_listen_cb = tprt_cb;
+	}
+	else
+	{
+		TRACE_INFO(("No transport information provided for Nodal Communication."));
 	}
 
 	/***************************************************************************/
-	/* UDP Connection Setup													   */
+	/* Cluster Peers Connection Setup										   */
 	/***************************************************************************/
-	TRACE_DETAIL(("Check for UDP: %d",(1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_UDP))));
-	if((1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_UDP))== TRUE)
+	if(LOCAL.local_location_cb.peer_listen_cb != NULL)
 	{
-		TRACE_INFO(("Start UDP Server"));
-		tprt_cb = hm_alloc_transport_cb(HM_TRANSPORT_UDP);
-		if(tprt_cb == NULL)
-		{
-			TRACE_ERROR(("Error allocating Transport structures for UDP Server."));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		tprt_cb->location_cb = &LOCAL.local_location_cb;
+		TRACE_INFO(("Start Peer Communication Transport"));
+		tprt_cb = LOCAL.local_location_cb.peer_listen_cb;
 
 		tprt_cb->sock_cb =
-				hm_tprt_open_connection(tprt_cb->type, (void *)&LOCAL.local_location_cb.udp_addr);
+				hm_tprt_open_connection(tprt_cb->type,
+						(void *)&LOCAL.local_location_cb.peer_listen_cb->address);
 		if(tprt_cb->sock_cb == NULL)
 		{
 			TRACE_ERROR(("Error initializing UDP server socket"));
 			ret_val = HM_ERR;
 			goto EXIT_LABEL;
 		}
-		LOCAL.local_location_cb.peer_listen_cb = tprt_cb;
 		tprt_cb->sock_cb->tprt_cb = tprt_cb;
 	}
 
 	/***************************************************************************/
 	/* Multicast Connection Setup											   */
 	/***************************************************************************/
-	TRACE_DETAIL(("Check for Mcast: %d",(1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_MCAST))));
-	if((1 & (LOCAL.transport_bitmask >> HM_TRANSPORT_MCAST))== TRUE)
+	if(LOCAL.local_location_cb.peer_broadcast_cb != NULL)
 	{
 		TRACE_INFO(("Start Multicast Service"));
-		tprt_cb = hm_alloc_transport_cb(HM_TRANSPORT_MCAST);
-		if(tprt_cb == NULL)
-		{
-			TRACE_ERROR(("Error allocating Transport structures for Multicast service."));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		tprt_cb->location_cb = &LOCAL.local_location_cb;
+		tprt_cb = LOCAL.local_location_cb.peer_broadcast_cb;
 
 		tprt_cb->sock_cb =
-				hm_tprt_open_connection(tprt_cb->type, (void *)&LOCAL.local_location_cb.mcast_addr);
+				hm_tprt_open_connection(tprt_cb->type,
+						(void *)&LOCAL.local_location_cb.peer_broadcast_cb->address);
 		if(tprt_cb->sock_cb == NULL)
 		{
 			TRACE_ERROR(("Error initializing Multicast socket"));
 			ret_val = HM_ERR;
 			goto EXIT_LABEL;
 		}
-		LOCAL.local_location_cb.peer_broadcast_cb = tprt_cb;
 		tprt_cb->sock_cb->tprt_cb = tprt_cb;
+
+		/***************************************************************************/
+		/* Start the Cluster Timer too											   */
+		/***************************************************************************/
+		LOCAL.local_location_cb.timer_cb = HM_TIMER_CREATE(LOCAL.peer_keepalive_period, TRUE,
+						hm_peer_keepalive_callback, (void *)&LOCAL.local_location_cb);
+		HM_TIMER_START(LOCAL.local_location_cb.timer_cb);
 	}
 
 EXIT_LABEL:
@@ -575,12 +615,21 @@ void hm_run_main_thread()
 	extern int32_t max_fd;
 	struct timeval select_timeout;
 
-	fd_set read_set;
+	fd_set read_set, write_set;
 
 	HM_MSG *buf = NULL;
 
 	HM_NODE_INIT_MSG *init_msg = NULL;
+	HM_PEER_MSG_INIT *peer_init_msg = NULL;
+	HM_PEER_MSG_KEEPALIVE *peer_tick_msg = NULL;
+	HM_LOCATION_CB *loc_cb = NULL;
+
+	HM_GLOBAL_LOCATION_CB *glob_cb = NULL;
+	int32_t loc_id;
+
 	int32_t bytes_rcvd = HM_ERR;
+
+	SOCKADDR *udp_sender = NULL;
 
 	HM_SUBSCRIBER node_cb;
 	/***************************************************************************/
@@ -605,21 +654,23 @@ void hm_run_main_thread()
 		/* ongoing routine/callback.											   */
 		/***************************************************************************/
 		select_timeout.tv_sec = 0;
-		select_timeout.tv_usec = /*300000*/0;
+		select_timeout.tv_usec = 250000; /* 250ms */
 
 		read_set = hm_tprt_conn_set;
-		/***************************************************************************/
-		/* Block the signal without seeing what was in previously.   			   */
-		/***************************************************************************/
-	    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
-	    {
-			TRACE_PERROR(("Error blocking signals before querying descriptors."));
-	    }
+		write_set = hm_tprt_write_set;
 
+		/***************************************************************************/
+		/* Unblock the signal.													   */
+		/***************************************************************************/
+	    if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
+	    {
+	    		TRACE_PERROR(("Error unblocking signals"));
+	    		//goto EXIT_LABEL;
+	    }
 		/***************************************************************************/
 		/* Check for listen/read events											   */
 		/***************************************************************************/
-		nready = select(max_fd+1, &read_set, NULL, NULL, &select_timeout);
+		nready = select(max_fd+1, &read_set, &write_set, NULL, &select_timeout);
 		if(nready == 0)
 		{
 			/***************************************************************************/
@@ -632,6 +683,14 @@ void hm_run_main_thread()
 			TRACE_PERROR(("Error Occurred on select() call."));
 			continue;
 		}
+
+		/***************************************************************************/
+		/* Block the signal without seeing what was in previously.   			   */
+		/***************************************************************************/
+	    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+	    {
+			TRACE_PERROR(("Error blocking signals before querying descriptors."));
+	    }
 
 		/***************************************************************************/
 		/* Check for incoming connections										   */
@@ -669,29 +728,163 @@ void hm_run_main_thread()
 		if((LOCAL.local_location_cb.peer_listen_cb->type == HM_TRANSPORT_TCP_LISTEN)||
 				(LOCAL.local_location_cb.peer_listen_cb->type == HM_TRANSPORT_TCP_IPv6_LISTEN))
 		{
-			/***************************************************************************/
-			/* Accept the connection only if we have not exceeded top-load benchmark   */
-			/***************************************************************************/
-			TRACE_INFO(("Cluster Port has requests."));
-			sock_cb = hm_tprt_accept_connection(
-								LOCAL.local_location_cb.peer_listen_cb->sock_cb->sock_fd);
-			if(sock_cb == NULL)
+			if(FD_ISSET(LOCAL.local_location_cb.peer_listen_cb->sock_cb->sock_fd, &read_set))
 			{
-				TRACE_ERROR(("Error accepting connection request."));
-				goto EXIT_LABEL;
-			}
-			/***************************************************************************/
-			/* If select returned 1, and it was a listen socket, it makes sense to poll*/
-			/* again by breaking out and use select again.							   */
-			/***************************************************************************/
-			if(--nready <=0)
-			{
-				TRACE_DETAIL(("No more incoming requests."));
-				continue;
-			}
+				/***************************************************************************/
+				/* Accept the connection only if we have not exceeded top-load benchmark   */
+				/***************************************************************************/
+				TRACE_INFO(("Cluster Port has requests."));
+				sock_cb = hm_tprt_accept_connection(
+									LOCAL.local_location_cb.peer_listen_cb->sock_cb->sock_fd);
+				if(sock_cb == NULL)
+				{
+					TRACE_ERROR(("Error accepting connection request."));
+					goto EXIT_LABEL;
+				}
+				/***************************************************************************/
+				/* If select returned 1, and it was a listen socket, it makes sense to poll*/
+				/* again by breaking out and use select again.							   */
+				/***************************************************************************/
+				if(--nready <=0)
+				{
+					TRACE_DETAIL(("No more incoming requests."));
+					continue;
+				}
+			}//end select on listenfd
 		}
 		/***************************************************************************/
-		/* There are more read events waiting to be processed.					   */
+		/* Check on Multicast socket too										   */
+		/***************************************************************************/
+		TRACE_DETAIL(("Check Multicast port %d!",
+						LOCAL.local_location_cb.peer_broadcast_cb->sock_cb->sock_fd));
+		if(LOCAL.local_location_cb.peer_broadcast_cb->sock_cb->sock_fd != -1)
+		{
+			TRACE_DETAIL(("Check Multicast port!"));
+			if(FD_ISSET(LOCAL.local_location_cb.peer_broadcast_cb->sock_cb->sock_fd, &read_set))
+			{
+				/***************************************************************************/
+				/* Accept the connection only if we have not exceeded top-load benchmark   */
+				/***************************************************************************/
+				TRACE_INFO(("Cluster Muticast Port has requests."));
+				/***************************************************************************/
+				/* We'll need to receive the message into a random buffer which must be as */
+				/* large as at least the INIT message of peers. 						   */
+				/***************************************************************************/
+				buf = hm_get_buffer( sizeof(HM_PEER_MSG_KEEPALIVE));
+				TRACE_ASSERT(buf != NULL);
+				if(buf == NULL)
+				{
+					TRACE_ERROR(("Error allocating buffer for incoming message."));
+					goto EXIT_LABEL;
+				}
+				/***************************************************************************/
+				/* First, receive the message header and verify that it is an INIT message */
+				/* Since we don't know yet if it is a Nodal Socket or Peer socket as no    */
+				/* association exists yet, we'll allocate the buffer which ever is larger  */
+				/* and try to receive data.												   */
+				/* It HAS to be an INIT request message for such connections or we can 	   */
+				/* discard it.															   */
+				/***************************************************************************/
+				if((bytes_rcvd = hm_tprt_recv_on_socket(
+								LOCAL.local_location_cb.peer_broadcast_cb->sock_cb->sock_fd,
+								LOCAL.local_location_cb.peer_broadcast_cb->sock_cb->sock_type,
+											buf->msg,
+											sizeof(HM_PEER_MSG_KEEPALIVE),
+											&(udp_sender)
+											))== HM_ERR)
+				{
+					TRACE_ERROR(("Error receiving message on socket."));
+					TRACE_ASSERT(FALSE);
+					//It is an error, but we'll still run (in release mode)
+					//FIXME
+					break;
+				}
+				TRACE_ASSERT(udp_sender != NULL);
+				if(bytes_rcvd == sizeof(HM_PEER_MSG_KEEPALIVE))
+				{
+					peer_tick_msg = (HM_PEER_MSG_KEEPALIVE *)buf->msg;
+					HM_GET_LONG(bytes_rcvd, peer_tick_msg->hdr.msg_type);
+					if( bytes_rcvd != HM_PEER_MSG_TYPE_KEEPALIVE)
+					{
+						TRACE_WARN(("Message type is not Keepalive request. Ignore."));
+						hm_free_buffer(buf);
+					}
+					else
+					{
+						/***************************************************************************/
+						/* It is an INIT request. Read the rest of the message and check if we know*/
+						/* about this location already.											   */
+						/***************************************************************************/
+						TRACE_INFO(("Keepalive message received. Check location awareness"));
+#ifdef I_WANT_TO_DEBUG
+						{
+							char ip_addr[128];
+							int32_t hw_id;
+							int32_t length = 128;
+							TRACE_ASSERT(udp_sender != NULL);
+							inet_ntop(AF_INET, &((SOCKADDR_IN *)udp_sender)->sin_addr, ip_addr, length);
+							TRACE_DETAIL(("%s:%d", ip_addr, ntohs(((SOCKADDR_IN *)udp_sender)->sin_port)));
+							HM_GET_LONG(hw_id, peer_tick_msg->hdr.hw_id);
+							TRACE_DETAIL(("HW ID: %d", hw_id));
+						}
+#endif
+						hm_cluster_check_location(	buf,
+													udp_sender);
+						hm_free_buffer(buf);
+						//TODO
+					}
+				}
+
+				/***************************************************************************/
+				/* If select returned 1, and it was a listen socket, it makes sense to poll*/
+				/* again by breaking out and use select again.							   */
+				/***************************************************************************/
+				if(--nready <=0)
+				{
+					TRACE_DETAIL(("No more incoming requests."));
+					continue;
+				}
+			}//end select on listenfd
+		}
+		/***************************************************************************/
+		/* Check for WRITE events on any socket									   */
+		/***************************************************************************/
+		for(sock_cb = (HM_SOCKET_CB *)HM_NEXT_IN_LIST(LOCAL.conn_list);
+				sock_cb != NULL;
+				sock_cb = HM_NEXT_IN_LIST(sock_cb->node))
+		{
+			if(FD_ISSET(sock_cb->sock_fd, &write_set))
+			{
+				/***************************************************************************/
+				/* The connection is valid and read event has occurred here.		       */
+				/***************************************************************************/
+				TRACE_DETAIL(("FD %d has a write event",sock_cb->sock_fd));
+
+				/***************************************************************************/
+				/* Connection connect() request must have completed successfully.		   */
+				/* Check if its state was INIT.											   */
+				/***************************************************************************/
+				if(sock_cb->conn_state == HM_TPRT_CONN_INIT)
+				{
+					TRACE_DETAIL(("Connect succeeded!"));
+					TRACE_ASSERT(sock_cb->tprt_cb->location_cb != NULL);
+					loc_cb = sock_cb->tprt_cb->location_cb;
+					hm_peer_fsm(HM_PEER_FSM_INIT_RCVD, loc_cb);
+				}
+				if(--nready <=0)
+				{
+					TRACE_DETAIL(("No more incoming requests."));
+					/*
+					 * FIXME: Possible breakpoint. If a socket has both read and write fd set
+					 * is it counted in twice?
+					 */
+					continue;
+				}
+			}
+		}
+
+		/***************************************************************************/
+		/* There are READ events waiting to be processed.					   */
 		/***************************************************************************/
 		for(sock_cb = (HM_SOCKET_CB *)HM_NEXT_IN_LIST(LOCAL.conn_list);
 				sock_cb != NULL;
@@ -711,12 +904,17 @@ void hm_run_main_thread()
 				/***************************************************************************/
 				if(sock_cb->tprt_cb == NULL)
 				{
-					TRACE_DETAIL(("Socket is currently not associated with any Node."));
+					TRACE_DETAIL(("Socket is currently not associated with any Node or Peer."));
+
 					/***************************************************************************/
 					/* We'll need to receive the message into a random buffer which must be as */
-					/* large as at least the INIT message.									   */
+					/* large as at least the INIT message of peers. This is because we are 	   */
+					/* currently not concerned if the Socket is TCP Type or UDP, so we're 	   */
+					/* preparing for a UDP socket too (provisioning a full buffer read because */
+					/* partial reading is not allowed on UDP).								   */
+					/* Even if it is TCP Socket, that is not a problem.						   */
 					/***************************************************************************/
-					buf = hm_get_buffer(sizeof(HM_NODE_INIT_MSG));
+					buf = hm_get_buffer( MAX(sizeof(HM_MSG_HEADER),sizeof(HM_PEER_MSG_INIT)) );
 					TRACE_ASSERT(buf != NULL);
 					if(buf == NULL)
 					{
@@ -725,11 +923,18 @@ void hm_run_main_thread()
 					}
 					/***************************************************************************/
 					/* First, receive the message header and verify that it is an INIT message */
+					/* Since we don't know yet if it is a Nodal Socket or Peer socket as no    */
+					/* association exists yet, we'll allocate the buffer which ever is larger  */
+					/* and try to receive data.												   */
+					/* It HAS to be an INIT request message for such connections or we can 	   */
+					/* discard it.															   */
 					/***************************************************************************/
 					if((bytes_rcvd = hm_tprt_recv_on_socket(	sock_cb->sock_fd,
-												HM_TRANSPORT_TCP_IN,
+												sock_cb->sock_type,
 												buf->msg,
-												sizeof(HM_MSG_HEADER)
+												MAX(sizeof(HM_MSG_HEADER),
+													sizeof(HM_PEER_MSG_INIT)),
+												&udp_sender
 												))== HM_ERR)
 					{
 						TRACE_ERROR(("Error receiving message on socket."));
@@ -738,6 +943,12 @@ void hm_run_main_thread()
 						//FIXME
 						break;
 					}
+					/***************************************************************************/
+					/* Depending on the number of bytes read, we can infer if it is a Peer INIT*/
+					/* Or a Node INIT														   */
+					/***************************************************************************/
+					//FIXME: There is a chance that size of HM_MSG_HDR and that of Peer Messages is same.
+					//Consider differentiating recv on basis of sock type
 					if(bytes_rcvd == sizeof(HM_MSG_HEADER))
 					{
 						init_msg = (HM_NODE_INIT_MSG *)buf->msg;
@@ -746,12 +957,16 @@ void hm_run_main_thread()
 							TRACE_WARN(("Message type is not INIT request. Ignore."));
 							/***************************************************************************/
 							/* Receive the rest of the message and discard the buffer.				   */
+							/* This can be problematic because the size of the buffer is fixed, but    */
+							/* the message that arrived on socket might be larger, due to which, the   */
+							/* socket descriptor will be set as long as there is data on that buffer.  */
 							/***************************************************************************/
 							if((bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-																	HM_TRANSPORT_TCP_IN,
+																	sock_cb->sock_type,
 																	(BYTE *)buf->msg + bytes_rcvd,
 																	sizeof(HM_NODE_INIT_MSG)
-																	- sizeof(HM_MSG_HEADER)
+																	- sizeof(HM_MSG_HEADER),
+																	&udp_sender
 																	))== HM_ERR)
 							{
 								TRACE_ERROR(("Error receiving rest of data"));
@@ -763,15 +978,27 @@ void hm_run_main_thread()
 						else
 						{
 							/***************************************************************************/
+							/* Grow the buffer to accommodate the INIT request						   */
+							/***************************************************************************/
+							buf = hm_grow_buffer(buf, sizeof(HM_NODE_INIT_MSG));
+							TRACE_ASSERT(buf != NULL);
+							if(buf == NULL)
+							{
+								TRACE_ERROR(("Error growing buffer for incoming message."));
+								goto EXIT_LABEL;
+							}
+							init_msg = (HM_NODE_INIT_MSG *)buf->msg;
+							/***************************************************************************/
 							/* It is an INIT request. Read the rest of the message and associate with  */
 							/* a node.																   */
 							/***************************************************************************/
 							TRACE_INFO(("INIT request received. Associate with a Node"));
 							if((bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-																		HM_TRANSPORT_TCP_IN,
+																		sock_cb->sock_type,
 																		(BYTE *)buf->msg + bytes_rcvd,
 																		sizeof(HM_NODE_INIT_MSG)
-																		- sizeof(HM_MSG_HEADER)
+																		- sizeof(HM_MSG_HEADER),
+																		&udp_sender
 																		))== HM_ERR)
 							{
 								TRACE_ERROR(("Error receiving rest of data"));
@@ -836,6 +1063,73 @@ void hm_run_main_thread()
 							//TODO
 						}
 					}
+					else if(bytes_rcvd == sizeof(HM_PEER_MSG_INIT))
+					{
+						peer_init_msg = (HM_PEER_MSG_INIT *)buf->msg;
+						HM_GET_LONG(bytes_rcvd, peer_tick_msg->hdr.msg_type);
+						if( bytes_rcvd!= HM_PEER_MSG_TYPE_INIT)
+						{
+							TRACE_WARN(("Message type is not INIT request. Ignore."));
+							hm_free_buffer(buf);
+						}
+						else
+						{
+							/***************************************************************************/
+							/* It is an INIT request. Read the rest of the message and associate with  */
+							/* a location.															   */
+							/***************************************************************************/
+							TRACE_INFO(("INIT request received. Associate with a Location"));
+							TRACE_INFO(("INIT Request from Peer, indexed: %d",
+																	ntohl((uint32_t)peer_init_msg->hdr.hw_id)));
+
+							/***************************************************************************/
+							/* Try to find the location in tree first. If found, this is error		   */
+							/* TODO: Move it into hm_cluster_check_location()						   */
+							/***************************************************************************/
+							loc_id = ntohl((uint32_t)peer_init_msg->hdr.hw_id);
+							glob_cb = (HM_GLOBAL_LOCATION_CB *)HM_AVL3_FIND(LOCAL.locations_tree,
+																				&loc_id,
+																				locations_tree_by_db_id );
+							if(glob_cb != NULL)
+							{
+								TRACE_ERROR(("Received INIT on TCP Port of a known location"));
+								TRACE_ASSERT(FALSE);
+							}
+							else
+							{
+								/***************************************************************************/
+								/* Create a Location CB and fill in the details.						   */
+								/***************************************************************************/
+								loc_cb = hm_alloc_location_cb();
+								loc_cb->index = ntohl((uint32_t)peer_init_msg->hdr.hw_id);
+								if(sock_cb->sock_type == HM_TRANSPORT_SOCK_TYPE_TCP)
+								{
+									loc_cb->peer_listen_cb = hm_alloc_transport_cb(HM_TRANSPORT_TCP_IN);
+								}
+								else
+								{
+									loc_cb->peer_listen_cb = hm_alloc_transport_cb(HM_TRANSPORT_UDP);
+								}
+								/***************************************************************************/
+								/* Fix pointers															   */
+								/***************************************************************************/
+								loc_cb->peer_listen_cb->location_cb = loc_cb;
+								loc_cb->peer_listen_cb->sock_cb = sock_cb;
+								sock_cb->tprt_cb = loc_cb->peer_listen_cb;
+								/***************************************************************************/
+								/* Add the location to global locations tree							   */
+								/***************************************************************************/
+								if(hm_peer_fsm(HM_PEER_FSM_INIT_RCVD,loc_cb)!= HM_OK)
+								{
+									TRACE_ERROR(("Error initializing location %d", loc_cb->index));
+									//TODO: What to do now?
+								}
+							}
+
+							//TODO
+							hm_free_buffer(buf);
+						}
+					}
 				}
 				else
 				{
@@ -850,29 +1144,35 @@ void hm_run_main_thread()
 					/* large as at least the INIT message.									   */
 					/***************************************************************************/
 					sock_cb->tprt_cb->in_buffer = (char *)&sock_cb->tprt_cb->header;
+					//TODO: Let this part be handled in the message router itself. We can decide
+					//on the basis of socket_type the sizeof the buffer we want to receive.
+					//For UDP, there will be just one read, and for TCP, there can be sequentially
+					//many.
 					/***************************************************************************/
 					/* First, receive the message header and verify that it is an INIT message */
 					/***************************************************************************/
-					bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-												HM_TRANSPORT_TCP_IN,
+					sock_cb->tprt_cb->in_bytes = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+												sock_cb->sock_type,
 												sock_cb->tprt_cb->in_buffer,
-												sizeof(HM_MSG_HEADER)
+												MAX(sizeof(HM_MSG_HEADER), sizeof(HM_PEER_MSG_HEADER)),
+												&udp_sender
 												);
-					if(bytes_rcvd != sizeof(HM_MSG_HEADER))
-					{
-						TRACE_DETAIL(("Message Length of %d was expected, %d was received",
-										sizeof(HM_MSG_HEADER), bytes_rcvd));
-						hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
-						//TODO: Quit or Continue?
-					}
-					else
+					if((sock_cb->tprt_cb->in_bytes == sizeof(HM_MSG_HEADER))
+							||
+						(sock_cb->tprt_cb->in_bytes == sizeof(HM_PEER_MSG_HEADER)))
 					{
 						//TODO
 						//Pass to message router to handle message accordingly
 						hm_route_incoming_message(sock_cb);
 						//Based on the type of message, process it.
 						//PROC_CREATE/DESTROY handled by Process layer
-
+					}
+					else
+					{
+						TRACE_DETAIL(("Message Length of %d was expected, %d was received",
+										sizeof(HM_MSG_HEADER), bytes_rcvd));
+						hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
+						//TODO: Quit or Continue?
 					}
 					/* Don't need to free the buffer, because it is a statically allocated memory */
 				}
@@ -888,14 +1188,6 @@ void hm_run_main_thread()
 			}// end if FD_ISSET(sockfd, &rset)
 		}//end for
 
-		/***************************************************************************/
-		/* Unblock the signal.													   */
-		/***************************************************************************/
-	    if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
-	    {
-	    		TRACE_PERROR(("Error unblocking signals"));
-	    		//goto EXIT_LABEL;
-	    }
 	}//end while(1)
 EXIT_LABEL:
 	/***************************************************************************/

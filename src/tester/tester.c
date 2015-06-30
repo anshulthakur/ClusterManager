@@ -165,7 +165,6 @@ int32_t main(int32_t argc, char **argv)
 	if(ret_val != sizeof(proc_msg))
 	{
 		TRACE_PERROR(("Error sending complete message on socket!"));
-		goto EXIT_LABEL;
 	}
 	TRACE_INFO(("PROCESS_CREATED Message sent."));
 
@@ -183,7 +182,7 @@ int32_t main(int32_t argc, char **argv)
 
 	//Send REGISTER for Group
 //	TRACE_INFO(("Sending Register for Group %d", subs_group));
-	reg_msg = (HM_REGISTER_MSG *)malloc(sizeof(HM_REGISTER_MSG) + 2* sizeof(HM_REGISTER_TLV_CB));
+	reg_msg = (HM_REGISTER_MSG *)malloc(sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB));
 	reg_msg->hdr.msg_id = 1;
 	reg_msg->hdr.msg_len = sizeof(HM_REGISTER_MSG) + 2* sizeof(HM_REGISTER_TLV_CB);
 	reg_msg->hdr.msg_type = HM_MSG_TYPE_REGISTER;
@@ -192,30 +191,27 @@ int32_t main(int32_t argc, char **argv)
 
 	reg_msg->num_register = 2;
 	reg_msg->subscriber_pid = pid;
+	reg_msg->type = HM_REG_SUBS_TYPE_PROC;
 
 	tlv = (HM_REGISTER_TLV_CB *)((char *)reg_msg + sizeof(HM_REGISTER_MSG));
-	tlv->id = subs_group;
-	TRACE_INFO(("Send Register for Group %d", tlv->id));
-	tlv->type = HM_REG_SUBS_TYPE_GROUP;
-	tlv = (HM_REGISTER_TLV_CB *)((char *)reg_msg + sizeof(HM_REGISTER_MSG) + sizeof(HM_REGISTER_TLV_CB));
 	tlv->id = pct_type;
-	TRACE_INFO(("Send Register for Process %d", tlv->id));
-	tlv->type = HM_REG_SUBS_TYPE_PROC;
+
 	TRACE_INFO(("Sending PROCESS_REGISTER message!"));
 	ret_val = send(sock_fd, (char *)reg_msg, reg_msg->hdr.msg_len, 0);
 	if(ret_val != reg_msg->hdr.msg_len)
 	{
 		TRACE_PERROR(("Error sending complete message on socket!"));
-		goto EXIT_LABEL;
 	}
+
+
 	TRACE_INFO(("Sent Register"));
 
 	//Receive REGISTER Response
 	memset((void *)reg_msg, 0, sizeof(reg_msg->hdr.msg_len));
 
 	ret_val = recv(sock_fd, (char *)reg_msg,
-					(sizeof(HM_REGISTER_MSG) + 2* sizeof(HM_REGISTER_TLV_CB)), 0);
-	if(ret_val != (sizeof(HM_REGISTER_MSG) + 2* sizeof(HM_REGISTER_TLV_CB)))
+					(sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB)), 0);
+	if(ret_val != (sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB)))
 	{
 		TRACE_WARN(("Partial Message Received!"));
 	}

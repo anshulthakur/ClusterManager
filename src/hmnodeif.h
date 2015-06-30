@@ -51,8 +51,8 @@
 /***************************************************************************/
 /* Address Types														   */
 /***************************************************************************/
-#define HM_NOTIFY_ADDR_TYPE_TCP_v4			((uint32_t) 1)
-#define HM_NOTIFY_ADDR_TYPE_TCP_v6			((uint32_t) 2)
+#define HM_NOTIFY_ADDR_TYPE_TCP_v4			((uint32_t) AF_INET)
+#define HM_NOTIFY_ADDR_TYPE_TCP_v6			((uint32_t) AF_INET6)
 
 
 /**STRUCT+********************************************************************/
@@ -222,11 +222,6 @@ typedef struct hm_process_update_msg
 typedef struct hm_register_tlv_cb
 {
 	/***************************************************************************/
-	/* Registration Type													   */
-	/***************************************************************************/
-	uint32_t type;
-
-	/***************************************************************************/
 	/* Register for what value												   */
 	/* If registering for a node, node number								   */
 	/* if for group, then group index										   */
@@ -262,6 +257,11 @@ typedef struct hm_register_msg
 	/* If the overall node is subscribing, set it to zero.					   */
 	/***************************************************************************/
 	uint32_t subscriber_pid;
+
+	/***************************************************************************/
+	/* Registration Type													   */
+	/***************************************************************************/
+	uint32_t type;
 
 	/***************************************************************************/
 	/* Number of registrations												   */

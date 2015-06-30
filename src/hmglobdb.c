@@ -21,7 +21,7 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 	/***************************************************************************/
 	HM_GLOBAL_LOCATION_CB *glob_cb = NULL;
 	int32_t ret_val = HM_OK;
-	int32_t trigger = TRUE;
+	int32_t trigger = FALSE;
 	HM_SUBSCRIBER_WILDCARD *greedy = NULL;
 
 	HM_SUBSCRIPTION_CB *sub_cb = NULL;
@@ -175,6 +175,14 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 	if(trigger == TRUE)
 	{
 		TRACE_DETAIL(("Trigger notification to existing subscribers."));
+		/***************************************************************************/
+		/* Send out update to cluster if cluster is enabled.					   */
+		/***************************************************************************/
+		if(hm_global_location_update(loc_cb)==HM_ERR)
+		{
+			TRACE_ERROR(("Error updating Global Location Tables."));
+			ret_val = HM_ERR;
+		}
 	}
 
 EXIT_LABEL:
@@ -200,14 +208,74 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
 	/* Variable Declarations												   */
 	/***************************************************************************/
 	int32_t ret_val = HM_OK;
+	int32_t notify;
+
+	HM_GLOBAL_LOCATION_CB *glob_cb = NULL;
+	HM_NOTIFICATION_CB *notify_cb = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
 	TRACE_ENTRY();
+
+	TRACE_ASSERT(loc_cb != NULL);
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+	/***************************************************************************/
+	/* Find Global Location pointer											   */
+	/***************************************************************************/
+	TRACE_ASSERT(loc_cb->db_ptr != NULL);
+	glob_cb = (HM_GLOBAL_LOCATION_CB *)loc_cb->db_ptr;
 
+	/***************************************************************************/
+	/* There are not going to be any notifications as such.					   */
+	/* But we need to send out updates on cluster.							   */
+	/***************************************************************************/
+	switch(glob_cb->status)
+	{
+	case HM_STATUS_RUNNING:
+		TRACE_DETAIL(("Location Active."));
+		notify = HM_NOTIFICATION_LOCATION_ACTIVE;
+		break;
+	case HM_STATUS_DOWN:
+		TRACE_DETAIL(("Location Down."));
+		notify = HM_NOTIFICATION_LOCATION_INACTIVE;
+		break;
+	default:
+		TRACE_WARN(("Unknown HM Status %d", glob_cb->status));
+		TRACE_ASSERT(FALSE);
+	}
+
+	/***************************************************************************/
+	/* Allocate a Notification CB and Add that notification CB to Notify Queue */
+	/***************************************************************************/
+	notify_cb =  hm_alloc_notify_cb();
+	if(notify_cb == NULL)
+	{
+		TRACE_ERROR(("Error creating Notification CB"));
+		TRACE_ERROR(("Update could not be propagated."));
+		ret_val = HM_ERR;
+	}
+	notify_cb->node_cb.process_cb = glob_cb;
+	notify_cb->notification_type = notify;
+	/***************************************************************************/
+	/* Queue the notification CB 											   */
+	/***************************************************************************/
+	HM_INSERT_BEFORE(LOCAL.notification_queue ,notify_cb->node);
+
+	//FIXME: Move it to a separate thread later
+	hm_service_notify_queue();
+
+
+	/***************************************************************************/
+	/* Send Notifications on the cluster too								   */
+	/***************************************************************************/
+	/*
+	 	TRACE_DETAIL(("Update cluster."));
+		hm_cluster_send_update(glob_cb);
+	*/
+
+EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -520,6 +588,16 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb)
 
 	//FIXME: Move it to a separate thread later
 	hm_service_notify_queue();
+
+	/***************************************************************************/
+	/* Send Notifications on the cluster too								   */
+	/***************************************************************************/
+	if(glob_cb->node_cb->parent_location_cb->index ==
+			LOCAL.local_location_cb.index)
+	{
+		TRACE_DETAIL(("Update cluster."));
+		hm_cluster_send_update(glob_cb);
+	}
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
@@ -860,6 +938,15 @@ int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb)
 	//FIXME: Move it to a separate thread later
 	hm_service_notify_queue();
 
+	/***************************************************************************/
+	/* Send Notifications on the cluster too								   */
+	/***************************************************************************/
+	if(glob_cb->proc_cb->parent_node_cb->parent_location_cb->index ==
+			LOCAL.local_location_cb.index)
+	{
+		TRACE_DETAIL(("Update cluster."));
+		hm_cluster_send_update(glob_cb);
+	}
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */

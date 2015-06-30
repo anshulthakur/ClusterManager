@@ -109,8 +109,8 @@
 #include <hmpeerif.h>
 #include <hmdef.h>
 #include <hmstrc.h>
-#include <hmfunc.h>
 #include <hmutil.h>
+#include <hmfunc.h>
 #include <hmglob.h>
 #include <hmlog.h>
 

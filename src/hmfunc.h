@@ -27,6 +27,8 @@ HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t);
 int32_t hm_free_transport_cb(HM_TRANSPORT_CB *);
 HM_SOCKET_CB * hm_alloc_sock_cb();
 void hm_free_sock_cb(HM_SOCKET_CB *);
+HM_LOCATION_CB * hm_alloc_location_cb();
+int32_t hm_free_location_cb(HM_LOCATION_CB *);
 HM_NODE_CB * hm_alloc_node_cb(uint32_t);
 int32_t hm_free_node_cb(HM_NODE_CB *);
 HM_PROCESS_CB * hm_alloc_process_cb();
@@ -38,7 +40,21 @@ void hm_free_notify_cb(HM_NOTIFICATION_CB *);
 //HM_TRANSPORT_CB * hm_init_transport_cb(	uint32_t );
 
 /* hmlocmgmt.c */
-int32_t hm_init_location_cb(HM_LOCATION_CB *);
+int32_t hm_peer_fsm(uint32_t , HM_LOCATION_CB *);
+int32_t hm_location_add(HM_LOCATION_CB *);
+int32_t hm_location_update(HM_LOCATION_CB *);
+int32_t hm_location_remove(HM_LOCATION_CB *);
+int32_t hm_peer_keepalive_callback(void *);
+
+/* hmcluster.c */
+void hm_cluster_check_location(HM_MSG *, SOCKADDR *);
+void hm_cluster_send_tick();
+int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *);
+int32_t hm_cluster_send_end_of_replay(HM_TRANSPORT_CB *);
+int32_t hm_receive_cluster_message(HM_SOCKET_CB *);
+int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *, HM_LOCATION_CB *);
+int32_t hm_cluster_send_update(void *);
+
 
 /* hmnodemgmt.c */
 int32_t hm_node_fsm(uint32_t, HM_NODE_CB *);
@@ -79,6 +95,7 @@ int32_t hm_tprt_handle_improper_read(int32_t , HM_TRANSPORT_CB *);
 int32_t hm_receive_msg_hdr(char *);
 int32_t hm_receive_msg(char *);
 int32_t hm_node_send_init_rsp(HM_NODE_CB *);
+int32_t hm_queue_on_transport(HM_MSG *, HM_TRANSPORT_CB *);
 int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *);
 
 /* hmtprt.c */
@@ -87,7 +104,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t, void *);
 int32_t hm_tprt_send_on_socket(struct sockaddr* ,int32_t ,
 						uint32_t, uint8_t *, uint32_t );
 int32_t hm_tprt_recv_on_socket(uint32_t , uint32_t ,
-							uint8_t * , uint32_t );
+							uint8_t * , uint32_t, struct sockaddr ** );
 int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *);
 void  hm_close_sock_connection(HM_SOCKET_CB *);
 
@@ -106,6 +123,9 @@ void avl3_verify_tree(HM_AVL3_TREE *,
                               const HM_AVL3_TREE_INFO *);
 
 /* hmutil2.c */
+int64_t hm_hton64(int64_t);
+int64_t hm_ntoh64(int64_t);
+
 void hm_base_timer_handler(int32_t , siginfo_t *, void *);
 
 int32_t hm_compare_ulong(void *, void *);

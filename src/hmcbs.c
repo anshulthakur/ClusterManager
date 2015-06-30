@@ -102,8 +102,13 @@ HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t conn_type)
 		TRACE_ERROR(("Error allocating memory for transport CB"));
 		goto EXIT_LABEL;
 	}
+
 	/* Got TCB */
+	memset(transport_cb, 0, sizeof(HM_TRANSPORT_CB));
+
 	transport_cb->type = conn_type;
+	transport_cb->address.type = conn_type;
+
 	transport_cb->location_cb = NULL;
 	transport_cb->node_cb = NULL;
 	transport_cb->sock_cb = NULL;
@@ -229,6 +234,16 @@ void hm_free_sock_cb(HM_SOCKET_CB *sock_cb)
 	if(sock_cb->sock_fd != -1)
 	{
 		TRACE_WARN(("Socket was not closed."));
+		if(FD_ISSET(sock_cb->sock_fd, &hm_tprt_conn_set))
+		{
+			TRACE_DETAIL(("Remove from Read set."));
+			FD_CLR(sock_cb->sock_fd, &hm_tprt_conn_set);
+		}
+		if(FD_ISSET(sock_cb->sock_fd, &hm_tprt_write_set))
+		{
+			TRACE_DETAIL(("Remove from write set."));
+			FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
+		}
 		close(sock_cb->sock_fd);
 	}
 
@@ -239,6 +254,118 @@ void hm_free_sock_cb(HM_SOCKET_CB *sock_cb)
 	/***************************************************************************/
 	TRACE_EXIT();
 }/* hm_free_sock_cb */
+
+/***************************************************************************/
+/* Name:	hm_alloc_location_cb 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	HM_LOCATION_CB *									*/
+/* Purpose: Allocates 			*/
+/***************************************************************************/
+HM_LOCATION_CB * hm_alloc_location_cb()
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_LOCATION_CB *loc_cb = NULL;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	loc_cb = (HM_LOCATION_CB *)malloc(sizeof(HM_LOCATION_CB));
+	if(loc_cb == NULL)
+	{
+		TRACE_ERROR(("Error allocating memory for Location CB"));
+		goto EXIT_LABEL;
+	}
+	/***************************************************************************/
+	/* Got Memory. Initialize defaults										   */
+	/***************************************************************************/
+	loc_cb->id = 0;
+	loc_cb->table_type = HM_TABLE_TYPE_LOCATION_LOCAL;
+	loc_cb->db_ptr = NULL;
+
+	loc_cb->index = 0;
+	HM_AVL3_INIT_TREE(loc_cb->node_tree, NULL);
+	loc_cb->fsm_state = HM_PEER_FSM_STATE_NULL; /* Since it is being added. */
+
+	loc_cb->timer_cb = HM_TIMER_CREATE(LOCAL.peer_keepalive_period, TRUE,
+				hm_peer_keepalive_callback, (void *)loc_cb );
+	if(loc_cb->timer_cb == NULL)
+	{
+		TRACE_ERROR(("Error creating timer for node"));
+		free(loc_cb);
+		loc_cb = NULL;
+		goto EXIT_LABEL;
+	}
+	loc_cb->keepalive_missed = 0;
+	loc_cb->keepalive_period = LOCAL.peer_keepalive_period;
+	loc_cb->peer_listen_cb = NULL;
+
+	loc_cb->active_nodes = 0;
+	loc_cb->active_processes = 0;
+	/***************************************************************************/
+	/* The following fields are necessary only for a local node. Maybe I would */
+	/* remove them later.													   */
+	/***************************************************************************/
+	loc_cb->node_listen_cb = NULL;
+	loc_cb->peer_broadcast_cb = NULL;
+	HM_INIT_ROOT(loc_cb->peer_list);
+	HM_INIT_ROOT(loc_cb->transport_cb_list);
+
+
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return(loc_cb);
+}/* hm_alloc_location_cb */
+
+/***************************************************************************/
+/* Name:	hm_free_location_cb 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Frees the resources of a location control block			*/
+/***************************************************************************/
+int32_t hm_free_location_cb(HM_LOCATION_CB *loc_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	int32_t ret_val = HM_OK;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(loc_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Free Nodes tree if not free.											   */
+	/***************************************************************************/
+
+	/***************************************************************************/
+	/* Free memory															   */
+	/***************************************************************************/
+	free(loc_cb);
+	loc_cb = NULL;
+
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+
+	return(ret_val);
+}/* hm_free_location_cb */
 
 /***************************************************************************/
 /* Name:	hm_alloc_node_cb 											   */

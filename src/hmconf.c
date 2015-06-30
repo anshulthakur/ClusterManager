@@ -26,7 +26,12 @@ static int32_t hm_get_attr_type(char *value)
 	/* Sanity Checks														   */
 	/***************************************************************************/
 	TRACE_ENTRY();
-	TRACE_ASSERT(value != NULL);
+
+	if(value == NULL)
+	{
+		TRACE_WARN(("No attribute passed."));
+		goto EXIT_LABEL;
+	}
 
 	/***************************************************************************/
 	/* Main Routine															   */
@@ -41,6 +46,7 @@ static int32_t hm_get_attr_type(char *value)
 			break;
 		}
 	}
+EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -348,6 +354,30 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				}
 #endif
 				address_cb->scope = ip_scope;
+
+				TRACE_DETAIL(("Comm Scope: %s",xmlGetProp((xmlNode *)config_node->self, "scope")));
+				if((ip_scope = hm_get_attr_type(xmlGetProp((xmlNode *)config_node->self, "scope")))== HM_ERR)
+				{
+					TRACE_WARN(("Error finding attribute type value. Set default!"));
+					ip_scope = HM_CONFIG_ATTR_SCOPE_NODE;
+				}
+#ifdef I_WANT_TO_DEBUG
+				else
+				{
+					switch (ip_scope)
+					{
+					case HM_CONFIG_ATTR_SCOPE_NODE:
+						TRACE_INFO(("Communicate on Nodal Level"));
+						break;
+					case HM_CONFIG_ATTR_SCOPE_CLUSTER:
+						TRACE_INFO(("Communicate on Cluster Level"));
+						break;
+					default:
+						TRACE_ERROR(("Unknown type %d", ret_val));
+					}
+				}
+#endif
+				address_cb->comm_scope = ip_scope;
 				config_node->opaque = (void *)address_cb;
 				HM_STACK_PUSH(stack, config_node);
 				break;
@@ -362,19 +392,19 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				{
 					switch (ret_val)
 					{
-					case HM_CONFIG_ATTR_HB_SCOPE_NODE:
+					case HM_CONFIG_ATTR_SCOPE_NODE:
 						TRACE_INFO(("Heartbeat scope is local"));
 						/***************************************************************************/
 						/* Set pointer to appropriate structure									   */
 						/***************************************************************************/
 						config_node->opaque = &hm_config->instance_info.node;
-						hm_config->instance_info.node.scope = HM_CONFIG_ATTR_HB_SCOPE_NODE;
+						hm_config->instance_info.node.scope = HM_CONFIG_ATTR_SCOPE_NODE;
 
 						break;
-					case HM_CONFIG_ATTR_HB_SCOPE_CLUSTER:
+					case HM_CONFIG_ATTR_SCOPE_CLUSTER:
 						TRACE_INFO(("Heartbeat scope is cluster"));
 						config_node->opaque = &hm_config->instance_info.cluster;
-						hm_config->instance_info.cluster.scope = HM_CONFIG_ATTR_HB_SCOPE_CLUSTER;
+						hm_config->instance_info.cluster.scope = HM_CONFIG_ATTR_SCOPE_CLUSTER;
 						break;
 
 					default:
@@ -625,33 +655,44 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 #endif
 					ip_scope = address_cb->scope;
 					/***************************************************************************/
-					/* 3 variables can have 8 combinations. We go down according to most frequ-*/
+					/* 4 variables can have 16 combinations.We go down according to most frequ-*/
 					/* -ently occuring ones													   */
 					/***************************************************************************/
 					if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
 						ip_type==HM_CONFIG_ATTR_IP_TYPE_TCP &&
-						ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL)
+						ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL &&
+						address_cb->comm_scope == HM_CONFIG_ATTR_SCOPE_NODE)
 					{
 						TRACE_DETAIL(("IPv4 TCP Address for Nodes"));
-						hm_config->instance_info.tcp = address_cb;
+						hm_config->instance_info.node_addr = address_cb;
+						address_cb->address.type = HM_TRANSPORT_TCP_LISTEN;
+					}
+					else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
+						ip_type==HM_CONFIG_ATTR_IP_TYPE_TCP &&
+						ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL &&
+						address_cb->comm_scope == HM_CONFIG_ATTR_SCOPE_CLUSTER)
+					{
+						TRACE_DETAIL(("IPv4 TCP Address for Clusters"));
+						hm_config->instance_info.cluster_addr = address_cb;
 						address_cb->address.type = HM_TRANSPORT_TCP_LISTEN;
 					}
 					else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
 								ip_type==HM_CONFIG_ATTR_IP_TYPE_UDP &&
-								ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL)
+								ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL &&
+								address_cb->comm_scope == HM_CONFIG_ATTR_SCOPE_CLUSTER)
 					{
-						TRACE_DETAIL(("IPv4 UDP Address for Nodes"));
-						hm_config->instance_info.udp = address_cb;
+						TRACE_DETAIL(("IPv4 UDP Address for Clusters"));
+						hm_config->instance_info.cluster_addr = address_cb;
 						address_cb->address.type = HM_TRANSPORT_UDP;
 					}
 					else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
 								ip_type==HM_CONFIG_ATTR_IP_TYPE_MCAST &&
-								ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL)
+								ip_scope==HM_CONFIG_ATTR_ADDR_TYPE_LOCAL &&
+								address_cb->comm_scope == HM_CONFIG_ATTR_SCOPE_CLUSTER)
 					{
 						TRACE_DETAIL(("IPv4 UDP Address for Multicast on cluster"));
 						hm_config->instance_info.mcast = address_cb;
 						address_cb->address.type = HM_TRANSPORT_MCAST;
-						address_cb->scope = HM_CONFIG_ATTR_ADDR_TYPE_LOCAL;
 					}
 					else if(	ip_version==HM_CONFIG_ATTR_IP_VERSION_4 &&
 								ip_type==HM_CONFIG_ATTR_IP_TYPE_TCP &&
@@ -669,8 +710,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 					}
 					else
 					{
-						TRACE_DETAIL(("Unknown: IP Type: %d; IP Version: %c; IP Scope: %d.",
-																ip_type, ip_version, ip_scope));
+						TRACE_DETAIL(("Unknown: IP Type: %d; IP Version: %c; IP Scope: %d; Comm Scope: %d",
+													ip_type, ip_version, ip_scope, address_cb->comm_scope));
 						address_cb = NULL;
 					}
 					parent_node->opaque = (void *)address_cb;
@@ -712,6 +753,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
+					config_node->opaque = (void *)address_cb;
 				}
 				break;
 

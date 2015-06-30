@@ -435,6 +435,12 @@ typedef struct hm_socket_cb {
 	struct sockaddr addr;
 
 	/***************************************************************************/
+	/* Socket Type															   */
+	/* Although we could have fetched it from Kernel by getsockopt(SOCK_TYPE)  */
+	/***************************************************************************/
+	int32_t sock_type;
+
+	/***************************************************************************/
 	/* Connection State (in transport layer, application independent)		   */
 	/* One of: HM_TRANSPORT_CONNECTION_STATES								   */
 	/***************************************************************************/
@@ -474,6 +480,13 @@ typedef struct hm_transport_cb {
 	HM_SOCKET_CB *sock_cb;
 
 	/***************************************************************************/
+	/* Transport Address													   */
+	/* Note that this structure must be replaced by a union of all transport   */
+	/* structures if providing multiple transport types						   */
+	/***************************************************************************/
+	HM_INET_ADDRESS address;
+
+	/***************************************************************************/
 	/* Parent Location CB. Cannot be NULL 									   */
 	/* Would be a Listen Socket, or P2P socket.								   */
 	/***************************************************************************/
@@ -488,6 +501,11 @@ typedef struct hm_transport_cb {
 	/* Pointer to incoming buffer											   */
 	/***************************************************************************/
 	char *in_buffer;
+
+	/***************************************************************************/
+	/* Number of bytes pending on In Buffer									   */
+	/***************************************************************************/
+	int32_t in_bytes;
 
 	/***************************************************************************/
 	/* Pointer to outgoing buffer											   */
@@ -510,7 +528,10 @@ typedef struct hm_transport_cb {
 	/* sized memory when data arrives, and then a bigger chunk later when the  */
 	/* header is parsed.													   */
 	/***************************************************************************/
-	HM_MSG_HEADER header;
+	union msg_header{
+		HM_MSG_HEADER node_header;
+		HM_PEER_MSG_UNION peer_msg;
+	} header;
 
 } HM_TRANSPORT_CB ;
 /**STRUCT-********************************************************************/
@@ -557,25 +578,21 @@ typedef struct hm_location_cb {
 	/***************************************************************************/
 	/* Hardware Location Index for this Node.								   */
 	/***************************************************************************/
-	uint8_t index;
-	HM_AVL3_NODE hm_id_node;
+	uint32_t index;
 
 	/***************************************************************************/
-	/* Parameters for TCP Address (listen type) of this node				   */
+	/* Parameters for Local Node Address  of this node				   		   */
 	/***************************************************************************/
-	HM_INET_ADDRESS tcp_addr; /* TCP Address */
 	HM_TRANSPORT_CB *node_listen_cb;
 
 	/***************************************************************************/
-	/* Parameters for UDP Address (cluster peer unicast) of this node.		   */
+	/* Parameters for Cluster Address (cluster peer) of this node.		   	   */
 	/***************************************************************************/
-	HM_INET_ADDRESS udp_addr; /* UDP Address */
 	HM_TRANSPORT_CB *peer_listen_cb;
 
 	/***************************************************************************/
-	/* Parameters for UDP Address (cluster general) Multicast of this node.	   */
+	/* Parameters for Cluster Address (cluster general) Multicast of this node.*/
 	/***************************************************************************/
-	HM_INET_ADDRESS mcast_addr; /* Multicast Address */
 	HM_TRANSPORT_CB *peer_broadcast_cb;
 
 	/***************************************************************************/
@@ -613,6 +630,16 @@ typedef struct hm_location_cb {
 	/* Missed Keepalive Count												   */
 	/***************************************************************************/
 	uint32_t keepalive_missed;
+
+	/***************************************************************************/
+	/* Number of active nodes												   */
+	/***************************************************************************/
+	uint32_t active_nodes;
+
+	/***************************************************************************/
+	/* Number of active processes											   */
+	/***************************************************************************/
+	uint32_t active_processes;
 
 } HM_LOCATION_CB ;
 /**STRUCT-********************************************************************/
@@ -1252,7 +1279,7 @@ typedef struct hm_config_address_cb
 	HM_INET_ADDRESS address;
 
 	/***************************************************************************/
-	/* Scope of address														   */
+	/* Scope of address	: Local or Remote									   */
 	/***************************************************************************/
 	uint32_t scope;
 
@@ -1260,6 +1287,11 @@ typedef struct hm_config_address_cb
 	/* Port 																   */
 	/***************************************************************************/
 	uint32_t port;
+
+	/***************************************************************************/
+	/* Scope of communication: node or cluster								   */
+	/***************************************************************************/
+	uint32_t comm_scope;
 
 	/***************************************************************************/
 	/* Node in list															   */
@@ -1367,8 +1399,8 @@ typedef struct hm_config_cb
 		/***************************************************************************/
 		/* Information on local TCP/UDP/Multicast Transports					   */
 		/***************************************************************************/
-		HM_CONFIG_ADDRESS_CB *tcp;
-		HM_CONFIG_ADDRESS_CB *udp;
+		HM_CONFIG_ADDRESS_CB *node_addr;
+		HM_CONFIG_ADDRESS_CB *cluster_addr;
 		HM_CONFIG_ADDRESS_CB *mcast;
 
 		uint32_t mcast_group;
@@ -1495,6 +1527,11 @@ typedef struct hm_global_data
 	/* List of all socket connections									       */
 	/***************************************************************************/
 	HM_LQE conn_list;
+
+	/***************************************************************************/
+	/* Address structure for Multicast sending								   */
+	/***************************************************************************/
+	HM_TRANSPORT_CB *mcast_addr;
 
 } HM_GLOBAL_DATA ;
 /**STRUCT-********************************************************************/

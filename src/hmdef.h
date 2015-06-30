@@ -14,12 +14,18 @@
 /* Maximum number of pending connections on a listen socket				   */
 /***************************************************************************/
 #define HM_MAX_PENDING_CONNECT_REQ 							((uint32_t)128)
-
+#define HM_MCAST_BASE_ADDRESS								((uint32_t)200)
 /***************************************************************************/
 /* Group HM_NODE_ROLES: Node Roles 										   */
 /***************************************************************************/
 #define NODE_ROLE_PASSIVE									((uint16_t)	0)
 #define NODE_ROLE_ACTIVE									((uint16_t)	1)
+
+/***************************************************************************/
+/* Group Socket Type													   */
+/***************************************************************************/
+#define HM_TRANSPORT_SOCK_TYPE_TCP							((uint32_t) 0)
+#define HM_TRANSPORT_SOCK_TYPE_UDP							((uint32_t) 1)
 
 /***************************************************************************/
 /* Group HM_TRANSPORT_ADDR_TYPE: Transport Types						   */
@@ -59,7 +65,8 @@
 #define HM_NOTIFICATION_INTERFACE_DELETE					((uint16_t) 6)
 #define HM_NOTIFICATION_SUBSCRIBE							((uint16_t) 7)
 #define HM_NOTIFICATION_UNSUBSCRIBE							((uint16_t) 8)
-
+#define HM_NOTIFICATION_LOCATION_ACTIVE						((uint16_t) 9)
+#define HM_NOTIFICATION_LOCATION_INACTIVE					((uint16_t) 10)
 
 /***************************************************************************/
 /* Group HM Node FSM States												   */
@@ -97,12 +104,24 @@
 /* Group HM Peer FSM States												   */
 /***************************************************************************/
 #define HM_PEER_FSM_STATE_NULL								((uint16_t) 0)
-#define HM_PEER_FSM_STATE_WAITING							((uint16_t) 1)
-#define HM_PEER_FSM_STATE_SYNC								((uint16_t) 2)
-#define HM_PEER_FSM_STATE_ACTIVE							((uint16_t) 3)
-#define HM_PEER_FSM_STATE_FAILED							((uint16_t) 4)
+#define HM_PEER_FSM_STATE_INIT								((uint16_t) 1)
+#define HM_PEER_FSM_STATE_ACTIVE							((uint16_t) 2)
+#define HM_PEER_FSM_STATE_FAILED							((uint16_t) 3)
 
-
+#define HM_PEER_FSM_NUM_STATES								((uint32_t) 4)
+/***************************************************************************/
+/* Group: Peer FSM Signals												   */
+/***************************************************************************/
+#define HM_PEER_FSM_CONNECT									((uint32_t) 0)
+#define HM_PEER_FSM_INIT_RCVD								((uint32_t) 1)
+#define HM_PEER_FSM_LOOP									((uint32_t) 2)
+#define HM_PEER_FSM_CLOSE									((uint32_t) 3)
+#define HM_PEER_FSM_CLOSED									((uint32_t) 4)
+#define HM_PEER_FSM_TIMER_POP								((uint32_t) 5)
+/***************************************************************************/
+/* Number of Peer FSM Signals											   */
+/***************************************************************************/
+#define HM_PEER_FSM_NUM_SIGNALS								((uint32_t) 6)
 
 /***************************************************************************/
 /* FSM Paths															   */
@@ -170,8 +189,8 @@
 #define HM_CONFIG_ATTR_RES_MIL_SEC							((uint32_t) 1)
 #define HM_CONFIG_ATTR_RES_SEC								((uint32_t) 2)
 /* Heartbeat Scopes */
-#define HM_CONFIG_ATTR_HB_SCOPE_NODE						((uint32_t) 3)
-#define HM_CONFIG_ATTR_HB_SCOPE_CLUSTER						((uint32_t) 4)
+#define HM_CONFIG_ATTR_SCOPE_NODE							((uint32_t) 3)
+#define HM_CONFIG_ATTR_SCOPE_CLUSTER						((uint32_t) 4)
 /* IP Type*/
 #define HM_CONFIG_ATTR_IP_TYPE_TCP							((uint32_t) 5)
 #define HM_CONFIG_ATTR_IP_TYPE_UDP							((uint32_t) 6)
@@ -226,11 +245,11 @@
 #define HM_TABLE_TYPE_LOCATION_LOCAL						((uint32_t) 9)
 
 
-
 /***************************************************************************/
 /* Process Status														   */
 /***************************************************************************/
-#define HM_STATUS_DOWN									((uint32_t) 0)
-#define HM_STATUS_RUNNING									((uint32_t) 1)
+#define HM_STATUS_DOWN										((uint32_t) 0)
+#define HM_STATUS_PENDING									((uint32_t) 1)
+#define HM_STATUS_RUNNING									((uint32_t) 2)
 
 #endif /* SRC_HMDEF_H_ */

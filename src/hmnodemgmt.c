@@ -92,7 +92,7 @@
 /*	 																			*/
 /********************************************************************************/
 
-HM_TPRT_FSM_ENTRY hm_tprt_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STATES] =
+HM_TPRT_FSM_ENTRY hm_node_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STATES] =
 {
 		//HM_NDOE_FSM_CREATE SIGNAL Received
 	{									//Next State				Path
@@ -208,7 +208,7 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 	{
 		TRACE_DETAIL(("Signal : %d", next_input));
 		input_signal = next_input;
-		action = hm_tprt_fsm_table[next_input][node_cb->fsm_state].path;
+		action = hm_node_fsm_table[next_input][node_cb->fsm_state].path;
 		next_input = HM_NODE_FSM_NULL; /* Set unless specifically changed later. */
 		/***************************************************************************/
 		/* Loop until the inputs are processed properly.						   */
@@ -253,6 +253,14 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 			TRACE_DETAIL(("Arm the keepalive timer."));
 			node_cb->keepalive_missed++;
 			HM_TIMER_START(node_cb->timer_cb);
+
+			/***************************************************************************/
+			/* Increment Parent Location's active node count						   */
+			/***************************************************************************/
+			node_cb->parent_location_cb->active_nodes++;
+			TRACE_INFO(("Parent location %d's active nodes now %d",
+					node_cb->parent_location_cb->index,
+					node_cb->parent_location_cb->active_nodes));
 			next_input = HM_NODE_FSM_ACTIVE;
 			break;
 
@@ -278,6 +286,13 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 				proc_cb->running = FALSE;
 				hm_process_update(proc_cb);
 			}
+			/***************************************************************************/
+			/* Decrement the number of active nodes on Location, since we're going down*/
+			/***************************************************************************/
+			node_cb->parent_location_cb->active_nodes--;
+			TRACE_INFO(("Parent location %d's active nodes now %d",
+					node_cb->parent_location_cb->index,
+					node_cb->parent_location_cb->active_nodes));
 			next_input = HM_NODE_FSM_TERM;
 			break;
 
@@ -342,9 +357,9 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 		if(node_cb != NULL)
 		{
 			TRACE_DETAIL(("Current State is: %d", node_cb->fsm_state));
-			if(node_cb->fsm_state != hm_tprt_fsm_table[input_signal][node_cb->fsm_state].next_state)
+			if(node_cb->fsm_state != hm_node_fsm_table[input_signal][node_cb->fsm_state].next_state)
 			{
-				node_cb->fsm_state = hm_tprt_fsm_table[input_signal][node_cb->fsm_state].next_state;
+				node_cb->fsm_state = hm_node_fsm_table[input_signal][node_cb->fsm_state].next_state;
 				/***************************************************************************/
 				/* Update global tables.												   */
 				/* NOTE:																   */

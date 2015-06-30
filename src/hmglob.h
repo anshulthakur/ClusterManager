@@ -17,8 +17,8 @@
 HM_ATTRIBUTE_MAP attribute_map[] = {
 		{"ms", 								HM_CONFIG_ATTR_RES_MIL_SEC},
 		{"s",								HM_CONFIG_ATTR_RES_SEC},
-		{"node",							HM_CONFIG_ATTR_HB_SCOPE_NODE},
-		{"cluster",							HM_CONFIG_ATTR_HB_SCOPE_CLUSTER},
+		{"node",							HM_CONFIG_ATTR_SCOPE_NODE},
+		{"cluster",							HM_CONFIG_ATTR_SCOPE_CLUSTER},
 		{"tcp",								HM_CONFIG_ATTR_IP_TYPE_TCP},
 		{"udp",								HM_CONFIG_ATTR_IP_TYPE_UDP},
 		{"mcast",							HM_CONFIG_ATTR_IP_TYPE_MCAST},
@@ -58,11 +58,6 @@ HM_AVL3_TREE_INFO global_process_tree_by_id = {
 	hm_compare_proc_tree_keys, /* pointer to function*/
 	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /* key offset*/
 	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /* node offset */
-};
-HM_AVL3_TREE_INFO locations_tree_by_hardware_id = {
-	hm_compare_ulong, /* pointer to function*/
-	HM_OFFSETOF(HM_LOCATION_CB, index)	, /* key offset*/
-	HM_OFFSETOF(HM_LOCATION_CB, hm_id_node)  /* node offset */
 };
 HM_AVL3_TREE_INFO locations_tree_by_db_id = {
 	hm_compare_ulong, /* pointer to function*/
@@ -129,6 +124,7 @@ int32_t max_fd;
 /* Global Socket descriptor set											   */
 /***************************************************************************/
 fd_set hm_tprt_conn_set;
+fd_set hm_tprt_write_set;
 
 /***************************************************************************/
 /* Timers table															   */
@@ -146,7 +142,6 @@ int32_t *var;
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_id;
 extern HM_AVL3_TREE_INFO node_process_tree_by_proc_type_and_pid;
 extern HM_AVL3_TREE_INFO global_process_tree_by_id;
-extern HM_AVL3_TREE_INFO locations_tree_by_hardware_id;
 extern HM_AVL3_TREE_INFO locations_tree_by_db_id;
 extern HM_AVL3_TREE_INFO nodes_tree_by_db_id;
 extern HM_AVL3_TREE_INFO nodes_tree_by_node_id;
@@ -162,6 +157,7 @@ extern sigset_t mask;
 
 extern int32_t  max_fd;
 extern fd_set hm_tprt_conn_set;
+extern fd_set hm_tprt_write_set;
 extern HM_AVL3_TREE global_timer_table;
 extern HM_AVL3_TREE_INFO timer_table_by_handle;
 
