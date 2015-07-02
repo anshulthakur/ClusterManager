@@ -22,8 +22,7 @@
 /*|	1	|	HM_PEER_FSM_STATE_INIT  |	A connect request has been sent to  |   */
 /*|		|							|	the Peer.			   				|	*/
 /*|		|							|	Waiting for Connect to complete		|	*/
-/*|	2	|	HM_PEER_FSM_STATE_ACTIVE|	Received INIT request. 				|	*/
-/*|		|							|	OR Connect Completed.				|	*/
+/*|	2	|	HM_PEER_FSM_STATE_ACTIVE|	Received INIT request/response.		|	*/
 /*|		|							|	This is (should be) the first  		|	*/
 /*|		|							|	message that is received. 			|	*/
 /*|		|							|	The Node is now an active member	|	*/
@@ -38,7 +37,7 @@
 /*|CONNECT		| 1	  A	|--- ERR|--- ERR|--- ERR|								*/
 /*|INIT_RCVD	| 2   B | 2	  B |--- ERR| 2   B |								*/
 /*|LOOP			|--- ERR|---  C |---  C |---  C |								*/
-/*|CLOSE		|--- ERR|--- ERR| 3   D |--- ERR|								*/
+/*|CLOSE		|--- ERR| 3   D | 3   D |--- ERR|								*/
 /*|CLOSED 		|--- ERR|--- ERR|--- ERR| 0  ---|								*/
 /*|POP			|--- ERR|--- ERR|---  E |--- ERR|								*/
 /*-----------------------------------------------								*/
@@ -96,7 +95,7 @@ HM_TPRT_FSM_ENTRY hm_peer_fsm_table[HM_PEER_FSM_NUM_SIGNALS][HM_PEER_FSM_NUM_STA
 	//HM_PEER_FSM_CLOSE
 	{									//Next State				Path
 /* HM_PEER_FSM_STATE_NULL	*/ 	 {	HM_PEER_FSM_STATE_INIT		,	FSM_ERR	},
-/* HM_PEER_FSM_STATE_INIT */	 {	HM_PEER_FSM_STATE_INIT		,	FSM_ERR	},
+/* HM_PEER_FSM_STATE_INIT */	 {	HM_PEER_FSM_STATE_FAILED	,	ACT_D	},
 /* HM_PEER_FSM_STATE_ACTIVE	*/ 	 {	HM_PEER_FSM_STATE_FAILED	,	ACT_D	},
 /* HM_PEER_FSM_STATE_FAILED*/ 	 {	HM_PEER_FSM_STATE_NULL		,	FSM_ERR	}
 	},
@@ -162,12 +161,6 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 		case ACT_A:
 			TRACE_DETAIL(("Act A"));
 			TRACE_DETAIL(("A new node has been created on discovery."));
-			if(hm_global_location_add(loc_cb, HM_STATUS_PENDING) == HM_ERR)
-			{
-				TRACE_ERROR(("Error occurred while adding Hardware Location to HM."));
-				ret_val = HM_ERR;
-				TRACE_ASSERT(FALSE);
-			}
 			break;
 
 		case ACT_B:
@@ -186,8 +179,18 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 			/* If at the second timer pop, it is still set, then next array mask is set*/
 			/* If N masks are set, then the Peer is declared dead.					   */
 			/***************************************************************************/
+			loc_cb->keepalive_missed = 0;
 			HM_TIMER_START(loc_cb->timer_cb);
 
+			/***************************************************************************/
+			/* Update its global DB													   */
+			/***************************************************************************/
+			if(hm_global_location_add(loc_cb, HM_STATUS_PENDING) == HM_ERR)
+			{
+				TRACE_ERROR(("Error occurred while adding Hardware Location to HM."));
+				ret_val = HM_ERR;
+				TRACE_ASSERT(FALSE);
+			}
 			/***************************************************************************/
 			/* Also, send complete Location, Node and Process Information of this loc  */
 			/* to the peer.															   */
@@ -197,7 +200,11 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 			/* We're expecting the peer to do the same as soon as it receives INIT Rsp.*/
 			/* Send END OF REPLAY at the end of it.									   */
 			/***************************************************************************/
-			//TODO
+			if(hm_cluster_replay_info(loc_cb->peer_listen_cb) != HM_OK)
+			{
+				TRACE_ERROR(("Error sending replay messages to peer."));
+				TRACE_ASSERT(FALSE);
+			}
 
 			next_input = HM_PEER_FSM_LOOP;
 
@@ -216,6 +223,10 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 		case ACT_D:
 			TRACE_DETAIL(("Act D"));
 			TRACE_WARN(("Peer disconnected."));
+			/***************************************************************************/
+			/* Stop timers													    	   */
+			/***************************************************************************/
+			HM_TIMER_STOP(loc_cb->timer_cb);
 			next_input = HM_PEER_FSM_LOOP;
 
 			break;

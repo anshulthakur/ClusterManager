@@ -582,6 +582,21 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 		}
 #endif
 
+		/***************************************************************************/
+		/* Do not loopback the packets											   */
+		/***************************************************************************/
+		/*
+		{
+			TRACE_DETAIL(("Setting Loopback to off."));
+			u_char flag;
+			flag = 0;
+
+			if(setsockopt(sock_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &flag, sizeof(flag)) == -1)
+			{
+				TRACE_PERROR(("Error setting loopback option on Multicast socket"));
+			}
+		}
+		*/
 		LOCAL.mcast_addr->sock_cb = sock_cb;
 		LOCAL.mcast_addr->location_cb = &LOCAL.local_location_cb;
 
@@ -595,6 +610,8 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 	/* All went well. Set the sock_fd as that of sock_cb					   */
 	/***************************************************************************/
 	sock_cb->sock_fd = sock_fd;
+
+	memcpy(&sock_cb->addr, &address->address, sizeof(SOCKADDR));
 	/***************************************************************************/
 	/* Insert in Connection List											   */
 	/***************************************************************************/
@@ -822,7 +839,10 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
     /***************************************************************************/
 	/* Now try to receive data												   */
 	/***************************************************************************/
-	*src_addr = NULL;
+	if(src_addr != NULL)
+	{
+		*src_addr = NULL;
+	}
 	do
 	{
 		TRACE_DETAIL(("Try to receive %d bytes on Socket %d", (length - bytes_rcvd), sock_fd));
@@ -943,9 +963,23 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 			total_bytes_rcvd = bytes_rcvd;
 		}
 	}
-
+#ifdef I_WANT_TO_DEBUG
+	if(ip_addr != NULL)
+	{
+		if(src_addr== NULL)
+		{
+			TRACE_WARN((
+			"UDP/Multicast UDP port was specified but address to fill sender addr was not given"
+					));
+		}
+		TRACE_ASSERT(src_addr!=NULL);
+	}
+#endif
+	if(src_addr != NULL)
+	{
+		*src_addr = ip_addr;
+	}
 	TRACE_EXIT();
-	*src_addr = ip_addr;
 	return (total_bytes_rcvd);
 } /* hm_tprt_recv_on_socket */
 

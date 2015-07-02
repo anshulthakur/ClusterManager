@@ -135,6 +135,7 @@ int32_t hm_aggregate_compare_pid(void *, void *);
 int32_t hm_aggregate_compare_if_id(void *, void *);
 HM_MSG * hm_get_buffer(uint32_t);
 HM_MSG * hm_grow_buffer(HM_MSG *, uint32_t);
+HM_MSG * hm_shrink_buffer(HM_MSG *, uint32_t);
 int32_t hm_free_buffer(HM_MSG *);
 
 #endif /* SRC_HMFUNC_H_ */

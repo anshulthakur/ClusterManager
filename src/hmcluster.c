@@ -53,7 +53,7 @@ void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
 		/* Create a Location CB and fill in the details.						   */
 		/***************************************************************************/
 		loc_cb = hm_alloc_location_cb();
-		loc_cb->fsm_state = HM_PEER_FSM_STATE_INIT;
+		loc_cb->fsm_state = HM_PEER_FSM_STATE_NULL;
 		HM_GET_LONG(loc_cb->index, keepalive_msg->hdr.hw_id);
 		/***************************************************************************/
 		/* It is going to be an outgoing connection								   */
@@ -84,6 +84,8 @@ void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
 
 		loc_cb->peer_listen_cb->sock_cb = sock_cb;
 		sock_cb->tprt_cb = loc_cb->peer_listen_cb;
+
+		hm_peer_fsm(HM_PEER_FSM_CONNECT, loc_cb);
 	}
 	else
 	{
@@ -223,6 +225,70 @@ EXIT_LABEL:
 
 
 /***************************************************************************/
+/* Name:	hm_cluster_send_init 									*/
+/* Parameters: Input - 										*/
+/*			   Input/Output -								*/
+/* Return:	int32_t									*/
+/* Purpose: Send an INIT request to the cluster location			*/
+/***************************************************************************/
+int32_t hm_cluster_send_init(HM_TRANSPORT_CB *tprt_cb)
+{
+	/***************************************************************************/
+	/* Variable Declarations												   */
+	/***************************************************************************/
+	HM_PEER_MSG_INIT *init_msg = NULL;
+	HM_MSG *msg = NULL;
+
+	int32_t ret_val= HM_OK;
+	/***************************************************************************/
+	/* Sanity Checks														   */
+	/***************************************************************************/
+	TRACE_ENTRY();
+
+	TRACE_ASSERT(tprt_cb != NULL);
+	/***************************************************************************/
+	/* Main Routine															   */
+	/***************************************************************************/
+	msg = hm_get_buffer(sizeof(HM_PEER_MSG_INIT));
+	if(msg == NULL)
+	{
+		TRACE_ERROR(("Error allocating buffer for INIT message."));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+	init_msg = (HM_PEER_MSG_INIT *)msg->msg;
+
+	HM_PUT_LONG(init_msg->hdr.hw_id, LOCAL.local_location_cb.index);
+	HM_PUT_LONG(init_msg->hdr.msg_type, HM_PEER_MSG_TYPE_INIT);
+#ifdef I_WANT_TO_DEBUG
+	{
+		uint32_t test;
+		HM_GET_LONG(test, init_msg->hdr.msg_type);
+		TRACE_DETAIL(("Sending %d", (uint32_t)(init_msg->hdr.msg_type)));
+		TRACE_DETAIL(("Sending %x", test));
+	}
+#endif
+	HM_PUT_LONG(init_msg->hdr.timestamp, 0);
+
+	HM_PUT_LONG(init_msg->request, TRUE);
+	HM_PUT_LONG(init_msg->response_ok, FALSE);
+
+	if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+	{
+		TRACE_ERROR(("Error sending message to peer!"));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+
+EXIT_LABEL:
+	/***************************************************************************/
+	/* Exit Level Checks													   */
+	/***************************************************************************/
+	TRACE_EXIT();
+	return(ret_val);
+}/* hm_cluster_send_init */
+
+/***************************************************************************/
 /* Name:	hm_cluster_replay_info 										   */
 /* Parameters: Input - 													   */
 /*			   Input/Output -											   */
@@ -257,7 +323,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 	/* that can transmit all Node info.										   */
 	/***************************************************************************/
 	chunks_needed =
-			((LOCAL.local_location_cb.active_nodes)/HM_PEER_NUM_TLVS_PER_UPDATE)+1;
+			((LOCAL.local_location_cb.active_nodes)/HM_PEER_NUM_TLVS_PER_UPDATE);
 	if(((LOCAL.local_location_cb.active_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE) != 0)
 	{
 	chunks_needed +=
@@ -267,6 +333,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 				((LOCAL.local_location_cb.active_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE)
 			 ); /* or simply 1 */
 	}
+	TRACE_DETAIL(("Chunks Needed = %d", chunks_needed));
 	if(chunks_needed == 0)
 	{
 		/***************************************************************************/
@@ -278,84 +345,111 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 		{
 			TRACE_ERROR(("Error while sending End of Replay Message"));
 			ret_val = HM_ERR;
-			goto EXIT_LABEL;
 		}
+		/***************************************************************************/
+		/* Nothing more to do. Time to return									   */
+		/***************************************************************************/
+		goto EXIT_LABEL;
 	}
 	/***************************************************************************/
 	/* First, build a message for Nodes										   */
 	/***************************************************************************/
-	for(i=0; i<chunks_needed; i++)
-	{
-
-		msg = hm_get_buffer(sizeof(HM_PEER_MSG_REPLAY));
-		if(msg == NULL)
-		{
-			TRACE_ERROR(("Error allocating memory for Replay Message."));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-
-		replay_msg = (HM_PEER_MSG_REPLAY *)msg->msg;
-		if(replay_msg == NULL)
-		{
-			TRACE_ERROR(("Error allocating memory for Replay Message."));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		HM_PUT_LONG(replay_msg->hdr.hw_id, LOCAL.local_location_cb.index);
-		HM_PUT_LONG(replay_msg->hdr.msg_type, HM_PEER_MSG_TYPE_REPLAY);
-		HM_PUT_LONG(replay_msg->hdr.timestamp, 0);
-
-		/* Not the last message */
-		HM_PUT_LONG(replay_msg->last, 0);
-		node_cb = (HM_NODE_CB *)HM_AVL3_FIRST(LOCAL.local_location_cb.node_tree,
+	index_filled = 0;
+	i = 0;
+	for(node_cb = (HM_NODE_CB *)HM_AVL3_FIRST(LOCAL.local_location_cb.node_tree,
 														nodes_tree_by_node_id);
-		TRACE_ASSERT(node_cb != NULL);
-
-		for(index_filled=0;
-			index_filled < HM_PEER_NUM_TLVS_PER_UPDATE;
-			index_filled++)
+				node_cb != NULL;
+				node_cb = (HM_NODE_CB *)HM_AVL3_NEXT(node_cb->index_node, nodes_tree_by_node_id))
+	{
+		TRACE_DETAIL(("Filling out Node %d information.", node_cb->index));
+		if(index_filled ==0)
 		{
-			if(node_cb != NULL && node_cb->fsm_state==HM_NODE_FSM_STATE_ACTIVE)
+			/***************************************************************************/
+			/* Allocate a message buffer if we know that currently, no indices have    */
+			/* been used. This implies a new message must be constructed.			   */
+			/***************************************************************************/
+#ifdef I_WANT_TO_DEBUG
+			i++; /* keep score of number of allocs so far */
+			TRACE_ASSERT(i<=chunks_needed);
+#endif
+			/***************************************************************************/
+			/* Allocate a buffer for update											   */
+			/***************************************************************************/
+			msg = hm_get_buffer(sizeof(HM_PEER_MSG_REPLAY));
+			if(msg == NULL)
 			{
-				HM_PUT_LONG(replay_msg->tlv[index_filled].group,
-								(uint32_t)node_cb->group);
-				HM_PUT_LONG(replay_msg->tlv[index_filled].node_id,
-								(uint32_t)node_cb->index);
-				HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
-								HM_PEER_REPLAY_UPDATE_TYPE_NODE);
-				HM_PUT_LONG(replay_msg->tlv[index_filled].role,
-												(uint32_t)node_cb->role);
+				TRACE_ERROR(("Error allocating memory for Replay Message."));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
 			}
-			else
-			{
-				break;
-			}
-			if(i != index_filled-1)
-			{
-				node_cb = (HM_NODE_CB *)HM_AVL3_NEXT(node_cb->index_node,
-															nodes_tree_by_node_id);
-			}
-		}
-		HM_PUT_LONG(replay_msg->num_tlvs, index_filled);
-		/***************************************************************************/
-		/* Made message, now queue on transport and send if possible			   */
-		/***************************************************************************/
-		if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
-		{
-			TRACE_ERROR(("Error sending message to peer!"));
-			ret_val = HM_ERR;
-			goto EXIT_LABEL;
-		}
-		hm_free_buffer(msg);
-	}
 
+			replay_msg = (HM_PEER_MSG_REPLAY *)msg->msg;
+			if(replay_msg == NULL)
+			{
+				TRACE_ERROR(("Error allocating memory for Replay Message."));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+			memset(replay_msg, 0, sizeof(HM_PEER_MSG_REPLAY));
+			HM_PUT_LONG(replay_msg->hdr.hw_id, LOCAL.local_location_cb.index);
+			HM_PUT_LONG(replay_msg->hdr.msg_type, HM_PEER_MSG_TYPE_REPLAY);
+			HM_PUT_LONG(replay_msg->hdr.timestamp, 0);
+
+			/* Not the last message */
+			HM_PUT_LONG(replay_msg->last, 0);
+		}
+		if(node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE)
+		{
+			HM_PUT_LONG(replay_msg->tlv[index_filled].group,
+							(uint32_t)node_cb->group);
+			HM_PUT_LONG(replay_msg->tlv[index_filled].node_id,
+							(uint32_t)node_cb->index);
+			HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
+							HM_PEER_REPLAY_UPDATE_TYPE_NODE);
+			HM_PUT_LONG(replay_msg->tlv[index_filled].role,
+											(uint32_t)node_cb->role);
+
+			index_filled++;
+		}
+		else
+		{
+			/***************************************************************************/
+			/* Node is not running. Exclude it from update.						   */
+			/***************************************************************************/
+			TRACE_DETAIL(("Exclude from update. Not running!"));
+			continue;
+		}
+		/***************************************************************************/
+		/* If we've filled enough TLVs at this point, send the message and prepare */
+		/* a new buffer for filling up.											   */
+		/***************************************************************************/
+		if(index_filled==HM_PEER_NUM_TLVS_PER_UPDATE)
+		{
+			HM_PUT_LONG(replay_msg->num_tlvs, index_filled);
+			/***************************************************************************/
+			/* Made message, now queue on transport and send if possible			   */
+			/***************************************************************************/
+			if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+			{
+				TRACE_ERROR(("Error sending message to peer!"));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+			hm_free_buffer(msg);
+			index_filled = 0;
+		}
+	}//Node loop
+
+	TRACE_ASSERT(i==chunks_needed);
+	/***************************************************************************/
+	/* At this point, either all node information has been sent, or there still*/
+	/* remains the last incomplete TLV block message.						   */
+	/* Now, we will fill it with Process information.						   */
 	/***************************************************************************/
 	/* Now, build a message for Processes									   */
 	/***************************************************************************/
-
 	chunks_needed =
-			((LOCAL.local_location_cb.active_processes)/HM_PEER_NUM_TLVS_PER_UPDATE)+1;
+			((LOCAL.local_location_cb.active_processes)/HM_PEER_NUM_TLVS_PER_UPDATE);
 	if(((LOCAL.local_location_cb.active_processes)%HM_PEER_NUM_TLVS_PER_UPDATE) != 0)
 	{
 		chunks_needed += 1;
@@ -370,15 +464,17 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 		{
 			TRACE_ERROR(("Error while sending End of Replay Message"));
 			ret_val = HM_ERR;
-			goto EXIT_LABEL;
 		}
+		/***************************************************************************/
+		/* Nothing more to do. Time to return									   */
+		/***************************************************************************/
+		goto EXIT_LABEL;
 	}
 
 	/***************************************************************************/
 	/* Now, loop through all the nodes collecting their running processes and  */
 	/* making an update.													   */
 	/***************************************************************************/
-	index_filled = 0;
 	i = 0;
 	for(node_cb = (HM_NODE_CB *)HM_AVL3_FIRST(LOCAL.local_location_cb.node_tree,
 													nodes_tree_by_node_id);
@@ -438,7 +534,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 				HM_PUT_LONG(replay_msg->tlv[index_filled].node_id,
 								(uint32_t)node_cb->index);
 				HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
-								HM_PEER_REPLAY_UPDATE_TYPE_NODE);
+								HM_PEER_REPLAY_UPDATE_TYPE_PROC);
 				HM_PUT_LONG(replay_msg->tlv[index_filled].pid,
 												(uint32_t)proc_cb->pid);
 
@@ -517,6 +613,7 @@ EXIT_LABEL:
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return(ret_val);
 }/* hm_cluster_replay_info */
 
 /***************************************************************************/
@@ -567,11 +664,20 @@ int32_t hm_cluster_send_end_of_replay(HM_TRANSPORT_CB *tprt_cb)
 	/* Not the last message */
 	HM_PUT_LONG(replay_msg->last, 1);
 
+	if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+	{
+		TRACE_ERROR(("Error sending message to peer!"));
+		ret_val = HM_ERR;
+		goto EXIT_LABEL;
+	}
+	hm_free_buffer(msg);
+
 EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return(ret_val);
 }/* hm_cluster_send_end_of_replay */
 
 /***************************************************************************/
@@ -592,7 +698,7 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 	int32_t msg_type;
 	int32_t hw_id;
 
-	HM_MSG *msg_buf;
+	HM_PEER_MSG_INIT *init_msg = NULL;
 	HM_PEER_MSG_REPLAY *replay_msg = NULL;
 	HM_PEER_MSG_NODE_UPDATE *node_update = NULL;
 	HM_PEER_MSG_PROCESS_UPDATE *proc_update = NULL;
@@ -600,6 +706,8 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 	HM_LOCATION_CB *loc_cb = NULL;
 	HM_NODE_CB *node_cb = NULL;
 	HM_PROCESS_CB *proc_cb = NULL;
+
+	HM_MSG *msg = NULL;
 
 	int32_t node_id;
 	int32_t proc_key[2];
@@ -632,6 +740,43 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 	{
 	case HM_PEER_MSG_TYPE_INIT:
 		TRACE_DETAIL(("Received INIT message."));
+		init_msg = (HM_PEER_MSG_INIT *)sock_cb->tprt_cb->in_buffer;
+		HM_GET_LONG(hw_id, init_msg->hdr.hw_id);
+		HM_GET_LONG(node_id, init_msg->request);
+		if(node_id == TRUE)
+		{
+			TRACE_DETAIL(("Received INIT request."));
+			HM_PUT_LONG(init_msg->response_ok, TRUE);
+			HM_PUT_LONG(init_msg->request, TRUE);
+			msg = hm_get_buffer(sizeof(HM_PEER_MSG_INIT));
+			if(msg == NULL)
+			{
+				TRACE_ERROR(("Error allocating buffer for INIT response."));
+				TRACE_ASSERT(msg != NULL);
+			}
+			memcpy(msg->msg, init_msg, sizeof(HM_PEER_MSG_INIT));
+			/***************************************************************************/
+			/* Queue on port														   */
+			/***************************************************************************/
+			if(hm_queue_on_transport(msg, sock_cb->tprt_cb)!= HM_OK)
+			{
+				TRACE_ERROR(("Error while sending INIT response."));
+				TRACE_ASSERT(FALSE);
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+			hm_free_buffer(msg);
+		}
+		else
+		{
+			TRACE_DETAIL(("Received INIT Response."));
+			HM_GET_LONG(node_id, init_msg->response_ok);
+			if(node_id != TRUE)
+			{
+				TRACE_ERROR(("Response is not OK"));
+				TRACE_ASSERT(FALSE);
+			}
+		}
 		hm_peer_fsm(HM_PEER_FSM_INIT_RCVD, sock_cb->tprt_cb->location_cb);
 		break;
 
@@ -829,6 +974,7 @@ EXIT_LABEL:
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return(ret_val);
 }/* hm_receive_cluster_message */
 
 /***************************************************************************/
@@ -848,7 +994,11 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 
 	int32_t hw_id, tlv_type, num_tlvs = 0;
 
-	int32_t node_id;
+	/***************************************************************************/
+	/* Use of i is necessary. We MUST traverse update in order only. Process   */
+	/* updates before nodes will fail if nodes do not exist.				   */
+	/***************************************************************************/
+	int32_t node_id, i;
 
 	HM_NODE_CB *node_cb= NULL;
 	HM_PROCESS_CB *proc_cb = NULL;
@@ -873,9 +1023,9 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 	/***************************************************************************/
 	HM_GET_LONG(num_tlvs, msg->num_tlvs);
 	TRACE_DETAIL(("%d TLVs present.", num_tlvs));
-	for(num_tlvs; num_tlvs>0;num_tlvs--)
+	for(i = 0;i< num_tlvs;i++)
 	{
-		HM_GET_LONG(tlv_type, msg->tlv[num_tlvs-1].update_type);
+		HM_GET_LONG(tlv_type, msg->tlv[i].update_type);
 		switch(tlv_type)
 		{
 		case HM_PEER_REPLAY_UPDATE_TYPE_NODE:
@@ -887,9 +1037,13 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 				ret_val = HM_ERR;
 				goto EXIT_LABEL;
 			}
-			HM_GET_LONG(node_cb->id, msg->tlv[num_tlvs-1].node_id);
-			HM_GET_LONG(node_cb->group, msg->tlv[num_tlvs-1].group);
-			HM_GET_LONG(node_cb->role, msg->tlv[num_tlvs-1].role);
+			HM_GET_LONG(node_cb->index, msg->tlv[i].node_id);
+			TRACE_DETAIL(("Node ID: %d", node_cb->index));
+			HM_GET_LONG(node_cb->group, msg->tlv[i].group);
+			HM_GET_LONG(node_cb->role, msg->tlv[i].role);
+
+			node_cb->fsm_state = HM_NODE_FSM_STATE_ACTIVE; /* Since it is replay */
+
 			/***************************************************************************/
 			/* Add node to system													   */
 			/***************************************************************************/
@@ -903,7 +1057,7 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 
 		case HM_PEER_REPLAY_UPDATE_TYPE_PROC:
 			TRACE_DETAIL(("Process Update"));
-			HM_GET_LONG(node_id, msg->tlv[num_tlvs-1].node_id);
+			HM_GET_LONG(node_id, msg->tlv[i].node_id);
 			/***************************************************************************/
 			/* Find the node first													   */
 			/***************************************************************************/
@@ -932,8 +1086,8 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 			/***************************************************************************/
 
 			proc_cb->parent_node_cb = node_cb;
-			HM_GET_LONG(proc_cb->pid, msg->tlv[num_tlvs-1].pid);
-			HM_GET_LONG(proc_cb->type, msg->tlv[num_tlvs-1].group);
+			HM_GET_LONG(proc_cb->pid, msg->tlv[i].pid);
+			HM_GET_LONG(proc_cb->type, msg->tlv[i].group);
 			proc_cb->running = TRUE;
 
 			if(hm_process_add(proc_cb, proc_cb->parent_node_cb)!= HM_OK)
@@ -958,6 +1112,7 @@ EXIT_LABEL:
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return(ret_val);
 }/* hm_cluster_process_replay */
 
 
@@ -1118,4 +1273,5 @@ EXIT_LABEL:
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return(ret_val);
 }/* hm_cluster_send_update */

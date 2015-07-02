@@ -403,14 +403,26 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->id = 0;
 		notify_msg->if_id = 0;
 		notify_msg->proc_type = 0;
+
+		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb != NULL);
+		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb->location_cb != NULL);
+
+		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb->sock_cb != NULL);
+
 		addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->transport_cb->sock_cb->addr);
-		if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN)
+
+		if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN
+			||
+			affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_OUT)
 		{
 			TRACE_DETAIL(("Node has IPv4 type of connection."));
 			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
-			memcpy(notify_msg->addr_info.addr,
-					&addr->in_addr.sin_addr.s_addr,
-				sizeof(struct in_addr));
+
+			memcpy(		notify_msg->addr_info.addr,
+						&addr->in_addr.sin_addr.s_addr,
+						sizeof(struct in_addr)
+					);
+
 			notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
 #ifdef I_WANT_TO_DEBUG
 		{
@@ -433,7 +445,7 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		}
 		else
 		{
-			TRACE_WARN(("Unknown Transport Type"));
+			TRACE_WARN(("Unknown Transport Type %d", affected_node.node_cb->node_cb->transport_cb->type));
 		}
 		notify_msg->addr_info.group = affected_node.node_cb->group_index;
 		notify_msg->addr_info.hw_index = affected_node.node_cb->node_cb->parent_location_cb->index;
@@ -448,7 +460,10 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->id = 0;
 		notify_msg->if_id = 0;
 		notify_msg->proc_type = 0;
+
 		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb != NULL);
+		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb->sock_cb != NULL);
+
 		addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->transport_cb->sock_cb->addr);
 		if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN)
 		{
@@ -484,7 +499,9 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->id = affected_node.process_cb->pid;
 		notify_msg->if_id = 0;
 		notify_msg->proc_type = affected_node.process_cb->type;
+
 		TRACE_ASSERT(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb != NULL);
+
 		addr = (HM_SOCKADDR_UNION *)&(
 				affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->sock_cb->addr);
 		if(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb->type

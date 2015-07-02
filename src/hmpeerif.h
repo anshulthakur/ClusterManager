@@ -18,7 +18,7 @@
 /***************************************************************************/
 /* Message Types to be used in msg_type field of HM_MSG_HEADER			   */
 /***************************************************************************/
-#define HM_PEER_MSG_TYPE_INIT					((uint32_t) 1) /* INIT Message*/
+#define HM_PEER_MSG_TYPE_INIT					((uint32_t) 4626) /* INIT Message*/
 #define HM_PEER_MSG_TYPE_KEEPALIVE				((uint32_t) 2) /* Keepalive Tick */
 #define HM_PEER_MSG_TYPE_PROCESS_UPDATE			((uint32_t) 3) /* Process Create/Destroy Update to HM */
 #define HM_PEER_MSG_TYPE_NODE_UPDATE			((uint32_t) 4) /* Node Create/Destroy update to HM */
@@ -87,6 +87,17 @@ typedef struct hm_peer_msg_init
 	/* HM Header															   */
 	/***************************************************************************/
 	HM_PEER_MSG_HEADER hdr;
+
+	/***************************************************************************/
+	/* Request/Response														   */
+	/***************************************************************************/
+	uint8_t request[4];
+
+	/***************************************************************************/
+	/* OK or not															   */
+	/* NOTE: This field was added to avoid size match on Node and Cluster Level*/
+	/***************************************************************************/
+	uint8_t response_ok[4];
 
 } HM_PEER_MSG_INIT ;
 /**STRUCT-********************************************************************/

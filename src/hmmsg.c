@@ -278,23 +278,43 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 	TRACE_ENTRY();
 
 	TRACE_ASSERT(sock_cb != NULL);
-	TRACE_ASSERT(sock_cb->tprt_cb->in_buffer != NULL);
+
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+	/***************************************************************************/
+	/* Transport will have at least the space for a Message Header. Get bytes  */
+	/* into that buffer and then invoke the layer specific code.			   */
+	/***************************************************************************/
+	sock_cb->tprt_cb->in_buffer = (char *)&sock_cb->tprt_cb->header;
 
-	if(sock_cb->tprt_cb->in_bytes == sizeof(HM_PEER_MSG_HEADER))
+	/***************************************************************************/
+	/* If associated transport has a node_cb associated with it, it is a Node  */
+	/* connection. Else, it is a cluster connection/Location Connection.	   */
+	/***************************************************************************/
+	if(sock_cb->tprt_cb->node_cb != NULL)
 	{
-		TRACE_DETAIL(("Message received from a peer."));
-		if(hm_receive_cluster_message(sock_cb)!= HM_OK)
+		TRACE_DETAIL(("Message must be from Node"));
+		/***************************************************************************/
+		/* First, receive the message header and verify that it is an INIT message */
+		/***************************************************************************/
+		sock_cb->tprt_cb->in_bytes = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+									sock_cb->sock_type,
+									sock_cb->tprt_cb->in_buffer,
+									sizeof(HM_MSG_HEADER),
+									NULL
+									);
+		if((sock_cb->tprt_cb->in_bytes != sizeof(HM_MSG_HEADER)))
 		{
-			TRACE_ERROR(("Error occurred while handling cluster message."));
+			TRACE_DETAIL(("Message Length of %d was expected, %d was received",
+						sizeof(HM_MSG_HEADER), sock_cb->tprt_cb->in_bytes));
+			hm_tprt_handle_improper_read(sock_cb->tprt_cb->in_bytes, sock_cb->tprt_cb);
 			ret_val = HM_ERR;
+			goto EXIT_LABEL;
 		}
-	}
-	else if(sock_cb->tprt_cb->in_bytes == sizeof(HM_MSG_HEADER))
-	{
-		TRACE_DETAIL(("Message from a Node"));
+		/***************************************************************************/
+		/* Route the message to its appropriate handler							   */
+		/***************************************************************************/
 		msg_hdr = (HM_MSG_HEADER *)sock_cb->tprt_cb->in_buffer;
 
 		/***************************************************************************/
@@ -403,7 +423,39 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 			TRACE_WARN(("Unknown Message Type"));
 			TRACE_ASSERT(FALSE);
 		}
-	}//end else
+	}//If message is from Node
+	else
+	{
+		TRACE_DETAIL(("Received Message from a peer."));
+		/***************************************************************************/
+		/* Irrespective of TCP or UDP, we'll be receiving full message chunks only */
+		/***************************************************************************/
+		sock_cb->tprt_cb->in_bytes = hm_tprt_recv_on_socket(sock_cb->sock_fd,
+									sock_cb->sock_type,
+									sock_cb->tprt_cb->in_buffer,
+									sizeof(HM_PEER_MSG_UNION),
+									&udp_sender
+									);
+		if(sock_cb->tprt_cb->in_bytes < sizeof(HM_PEER_MSG_HEADER))
+		{
+			TRACE_DETAIL(("Message Length of at least %d was expected, %d was received",
+						sizeof(HM_PEER_MSG_HEADER), bytes_rcvd));
+			hm_tprt_handle_improper_read(sock_cb->tprt_cb->in_bytes, sock_cb->tprt_cb);
+			/***************************************************************************/
+			/* Shh.. We've handled the network error. It is OK now.					   */
+			/***************************************************************************/
+			ret_val = HM_OK;
+			goto EXIT_LABEL;
+		}
+		/***************************************************************************/
+		/* Process message received from cluster								   */
+		/***************************************************************************/
+		if(hm_receive_cluster_message(sock_cb)!= HM_OK)
+		{
+			TRACE_ERROR(("Error occurred while handling cluster message."));
+			ret_val = HM_ERR;
+		}
+	}
 
 EXIT_LABEL:
 	/***************************************************************************/
@@ -437,9 +489,16 @@ int32_t hm_tprt_handle_improper_read(int32_t bytes_rcvd, HM_TRANSPORT_CB *tprt_c
 	/***************************************************************************/
 	if(bytes_rcvd == 0)
 	{
-		TRACE_WARN(("Remote Peer has disconnected."));
+		TRACE_WARN(("Remote side has disconnected."));
 		tprt_cb->in_buffer = NULL;
-		hm_node_fsm(HM_NODE_FSM_TERM, tprt_cb->node_cb);
+		if(tprt_cb->node_cb!=NULL)
+		{
+			hm_node_fsm(HM_NODE_FSM_TERM, tprt_cb->node_cb);
+		}
+		else
+		{
+			hm_peer_fsm(HM_PEER_FSM_CLOSE, tprt_cb->location_cb);
+		}
 	}
 	/***************************************************************************/
 	/* Exit Level Checks													   */

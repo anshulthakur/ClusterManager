@@ -67,10 +67,9 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 		/* error.																  */
 
 		TRACE_WARN(("Found a previous node with the same index."));
-		ret_val = HM_ERR;
-		goto EXIT_LABEL;
 
 		/* Currently ineffective and unhittable. This is just an evolution path.  */
+		trigger = TRUE;
 		if(glob_cb->status == status)
 		{
 			TRACE_DETAIL(("States are same. Do not trigger notifications!"));
@@ -226,18 +225,18 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
 	/***************************************************************************/
 	TRACE_ASSERT(loc_cb->db_ptr != NULL);
 	glob_cb = (HM_GLOBAL_LOCATION_CB *)loc_cb->db_ptr;
-
+	glob_cb->status = glob_cb->loc_cb->fsm_state;
 	/***************************************************************************/
 	/* There are not going to be any notifications as such.					   */
 	/* But we need to send out updates on cluster.							   */
 	/***************************************************************************/
 	switch(glob_cb->status)
 	{
-	case HM_STATUS_RUNNING:
+	case HM_PEER_FSM_STATE_ACTIVE:
 		TRACE_DETAIL(("Location Active."));
 		notify = HM_NOTIFICATION_LOCATION_ACTIVE;
 		break;
-	case HM_STATUS_DOWN:
+	case HM_PEER_FSM_STATE_FAILED:
 		TRACE_DETAIL(("Location Down."));
 		notify = HM_NOTIFICATION_LOCATION_INACTIVE;
 		break;
@@ -371,6 +370,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 		/***************************************************************************/
 		/* Allocate a global location CB										   */
 		/***************************************************************************/
+		TRACE_DETAIL(("New node %d added", node_cb->index));
 		insert_cb = (HM_GLOBAL_NODE_CB *)malloc(sizeof(HM_GLOBAL_NODE_CB));
 		TRACE_ASSERT(insert_cb != NULL);
 		if(insert_cb == NULL)
@@ -388,7 +388,7 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 		insert_cb->table_type = HM_TABLE_TYPE_NODES;
 	}
 
-	TRACE_DETAIL(("Node ID: %d", insert_cb->id));
+	TRACE_DETAIL(("Node DB ID: %d", insert_cb->id));
 	insert_cb->node_cb = node_cb;
 	insert_cb->role = node_cb->role;
 	insert_cb->status = node_cb->fsm_state;
@@ -536,7 +536,7 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb)
 	/* Find the node in DB.													   */
 	/***************************************************************************/
 	glob_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
-											&node_cb->id, nodes_tree_by_db_id);
+											&node_cb->index, nodes_tree_by_db_id);
 	if(glob_cb == NULL)
 	{
 		TRACE_ERROR(("No Global DB Entry found for this node. This shouldn't happen."));

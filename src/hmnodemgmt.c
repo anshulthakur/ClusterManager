@@ -417,8 +417,8 @@ int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
 	insert_cb = (HM_NODE_CB *)HM_AVL3_INSERT_OR_FIND(location_cb->node_tree,
 										node_cb->index_node,
 										nodes_tree_by_node_id);
-	 if(insert_cb != NULL)
-	 {
+	if(insert_cb != NULL)
+	{
 		 TRACE_WARN(("Found an existing entry with same parameters. Overwriting fields"));
 		 /***************************************************************************/
 		 /* Validate that the two are one and the same thing. Maybe it had gone down*/
@@ -439,7 +439,14 @@ int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
 		 TRACE_DETAIL(("Initial transport CB (%p) written with (%p)",
 				 	 insert_cb->transport_cb, node_cb->transport_cb));
 		 insert_cb->transport_cb = node_cb->transport_cb;
-	 }
+		 hm_free_node_cb(node_cb);
+		 node_cb = insert_cb;
+	}
+	else
+	{
+		TRACE_DETAIL(("New node %d added.", node_cb->index));
+		insert_cb = node_cb;
+	}
 
 	 if(node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
 	 {
@@ -469,9 +476,15 @@ int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
 	 {
 		 TRACE_INFO(("Remote Node information added."));
 		 /***************************************************************************/
-		 /* Update FSM State of old state (if it has gone up)						*/
+		 /*Associate the transport of parent Location with this node also.			*/
 		 /***************************************************************************/
-		 insert_cb->fsm_state = node_cb->fsm_state;
+		 node_cb->transport_cb = node_cb->parent_location_cb->peer_listen_cb;
+		 TRACE_ASSERT(node_cb->transport_cb->sock_cb!=NULL);
+
+		 TRACE_DETAIL(("Node associated with socket %d",
+				 node_cb->transport_cb->sock_cb->sock_fd));
+		 /* Transport doesn't know this association */
+		 TRACE_ASSERT(node_cb->transport_cb->node_cb == NULL);
 	 }
 
 	 /***************************************************************************/

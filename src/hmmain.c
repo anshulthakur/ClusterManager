@@ -610,12 +610,14 @@ void hm_run_main_thread()
 	/***************************************************************************/
 	int32_t nready; //Number of ready descriptors
 
+	int32_t val;
+	uint32_t msg_type;
 	HM_SOCKET_CB *sock_cb;
 	extern fd_set hm_tprt_conn_set;
 	extern int32_t max_fd;
 	struct timeval select_timeout;
 
-	fd_set read_set, write_set;
+	fd_set read_set, write_set, except_set;
 
 	HM_MSG *buf = NULL;
 
@@ -658,7 +660,7 @@ void hm_run_main_thread()
 
 		read_set = hm_tprt_conn_set;
 		write_set = hm_tprt_write_set;
-
+		except_set = hm_tprt_write_set;
 		/***************************************************************************/
 		/* Unblock the signal.													   */
 		/***************************************************************************/
@@ -670,7 +672,7 @@ void hm_run_main_thread()
 		/***************************************************************************/
 		/* Check for listen/read events											   */
 		/***************************************************************************/
-		nready = select(max_fd+1, &read_set, &write_set, NULL, &select_timeout);
+		nready = select(max_fd+1, &read_set, &write_set, &except_set, &select_timeout);
 		if(nready == 0)
 		{
 			/***************************************************************************/
@@ -691,7 +693,6 @@ void hm_run_main_thread()
 	    {
 			TRACE_PERROR(("Error blocking signals before querying descriptors."));
 	    }
-
 		/***************************************************************************/
 		/* Check for incoming connections										   */
 		/***************************************************************************/
@@ -847,6 +848,65 @@ void hm_run_main_thread()
 			}//end select on listenfd
 		}
 		/***************************************************************************/
+		/* Check for Exception events on any socket									   */
+		/***************************************************************************/
+		for(sock_cb = (HM_SOCKET_CB *)HM_NEXT_IN_LIST(LOCAL.conn_list);
+				sock_cb != NULL;
+				sock_cb = HM_NEXT_IN_LIST(sock_cb->node))
+		{
+			if(FD_ISSET(sock_cb->sock_fd, &except_set))
+			{
+				/***************************************************************************/
+				/* The connection is valid and read event has occurred here.		       */
+				/***************************************************************************/
+				TRACE_DETAIL(("FD %d has a exception event",sock_cb->sock_fd));
+
+				/***************************************************************************/
+				/* Connection connect() request must have failed.		   				   */
+				/* Check if its state was INIT.											   */
+				/***************************************************************************/
+				if(sock_cb->conn_state == HM_TPRT_CONN_INIT)
+				{
+					TRACE_DETAIL(("Connect failed!"));
+					TRACE_ASSERT(sock_cb->tprt_cb->location_cb != NULL);
+					loc_cb = sock_cb->tprt_cb->location_cb;
+					/***************************************************************************/
+					/* Retry request														   */
+					/***************************************************************************/
+					if((val = connect(sock_cb->sock_fd, &sock_cb->addr, sizeof(SOCKADDR_IN)))!=0)
+					{
+						if(errno == EINPROGRESS)
+						{
+							TRACE_DETAIL(("Connect will complete asynchronously."));
+						}
+						else
+						{
+							TRACE_PERROR(("Connect failed on socket %d", sock_cb->sock_fd));
+							FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
+							close(sock_cb->sock_fd);
+							sock_cb->sock_fd = -1;
+							goto EXIT_LABEL;
+						}
+					}
+					else
+					{
+						TRACE_DETAIL(("Connect succeeded!"));
+						/* Directly move connection to active state */
+						sock_cb->conn_state = HM_TPRT_CONN_ACTIVE;
+					}
+				}
+				if(--nready <=0)
+				{
+					TRACE_DETAIL(("No more incoming requests."));
+					/*
+					 * FIXME: Possible breakpoint. If a socket has both read and write fd set
+					 * is it counted in twice?
+					 */
+					continue;
+				}
+			}
+		}
+		/***************************************************************************/
 		/* Check for WRITE events on any socket									   */
 		/***************************************************************************/
 		for(sock_cb = (HM_SOCKET_CB *)HM_NEXT_IN_LIST(LOCAL.conn_list);
@@ -869,7 +929,15 @@ void hm_run_main_thread()
 					TRACE_DETAIL(("Connect succeeded!"));
 					TRACE_ASSERT(sock_cb->tprt_cb->location_cb != NULL);
 					loc_cb = sock_cb->tprt_cb->location_cb;
-					hm_peer_fsm(HM_PEER_FSM_INIT_RCVD, loc_cb);
+					/***************************************************************************/
+					/* Send an INIT request to the Peer 									   */
+					/***************************************************************************/
+					hm_cluster_send_init(sock_cb->tprt_cb);
+					/***************************************************************************/
+					/* Remove it from global FD write set now.								   */
+					/***************************************************************************/
+
+					FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
 				}
 				if(--nready <=0)
 				{
@@ -884,7 +952,7 @@ void hm_run_main_thread()
 		}
 
 		/***************************************************************************/
-		/* There are READ events waiting to be processed.					   */
+		/* There are READ events waiting to be processed.					   	   */
 		/***************************************************************************/
 		for(sock_cb = (HM_SOCKET_CB *)HM_NEXT_IN_LIST(LOCAL.conn_list);
 				sock_cb != NULL;
@@ -914,7 +982,7 @@ void hm_run_main_thread()
 					/* partial reading is not allowed on UDP).								   */
 					/* Even if it is TCP Socket, that is not a problem.						   */
 					/***************************************************************************/
-					buf = hm_get_buffer( MAX(sizeof(HM_MSG_HEADER),sizeof(HM_PEER_MSG_INIT)) );
+					buf = hm_get_buffer( MAX(sizeof(HM_NODE_INIT_MSG),sizeof(HM_PEER_MSG_INIT)) );
 					TRACE_ASSERT(buf != NULL);
 					if(buf == NULL)
 					{
@@ -928,11 +996,16 @@ void hm_run_main_thread()
 					/* and try to receive data.												   */
 					/* It HAS to be an INIT request message for such connections or we can 	   */
 					/* discard it.															   */
+					/* Update: 																   */
+					/* We will have to try and receive Full INIT message on the socket because */
+					/* the INIT message of Nodes is bigger, and since both are TCP sockets	   */
+					/* we cannot (we can but don't want to) make a distinction between a Node  */
+					/* socket and Location Socket.											   */
 					/***************************************************************************/
-					if((bytes_rcvd = hm_tprt_recv_on_socket(	sock_cb->sock_fd,
+					if((bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
 												sock_cb->sock_type,
 												buf->msg,
-												MAX(sizeof(HM_MSG_HEADER),
+												MAX(sizeof(HM_NODE_INIT_MSG),
 													sizeof(HM_PEER_MSG_INIT)),
 												&udp_sender
 												))== HM_ERR)
@@ -949,7 +1022,7 @@ void hm_run_main_thread()
 					/***************************************************************************/
 					//FIXME: There is a chance that size of HM_MSG_HDR and that of Peer Messages is same.
 					//Consider differentiating recv on basis of sock type
-					if(bytes_rcvd == sizeof(HM_MSG_HEADER))
+					if(bytes_rcvd == sizeof(HM_NODE_INIT_MSG))
 					{
 						init_msg = (HM_NODE_INIT_MSG *)buf->msg;
 						if((init_msg->hdr.msg_type != HM_MSG_TYPE_INIT) || (init_msg->hdr.request != TRUE))
@@ -977,34 +1050,7 @@ void hm_run_main_thread()
 						}
 						else
 						{
-							/***************************************************************************/
-							/* Grow the buffer to accommodate the INIT request						   */
-							/***************************************************************************/
-							buf = hm_grow_buffer(buf, sizeof(HM_NODE_INIT_MSG));
-							TRACE_ASSERT(buf != NULL);
-							if(buf == NULL)
-							{
-								TRACE_ERROR(("Error growing buffer for incoming message."));
-								goto EXIT_LABEL;
-							}
 							init_msg = (HM_NODE_INIT_MSG *)buf->msg;
-							/***************************************************************************/
-							/* It is an INIT request. Read the rest of the message and associate with  */
-							/* a node.																   */
-							/***************************************************************************/
-							TRACE_INFO(("INIT request received. Associate with a Node"));
-							if((bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-																		sock_cb->sock_type,
-																		(BYTE *)buf->msg + bytes_rcvd,
-																		sizeof(HM_NODE_INIT_MSG)
-																		- sizeof(HM_MSG_HEADER),
-																		&udp_sender
-																		))== HM_ERR)
-							{
-								TRACE_ERROR(("Error receiving rest of data"));
-								TRACE_ASSERT(FALSE);
-								//TODO: Error handling? Exit or continue?
-							}
 							TRACE_INFO(("INIT Request from Node Index: %d, Group %d",
 													init_msg->index, init_msg->service_group_index));
 							/***************************************************************************/
@@ -1065,11 +1111,25 @@ void hm_run_main_thread()
 					}
 					else if(bytes_rcvd == sizeof(HM_PEER_MSG_INIT))
 					{
-						peer_init_msg = (HM_PEER_MSG_INIT *)buf->msg;
-						HM_GET_LONG(bytes_rcvd, peer_tick_msg->hdr.msg_type);
-						if( bytes_rcvd!= HM_PEER_MSG_TYPE_INIT)
+						buf = hm_shrink_buffer(buf, sizeof(HM_PEER_MSG_INIT));
+						if(buf == NULL)
 						{
-							TRACE_WARN(("Message type is not INIT request. Ignore."));
+							TRACE_ERROR(("Error shrinking buffer!"));
+							TRACE_ASSERT(FALSE);
+						}
+						peer_init_msg = (HM_PEER_MSG_INIT *)buf->msg;
+						/***************************************************************************/
+						/* Necessary to initialize msg_type to 0.								   */
+						/***************************************************************************/
+						msg_type = 0;
+						/***************************************************************************/
+						/* FIXME Keepalive message is still referenced.							   */
+						/***************************************************************************/
+						HM_GET_LONG(msg_type, peer_init_msg->hdr.msg_type);
+
+						if( msg_type != HM_PEER_MSG_TYPE_INIT)
+						{
+							TRACE_WARN(("Message type %d is not INIT request. Ignore.", msg_type));
 							hm_free_buffer(buf);
 						}
 						else
@@ -1079,21 +1139,24 @@ void hm_run_main_thread()
 							/* a location.															   */
 							/***************************************************************************/
 							TRACE_INFO(("INIT request received. Associate with a Location"));
-							TRACE_INFO(("INIT Request from Peer, indexed: %d",
-																	ntohl((uint32_t)peer_init_msg->hdr.hw_id)));
-
+							{
+								int32_t location_id;
+								HM_GET_LONG(location_id, peer_init_msg->hdr.hw_id);
+								TRACE_INFO(("INIT Request from Peer, indexed: %d",
+																		location_id));
+							}
 							/***************************************************************************/
 							/* Try to find the location in tree first. If found, this is error		   */
 							/* TODO: Move it into hm_cluster_check_location()						   */
 							/***************************************************************************/
-							loc_id = ntohl((uint32_t)peer_init_msg->hdr.hw_id);
+							HM_GET_LONG(loc_id, peer_init_msg->hdr.hw_id);
 							glob_cb = (HM_GLOBAL_LOCATION_CB *)HM_AVL3_FIND(LOCAL.locations_tree,
 																				&loc_id,
 																				locations_tree_by_db_id );
 							if(glob_cb != NULL)
 							{
 								TRACE_ERROR(("Received INIT on TCP Port of a known location"));
-								TRACE_ASSERT(FALSE);
+								hm_peer_fsm(HM_PEER_FSM_INIT_RCVD, glob_cb->loc_cb);
 							}
 							else
 							{
@@ -1101,7 +1164,7 @@ void hm_run_main_thread()
 								/* Create a Location CB and fill in the details.						   */
 								/***************************************************************************/
 								loc_cb = hm_alloc_location_cb();
-								loc_cb->index = ntohl((uint32_t)peer_init_msg->hdr.hw_id);
+								loc_cb->index =loc_id;
 								if(sock_cb->sock_type == HM_TRANSPORT_SOCK_TYPE_TCP)
 								{
 									loc_cb->peer_listen_cb = hm_alloc_transport_cb(HM_TRANSPORT_TCP_IN);
@@ -1116,6 +1179,19 @@ void hm_run_main_thread()
 								loc_cb->peer_listen_cb->location_cb = loc_cb;
 								loc_cb->peer_listen_cb->sock_cb = sock_cb;
 								sock_cb->tprt_cb = loc_cb->peer_listen_cb;
+
+								/***************************************************************************/
+								/* Send a response of INIT first, and then commence Replay				   */
+								/***************************************************************************/
+								HM_PUT_LONG(peer_init_msg->request, FALSE );
+								HM_PUT_LONG(peer_init_msg->response_ok, TRUE);
+
+								if(hm_queue_on_transport(buf, sock_cb->tprt_cb)!= HM_OK)
+								{
+									TRACE_ERROR(("Error sending INIT response!"));
+									TRACE_ASSERT((FALSE));
+									//TODO?
+								}
 								/***************************************************************************/
 								/* Add the location to global locations tree							   */
 								/***************************************************************************/
@@ -1135,44 +1211,12 @@ void hm_run_main_thread()
 				{
 					TRACE_DETAIL(("Socket associated with Transport of Location %d",
 													sock_cb->tprt_cb->location_cb->index));
-					/***************************************************************************/
-					/* Transport will have at least the space for a Message Header. Get bytes  */
-					/* into that buffer and then invoke the layer specific code.			   */
-					/***************************************************************************/
-					/***************************************************************************/
-					/* We'll need to receive the message into a random buffer which must be as */
-					/* large as at least the INIT message.									   */
-					/***************************************************************************/
-					sock_cb->tprt_cb->in_buffer = (char *)&sock_cb->tprt_cb->header;
-					//TODO: Let this part be handled in the message router itself. We can decide
-					//on the basis of socket_type the sizeof the buffer we want to receive.
-					//For UDP, there will be just one read, and for TCP, there can be sequentially
-					//many.
-					/***************************************************************************/
-					/* First, receive the message header and verify that it is an INIT message */
-					/***************************************************************************/
-					sock_cb->tprt_cb->in_bytes = hm_tprt_recv_on_socket(sock_cb->sock_fd,
-												sock_cb->sock_type,
-												sock_cb->tprt_cb->in_buffer,
-												MAX(sizeof(HM_MSG_HEADER), sizeof(HM_PEER_MSG_HEADER)),
-												&udp_sender
-												);
-					if((sock_cb->tprt_cb->in_bytes == sizeof(HM_MSG_HEADER))
-							||
-						(sock_cb->tprt_cb->in_bytes == sizeof(HM_PEER_MSG_HEADER)))
+					if(hm_route_incoming_message(sock_cb)!= HM_OK)
 					{
-						//TODO
-						//Pass to message router to handle message accordingly
-						hm_route_incoming_message(sock_cb);
-						//Based on the type of message, process it.
-						//PROC_CREATE/DESTROY handled by Process layer
-					}
-					else
-					{
-						TRACE_DETAIL(("Message Length of %d was expected, %d was received",
-										sizeof(HM_MSG_HEADER), bytes_rcvd));
-						hm_tprt_handle_improper_read(bytes_rcvd, sock_cb->tprt_cb);
-						//TODO: Quit or Continue?
+						TRACE_ERROR(("Some error occured while processing message!"));
+						TRACE_ASSERT(FALSE);
+						break;
+						//FIXME: What now?
 					}
 					/* Don't need to free the buffer, because it is a statically allocated memory */
 				}
