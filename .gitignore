@@ -6,4 +6,4 @@
 /Debug/HardwareManager
 *.d
 /Debug/tester
-/Debug/
+/Debug/*.o
