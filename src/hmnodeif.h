@@ -136,7 +136,7 @@ typedef struct hm_node_init_msg
 	uint32_t keepalive_period;
 
 	/***************************************************************************/
-	/* Location Status														   */
+	/* Location Status: Active/Passive: To be filled by HM in response.		   */
 	/***************************************************************************/
 	uint32_t location_status;
 

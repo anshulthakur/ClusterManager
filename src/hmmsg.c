@@ -85,7 +85,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	tprt_cb->in_buffer = (char *)msg->msg+ sizeof(HM_REGISTER_MSG);
 	bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
 										tprt_cb->sock_cb->sock_type,
-										tprt_cb->in_buffer,
+										(uint8_t *)tprt_cb->in_buffer,
 										(reg->num_register * sizeof(HM_REGISTER_TLV_CB)),
 										&udp_sender);
 	if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB)))
@@ -143,7 +143,6 @@ int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 	/***************************************************************************/
 	/* Variable Declarations												   */
 	/***************************************************************************/
-	HM_LIST_BLOCK *block = NULL;
 	HM_PROCESS_UPDATE_MSG *proc_msg = NULL;
 	int32_t ret_val = HM_OK;
 
@@ -199,7 +198,7 @@ int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 		proc_cb->pid = proc_msg->pid;
 		proc_cb->type = proc_msg->proc_type;
 		proc_cb->running = TRUE;
-		snprintf(proc_cb->name, sizeof(proc_cb->name),"%s",proc_msg->name);
+		snprintf((char *)proc_cb->name, sizeof(proc_cb->name),"%s",proc_msg->name);
 
 		if(hm_process_add(proc_cb, proc_cb->parent_node_cb)!= HM_OK)
 		{
@@ -300,7 +299,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 		/***************************************************************************/
 		sock_cb->tprt_cb->in_bytes = hm_tprt_recv_on_socket(sock_cb->sock_fd,
 									sock_cb->sock_type,
-									sock_cb->tprt_cb->in_buffer,
+									(BYTE *)sock_cb->tprt_cb->in_buffer,
 									sizeof(HM_MSG_HEADER),
 									NULL
 									);
@@ -355,7 +354,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 			size  = sizeof(HM_REGISTER_MSG)-sizeof(HM_MSG_HEADER);
 			bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
 												sock_cb->sock_type,
-												sock_cb->tprt_cb->in_buffer,
+												(BYTE *)sock_cb->tprt_cb->in_buffer,
 												size,
 												&udp_sender
 												);
@@ -398,7 +397,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 			size  = sizeof(HM_PROCESS_UPDATE_MSG)-sizeof(HM_MSG_HEADER);
 			bytes_rcvd = hm_tprt_recv_on_socket(sock_cb->sock_fd,
 												sock_cb->sock_type,
-												sock_cb->tprt_cb->in_buffer,
+												(BYTE *)sock_cb->tprt_cb->in_buffer,
 												size,
 												&udp_sender);
 			if(bytes_rcvd < size)
@@ -432,7 +431,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 		/***************************************************************************/
 		sock_cb->tprt_cb->in_bytes = hm_tprt_recv_on_socket(sock_cb->sock_fd,
 									sock_cb->sock_type,
-									sock_cb->tprt_cb->in_buffer,
+									(BYTE *)sock_cb->tprt_cb->in_buffer,
 									sizeof(HM_PEER_MSG_UNION),
 									&udp_sender
 									);
@@ -478,7 +477,7 @@ int32_t hm_tprt_handle_improper_read(int32_t bytes_rcvd, HM_TRANSPORT_CB *tprt_c
 	/***************************************************************************/
 	/* Variable Declarations												   */
 	/***************************************************************************/
-
+	int32_t ret_val = HM_OK;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -504,6 +503,7 @@ int32_t hm_tprt_handle_improper_read(int32_t bytes_rcvd, HM_TRANSPORT_CB *tprt_c
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return(ret_val);
 }/* hm_tprt_handle_improper_read */
 
 /***************************************************************************/
@@ -528,7 +528,7 @@ int32_t hm_receive_msg_hdr(char *buf)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-EXIT_LABEL:
+
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -558,7 +558,7 @@ int32_t hm_receive_msg(char *buf)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-EXIT_LABEL:
+
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -611,7 +611,7 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
 	/* Set the Hardware Location Number of the Location						   */
 	/***************************************************************************/
 	init_msg->hardware_num = LOCAL.local_location_cb.index;
-	init_msg->location_status = TRUE;
+	init_msg->location_status = node_cb->current_role;
 
 	init_msg->keepalive_period = node_cb->keepalive_period;
 
@@ -621,7 +621,7 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
 	ret_val = hm_queue_on_transport(msg, node_cb->transport_cb);
 	node_cb->transport_cb->in_buffer = NULL;
 
-EXIT_LABEL:
+
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/

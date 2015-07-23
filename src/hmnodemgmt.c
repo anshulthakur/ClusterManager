@@ -36,7 +36,7 @@
 /*|Create		|1	  A	|--- ERR|--- ERR|--- ERR|--- ERR|						*/
 /*|INIT			|--- ERR|2	  B |--- ERR|--- ERR|--- ERR|						*/
 /*|Data			|--- ERR|--- ERR|---  C |--- ERR|--- ERR|						*/
-/*|Terminate	|--- ERR|--- ERR| 3   D |---  I |--- ERR|						*/
+/*|Terminate	|--- ERR|--- ERR| 3   D |---  I |--- ---|						*/
 /*|Close 		|--- ERR|--- ERR|--- ERR|--- ERR| 1  ---|						*/
 /*|TimerPop 	|--- ERR| 3   E | 2   F |--- ERR|--- ERR|						*/
 /*|TimeOut 		|--- ERR|--- ERR| 3   G |--- ERR|--- ERR|						*/
@@ -127,7 +127,7 @@ HM_TPRT_FSM_ENTRY hm_node_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STA
 /* HM_NODE_FSM_STATE_WAITING */	 {	HM_NODE_FSM_STATE_WAITING	,	FSM_ERR	},
 /* HM_NODE_FSM_STATE_ACTIVE	*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	ACT_D	},
 /* HM_NODE_FSM_STATE_FAILING*/ 	 {	HM_NODE_FSM_STATE_FAILING	,	ACT_I	},
-/* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_FAILED	,	FSM_ERR	}
+/* HM_NODE_FSM_STATE_FAILED */ 	 {	HM_NODE_FSM_STATE_FAILED	,	ACT_NO	}
 	},
 
 	//HM_NDOE_FSM_CLOSE
@@ -302,7 +302,7 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 			/* Stop timer. No more Pop-ups! */
 			HM_TIMER_STOP(node_cb->timer_cb);
 
-			next_input = HM_NODE_FSM_FAILED;
+			next_input = HM_NODE_FSM_TERM;
 			break;
 
 		case ACT_F:
@@ -331,9 +331,16 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 			break;
 
 		case ACT_J:
-			TRACE_DETAIL(("Act I"));
+			TRACE_DETAIL(("Act J"));
 			TRACE_DETAIL(("Node has failed. Release resources."));
-			hm_tprt_close_connection(node_cb->transport_cb);
+			if(node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
+			{
+				hm_tprt_close_connection(node_cb->transport_cb);
+			}
+			else
+			{
+				TRACE_DETAIL(("Do not remove shared resources for remote node."));
+			}
 			next_input = HM_NODE_FSM_CLOSE;
 			break;
 
@@ -446,6 +453,10 @@ int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
 	{
 		TRACE_DETAIL(("New node %d added.", node_cb->index));
 		insert_cb = node_cb;
+		/***************************************************************************/
+		/* Increment the number of nodes on this location.						   */
+		/***************************************************************************/
+		location_cb->total_nodes++;
 	}
 
 	 if(node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
@@ -508,11 +519,14 @@ int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
 	 /***************************************************************************/
 	 if(node_cb->parent_location_cb->index != LOCAL.local_location_cb.index)
 	 {
-		 if(hm_global_node_update(node_cb)!= HM_OK)
+		 if(node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE)
 		 {
-			 TRACE_ERROR(("Error propagating node update"));
-			 ret_val = HM_ERR;
-			 goto EXIT_LABEL;
+			 if(hm_global_node_update(node_cb)!= HM_OK)
+			 {
+				 TRACE_ERROR(("Error propagating node update"));
+				 ret_val = HM_ERR;
+				 goto EXIT_LABEL;
+			 }
 		 }
 	 }
 

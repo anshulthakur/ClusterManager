@@ -232,7 +232,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 
 	char target[128], service[128];
 
-	int32_t ret_val;
+	int32_t ret_val = HM_OK;
 
 	struct addrinfo hints, *res, *ressave;
 	HM_SOCKADDR_UNION *mcast_cast = NULL, *addr = NULL;
@@ -523,12 +523,11 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 
 #ifdef I_WANT_TO_DEBUG
 		{
-		int i;
 		char address_value[128];
 		HM_SOCKADDR_UNION addr;
 		socklen_t addrlen = sizeof(addr);
 
-		i = getsockname(sock_fd, &addr.sock_addr,  &addrlen);
+		getsockname(sock_fd, &addr.sock_addr,  &addrlen);
 		inet_ntop(addr.in_addr.sin_family,
 					&addr.in_addr.sin_addr,
 						address_value, sizeof(address_value));
@@ -618,7 +617,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 	HM_INSERT_BEFORE(LOCAL.conn_list, sock_cb->node);
 
 EXIT_LABEL:
-	if (ret_val == 0)
+	if (ret_val == HM_OK)
 	{
 		/***************************************************************************/
 		/* Free the address structures that were allocated in getaddrinfo in kernel*/
@@ -710,12 +709,11 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 			TRACE_DETAIL(("Data to be sent on UDP Mcast connection "));
 #ifdef I_WANT_TO_DEBUG
 		{
-		int i;
 		char address_value[128];
 		HM_SOCKADDR_UNION addr;
 		socklen_t addrlen = sizeof(addr);
 
-		i = getsockname(sock_fd, &addr.sock_addr,  &addrlen);
+		getsockname(sock_fd, &addr.sock_addr,  &addrlen);
 		inet_ntop(addr.in_addr.sin_family,
 					&addr.in_addr.sin_addr,
 						address_value, sizeof(address_value));
@@ -977,7 +975,7 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 #endif
 	if(src_addr != NULL)
 	{
-		*src_addr = ip_addr;
+		*src_addr = (SOCKADDR *)ip_addr;
 	}
 	TRACE_EXIT();
 	return (total_bytes_rcvd);
@@ -1010,6 +1008,7 @@ int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
+
 	/***************************************************************************/
 	/* Empty the outgoing buffers queue. Don't try to send them, just drop.	   */
 	/***************************************************************************/
@@ -1053,6 +1052,7 @@ int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
 			tprt_cb->sock_cb = NULL;
 		}
 	}
+
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/

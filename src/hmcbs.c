@@ -306,7 +306,9 @@ HM_LOCATION_CB * hm_alloc_location_cb()
 	loc_cb->peer_listen_cb = NULL;
 
 	loc_cb->active_nodes = 0;
+	loc_cb->total_nodes = 0;
 	loc_cb->active_processes = 0;
+	loc_cb->replay_in_progress = FALSE;
 	/***************************************************************************/
 	/* The following fields are necessary only for a local node. Maybe I would */
 	/* remove them later.													   */
@@ -404,6 +406,7 @@ HM_NODE_CB * hm_alloc_node_cb(uint32_t local)
 
 	node_cb->group = 0;
 	node_cb->role = NODE_ROLE_PASSIVE;
+	node_cb->current_role = NODE_ROLE_PASSIVE;
 	memset(&node_cb->name, '\0', sizeof(node_cb->name));
 	node_cb->transport_cb = NULL;
 	node_cb->parent_location_cb = NULL;
@@ -584,6 +587,8 @@ int32_t hm_free_process_cb(HM_PROCESS_CB *proc_cb)
 	/* Variable Declarations												   */
 	/***************************************************************************/
 	int32_t ret_val = HM_OK;
+
+	HM_INTERFACE_CB *list_node = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -596,7 +601,17 @@ int32_t hm_free_process_cb(HM_PROCESS_CB *proc_cb)
 	/***************************************************************************/
 	/* Empty the interfaces list											   */
 	/***************************************************************************/
-	HM_EMPTY_LIST(proc_cb->interfaces_list);
+	if(!HM_EMPTY_LIST(proc_cb->interfaces_list))
+	{
+		TRACE_DETAIL(("Emptying Interface list"));
+		for(list_node = (HM_INTERFACE_CB *)HM_NEXT_IN_LIST(proc_cb->interfaces_list);
+				list_node != NULL;
+				list_node = (HM_INTERFACE_CB *)HM_NEXT_IN_LIST(proc_cb->interfaces_list))
+		{
+			HM_REMOVE_FROM_LIST(list_node->list_node);
+			free(list_node);
+		}
+	}
 
 	/***************************************************************************/
 	/* Remove from Nodes tree												   */

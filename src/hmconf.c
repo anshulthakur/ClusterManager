@@ -15,7 +15,7 @@
 /* Return:	static int32_t									*/
 /* Purpose: Gets the attribute type value			*/
 /***************************************************************************/
-static int32_t hm_get_attr_type(char *value)
+static int32_t hm_get_attr_type(xmlChar *value)
 {
 	/***************************************************************************/
 	/* Variable Declarations												   */
@@ -39,7 +39,7 @@ static int32_t hm_get_attr_type(char *value)
 	TRACE_DETAIL(("Look for %s", value));
 	for(i=0; i< size_of_map; i++)
 	{
-		if(strncmp(value, attribute_map[i].attribute, strlen(value))==0)
+		if(strncmp((const char *)value, attribute_map[i].attribute, strlen((const char *)value))==0)
 		{
 			ret_val = attribute_map[i].type;
 			TRACE_DETAIL(("Found attribute type %d", attribute_map[i].type));
@@ -79,74 +79,73 @@ static int32_t hm_get_node_type(xmlNode *node)
 	/***************************************************************************/
 	/* Main Routine															   */
 	/***************************************************************************/
-	if(strstr(node->name, "hm_instance_info") != NULL)
+	if(strstr((const char *)node->name, "hm_instance_info") != NULL)
 	{
 		ret_val = HM_CONFIG_HM_INSTANCE;
 	}
-	else if(strstr(node->name, "config") != NULL)
+	else if(strstr((const char *)node->name, "config") != NULL)
 	{
 		ret_val = HM_CONFIG_ROOT;
 	}
-	else if(strstr(node->name, "heartbeat") != NULL)
+	else if(strstr((const char *)node->name, "heartbeat") != NULL)
 	{
 		ret_val = HM_CONFIG_HEARTBEAT;
 	}
-	else if(strstr(node->name, "address") != NULL)
+	else if(strstr((const char *)node->name, "address") != NULL)
 	{
 		ret_val = HM_CONFIG_ADDRESS;
 	}
-	else if(strstr(node->name, "period") != NULL)
+	else if(strstr((const char *)node->name, "period") != NULL)
 	{
 		ret_val = HM_CONFIG_PERIOD;
 	}
-	else if(strstr(node->name, "threshold") != NULL)
+	else if(strstr((const char *)node->name, "threshold") != NULL)
 	{
 		ret_val = HM_CONFIG_THRESHOLD;
 	}
 	/* Order of occurance is important while using strstr */
 	/* ip occurs in subscr'ip'tions. So, first check for longest word first */
-	else if(strstr(node->name, "subscriptions") != NULL)
+	else if(strstr((const char *)node->name, "subscriptions") != NULL)
 	{
 		ret_val = HM_CONFIG_SUBSCRIPTION_TREE;
 	}
-	else if(strstr(node->name, "subscription") != NULL)
+	else if(strstr((const char *)node->name, "subscription") != NULL)
 	{
 		ret_val = HM_CONFIG_SUBSCRIPTION_INSTANCE;
 	}
-	else if(strstr(node->name, "ip") != NULL)
+	else if(strstr((const char *)node->name, "ip") != NULL)
 	{
 		ret_val = HM_CONFIG_IP;
 	}
-	else if(strstr(node->name, "port") != NULL)
+	else if(strstr((const char *)node->name, "port") != NULL)
 	{
 		ret_val = HM_CONFIG_PORT;
 	}
-	else if(strstr(node->name, "group") != NULL)
+	else if(strstr((const char *)node->name, "group") != NULL)
 	{
 		ret_val = HM_CONFIG_GROUP;
 	}
-	else if(strstr(node->name, "nodes") != NULL)
+	else if(strstr((const char *)node->name, "nodes") != NULL)
 	{
 		ret_val = HM_CONFIG_NODE_TREE;
 	}
-	else if(strstr(node->name, "node") != NULL)
+	else if(strstr((const char *)node->name, "node") != NULL)
 	{
 		ret_val = HM_CONFIG_NODE_INSTANCE;
 	}
-	else if(strstr(node->name, "index") != NULL)
+	else if(strstr((const char *)node->name, "index") != NULL)
 	{
 		ret_val = HM_CONFIG_INDEX;
 	}
-	else if(strstr(node->name, "name") != NULL)
+	else if(strstr((const char *)node->name, "name") != NULL)
 	{
 		ret_val = HM_CONFIG_NAME;
 	}
-	else if(strstr(node->name, "role") != NULL)
+	else if(strstr((const char *)node->name, "role") != NULL)
 	{
 		ret_val = HM_CONFIG_ROLE;
 	}
 
-EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -168,7 +167,6 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 	/***************************************************************************/
 	int32_t ret_val = HM_OK;
 	xmlNode *current_node = NULL;
-	xmlAttr *attributes = NULL;
 
 	HM_CONFIG_NODE *config_node = NULL;
 	HM_CONFIG_NODE *parent_node = NULL;
@@ -332,8 +330,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				/***************************************************************************/
 				/* Fetch the scope of address first so that we may know the variable to use*/
 				/***************************************************************************/
-				TRACE_DETAIL(("Address type: %s",xmlGetProp((xmlNode *)config_node->self, "type")));
-				if((ip_scope = hm_get_attr_type(xmlGetProp((xmlNode *)config_node->self, "type")))== HM_ERR)
+				TRACE_DETAIL(("Address type: %s",xmlGetProp((xmlNode *)config_node->self, (const xmlChar *)"type")));
+				if((ip_scope = hm_get_attr_type(xmlGetProp((xmlNode *)config_node->self, (const xmlChar *)"type")))== HM_ERR)
 				{
 					TRACE_WARN(("Error finding attribute type value. Ignoring!"));
 				}
@@ -355,8 +353,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 #endif
 				address_cb->scope = ip_scope;
 
-				TRACE_DETAIL(("Comm Scope: %s",xmlGetProp((xmlNode *)config_node->self, "scope")));
-				if((ip_scope = hm_get_attr_type(xmlGetProp((xmlNode *)config_node->self, "scope")))== HM_ERR)
+				TRACE_DETAIL(("Comm Scope: %s",xmlGetProp((xmlNode *)config_node->self, (const xmlChar *)"scope")));
+				if((ip_scope = hm_get_attr_type(xmlGetProp((xmlNode *)config_node->self, (const xmlChar *)"scope")))== HM_ERR)
 				{
 					TRACE_WARN(("Error finding attribute type value. Set default!"));
 					ip_scope = HM_CONFIG_ATTR_SCOPE_NODE;
@@ -383,8 +381,8 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				break;
 
 			case HM_CONFIG_HEARTBEAT:
-				TRACE_INFO(("Scope of Heartbeat: %s", xmlGetProp(current_node, "scope")));
-				if((ret_val = hm_get_attr_type(xmlGetProp(current_node, "scope")))== HM_ERR)
+				TRACE_INFO(("Scope of Heartbeat: %s", xmlGetProp(current_node, (const xmlChar *)"scope")));
+				if((ret_val = hm_get_attr_type(xmlGetProp(current_node, (const xmlChar *)"scope")))== HM_ERR)
 				{
 					TRACE_WARN(("Error finding attribute type value. Ignoring!"));
 				}
@@ -484,7 +482,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 				{
 					TRACE_DETAIL(("Parent Instance is Hardware Manager Keepalive"));
 					hb_config = (HM_HEARTBEAT_CONFIG *)parent_node->opaque;
-					if((ret_val = hm_get_attr_type(xmlGetProp(current_node, "resolution")))== HM_ERR)
+					if((ret_val = hm_get_attr_type(xmlGetProp(current_node, (const xmlChar *)"resolution")))== HM_ERR)
 					{
 						TRACE_WARN(("Error finding attribute type value. Ignoring!"));
 					}
@@ -531,7 +529,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						config_node = NULL;
 						goto EXIT_LABEL;
 					}
-					TRACE_INFO(("[Attribute] resolution:  %s",xmlGetProp(current_node, "resolution")));
+					TRACE_INFO(("[Attribute] resolution:  %s",xmlGetProp(current_node, (const xmlChar *)"resolution")));
 				}
 
 				break;
@@ -607,7 +605,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						goto EXIT_LABEL;
 					}
 
-					if((ip_version = hm_get_attr_type(xmlGetProp(current_node, "version")))== HM_ERR)
+					if((ip_version = hm_get_attr_type(xmlGetProp(current_node, (const xmlChar *)"version")))== HM_ERR)
 					{
 						TRACE_WARN(("Error finding attribute type value. Ignoring!"));
 					}
@@ -629,7 +627,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 					}
 #endif
 
-					if((ip_type = hm_get_attr_type(xmlGetProp(current_node, "type")))== HM_ERR)
+					if((ip_type = hm_get_attr_type(xmlGetProp(current_node, (const xmlChar *)"type")))== HM_ERR)
 					{
 						TRACE_WARN(("Error finding attribute type value. Ignoring!"));
 					}
@@ -930,7 +928,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 					}
 					HM_INIT_LQE(subs_cb->node, subs_cb);
 
-					if((ret_val = hm_get_attr_type(xmlGetProp(current_node, "type")))== HM_ERR)
+					if((ret_val = hm_get_attr_type(xmlGetProp(current_node, (const xmlChar *)"type")))== HM_ERR)
 					{
 						TRACE_WARN(("Error finding attribute type value. Ignoring!"));
 					}
@@ -1032,7 +1030,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							ret_val = HM_ERR;
 							goto EXIT_LABEL;
 						}
-						hm_config->instance_info.index = atoi(current_node->content);
+						hm_config->instance_info.index = atoi((const char *)current_node->content);
 						TRACE_INFO(("Hardware Index: %d", hm_config->instance_info.index));
 					}
 					else if(parent_node->type == HM_CONFIG_NODE_INSTANCE)
@@ -1049,7 +1047,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							goto EXIT_LABEL;
 						}
 						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
-						node_config_cb->node_cb->index = atoi(current_node->content);
+						node_config_cb->node_cb->index = atoi((const char *)current_node->content);
 						TRACE_INFO(("Node Index: %d", node_config_cb->node_cb->index));
 					}
 					/***************************************************************************/
@@ -1083,7 +1081,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						}
 
 						hb_config = (HM_HEARTBEAT_CONFIG *)config_node->opaque;
-						hb_config->timer_val = atoi(current_node->content);
+						hb_config->timer_val = atoi((const char *)current_node->content);
 						TRACE_INFO(("Heartbeat period: %d", hb_config->timer_val));
 					}
 					free(config_node);
@@ -1107,7 +1105,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							goto EXIT_LABEL;
 						}
 						hb_config = (HM_HEARTBEAT_CONFIG *)config_node->opaque;
-						hb_config->threshold = atoi(current_node->content);
+						hb_config->threshold = atoi((const char *)current_node->content);
 						TRACE_INFO(("Heartbeat threshold: %d", hb_config->threshold));
 					}
 					free(config_node);
@@ -1134,7 +1132,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						}
 					}
 					sock_addr = (SOCKADDR_IN *)&address_cb->address.address;
-					inet_pton(AF_INET, current_node->content, &sock_addr->sin_addr);
+					inet_pton(AF_INET, (const char *)current_node->content, &sock_addr->sin_addr);
 #ifdef I_WANT_TO_DEBUG
 					{
 						char tmp[100];
@@ -1167,7 +1165,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						}
 
 						sock_addr = (SOCKADDR_IN *)&address_cb->address.address;
-						sock_addr->sin_port = htons(atoi(current_node->content));
+						sock_addr->sin_port = htons(atoi((const char *)current_node->content));
 						address_cb->port = sock_addr->sin_port;
 						TRACE_INFO(("Port: %d", ntohs(sock_addr->sin_port)));
 					}
@@ -1204,7 +1202,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							goto EXIT_LABEL;
 						}
 						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
-						node_config_cb->node_cb->group = atoi(current_node->content);
+						node_config_cb->node_cb->group = atoi((const char *)current_node->content);
 						TRACE_INFO(("Node Group: %d", node_config_cb->node_cb->group));
 					}
 					free(config_node);
@@ -1227,9 +1225,9 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
 						TRACE_ASSERT(node_config_cb != NULL);
 
-						snprintf(node_config_cb->node_cb->name,
+						snprintf((char *)node_config_cb->node_cb->name,
 								sizeof(node_config_cb->node_cb->name),
-								"%s",current_node->content);
+								"%s",(const char *)current_node->content);
 						TRACE_INFO(("Node Name: %s", node_config_cb->node_cb->name));
 					}
 					free(config_node);
@@ -1252,7 +1250,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 						node_config_cb = (HM_CONFIG_NODE_CB *)config_node->opaque;
 						TRACE_ASSERT(node_config_cb != NULL);
 
-						if(strstr(current_node->content, "active")== NULL)
+						if(strstr((const char *)current_node->content, "active")== NULL)
 						{
 							node_config_cb->node_cb->role = NODE_ROLE_PASSIVE;
 						}
@@ -1280,7 +1278,7 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 							goto EXIT_LABEL;
 						}
 						subs_cb = (HM_CONFIG_SUBSCRIPTION_CB *)config_node->opaque;
-						subs_cb->value = atoi(current_node->content);
+						subs_cb->value = atoi((const char *)current_node->content);
 
 						TRACE_INFO(("Subscription group: %d", subs_cb->value));
 					}
@@ -1351,7 +1349,6 @@ int32_t hm_parse_config(HM_CONFIG_CB *config_cb, char *config_file)
 	xmlNode *root = NULL;
 
 	HM_STACK *config_stack = NULL;
-	HM_CONFIG_NODE *config_node = NULL;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/

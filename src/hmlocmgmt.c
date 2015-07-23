@@ -138,8 +138,6 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 	uint32_t action;
 	int32_t ret_val = HM_OK;;
 
-	HM_PROCESS_CB *proc_cb = NULL;
-
 	TRACE_ENTRY();
 
 	TRACE_ASSERT(loc_cb != NULL);
@@ -200,6 +198,7 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 			/* We're expecting the peer to do the same as soon as it receives INIT Rsp.*/
 			/* Send END OF REPLAY at the end of it.									   */
 			/***************************************************************************/
+			loc_cb->replay_in_progress = TRUE;
 			if(hm_cluster_replay_info(loc_cb->peer_listen_cb) != HM_OK)
 			{
 				TRACE_ERROR(("Error sending replay messages to peer."));
@@ -396,7 +395,6 @@ int32_t hm_location_update(HM_LOCATION_CB *loc_cb)
 		ret_val = HM_ERR;
 	}
 
-EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/

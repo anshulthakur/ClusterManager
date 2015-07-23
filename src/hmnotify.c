@@ -462,31 +462,41 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 		notify_msg->proc_type = 0;
 
 		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb != NULL);
-		TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb->sock_cb != NULL);
 
-		addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->transport_cb->sock_cb->addr);
-		if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN)
+		if(affected_node.node_cb->node_cb->transport_cb->sock_cb != NULL)
 		{
-			TRACE_DETAIL(("Node has IPv4 type of connection."));
-			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
-			memcpy(notify_msg->addr_info.addr,
-					&addr->in_addr.sin_addr.s_addr,
-				sizeof(struct in_addr));
-			notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
-		}
-		else if(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IPv6_IN)
-		{
-			TRACE_DETAIL(("Node has IPv6 type of connection"));
-			notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v6;
-			memcpy(notify_msg->addr_info.addr,
-				&addr->in6_addr.sin6_addr,
-				sizeof(struct in6_addr));
-			notify_msg->addr_info.port = (uint32_t)addr->in6_addr.sin6_port;
+			addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->transport_cb->sock_cb->addr);
+			if((affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IN) ||
+				(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_OUT))
+			{
+				TRACE_DETAIL(("Node has IPv4 type of connection."));
+				notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
+				memcpy(notify_msg->addr_info.addr,
+						&addr->in_addr.sin_addr.s_addr,
+					sizeof(struct in_addr));
+				notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
+			}
+			else if((affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IPv6_IN)||
+					(affected_node.node_cb->node_cb->transport_cb->type == HM_TRANSPORT_TCP_IPv6_OUT))
+			{
+				TRACE_DETAIL(("Node has IPv6 type of connection"));
+				notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v6;
+				memcpy(notify_msg->addr_info.addr,
+					&addr->in6_addr.sin6_addr,
+					sizeof(struct in6_addr));
+				notify_msg->addr_info.port = (uint32_t)addr->in6_addr.sin6_port;
+			}
+			else
+			{
+				TRACE_WARN(("Unknown Transport Type"));
+			}
+
 		}
 		else
 		{
-			TRACE_WARN(("Unknown Transport Type"));
+			TRACE_WARN(("Node never connected. Nothing to put in its transport profile notification."));
 		}
+
 		notify_msg->addr_info.group = affected_node.node_cb->group_index;
 		notify_msg->addr_info.hw_index = affected_node.node_cb->node_cb->parent_location_cb->index;
 		notify_msg->addr_info.node_id = affected_node.node_cb->index;

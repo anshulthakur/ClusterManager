@@ -30,6 +30,7 @@ void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
 
 
 	int32_t loc_id, port_id;
+	uint32_t temp_var;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -102,6 +103,33 @@ void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
 		{
 			glob_cb->loc_cb->keepalive_missed--;
 		}
+		/***************************************************************************/
+		/* Check if the number of processes and nodes cited in Keepalive are consi-*/
+		/* -stent with what we have. If not, re-initiate replay.				   */
+		/***************************************************************************/
+		if(!glob_cb->loc_cb->replay_in_progress)
+		{
+			TRACE_DETAIL(("Replay not in progress. Check consistency!"));
+			HM_GET_LONG(temp_var, keepalive_msg->num_nodes);
+			if(temp_var != glob_cb->loc_cb->active_nodes)
+			{
+				TRACE_WARN(("States inconsistent, initiate replay."));
+				hm_cluster_replay_info(glob_cb->loc_cb->peer_listen_cb);
+				glob_cb->loc_cb->replay_in_progress = TRUE;
+			}
+			temp_var = 0;
+			HM_GET_LONG(temp_var, keepalive_msg->num_proc);
+			if(temp_var != glob_cb->loc_cb->active_processes)
+			{
+				TRACE_WARN(("States inconsistent, initiate replay."));
+				hm_cluster_replay_info(glob_cb->loc_cb->peer_listen_cb);
+				glob_cb->loc_cb->replay_in_progress = TRUE;
+			}
+		}
+		else
+		{
+			TRACE_INFO(("Peer is in replay mode. Stats must converge soon."));
+		}
 	}
 EXIT_LABEL:
 	/***************************************************************************/
@@ -173,7 +201,7 @@ void hm_cluster_send_tick()
 #endif
 
 	current_time = hm_hton64(time(NULL));
-	TRACE_DETAIL(("Time value: 0x%x", current_time));
+	TRACE_DETAIL(("Time value: 0x%x", (unsigned int)current_time));
 	memcpy(tick_msg->hdr.timestamp, &current_time, sizeof(current_time));
 #ifdef I_WANT_TO_DEBUG
 	for(i=0;i<sizeof(tick_msg->hdr.timestamp);i++)
@@ -216,7 +244,6 @@ void hm_cluster_send_tick()
 		TRACE_ERROR(("Error occured while sending Tick"));
 	}
 
-EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -323,14 +350,14 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 	/* that can transmit all Node info.										   */
 	/***************************************************************************/
 	chunks_needed =
-			((LOCAL.local_location_cb.active_nodes)/HM_PEER_NUM_TLVS_PER_UPDATE);
-	if(((LOCAL.local_location_cb.active_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE) != 0)
+			((LOCAL.local_location_cb.total_nodes)/HM_PEER_NUM_TLVS_PER_UPDATE);
+	if(((LOCAL.local_location_cb.total_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE) != 0)
 	{
 	chunks_needed +=
 			(
-				((LOCAL.local_location_cb.active_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE)
+				((LOCAL.local_location_cb.total_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE)
 				/
-				((LOCAL.local_location_cb.active_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE)
+				((LOCAL.local_location_cb.total_nodes)%HM_PEER_NUM_TLVS_PER_UPDATE)
 			 ); /* or simply 1 */
 	}
 	TRACE_DETAIL(("Chunks Needed = %d", chunks_needed));
@@ -398,27 +425,26 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 			/* Not the last message */
 			HM_PUT_LONG(replay_msg->last, 0);
 		}
-		if(node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE)
-		{
-			HM_PUT_LONG(replay_msg->tlv[index_filled].group,
-							(uint32_t)node_cb->group);
-			HM_PUT_LONG(replay_msg->tlv[index_filled].node_id,
-							(uint32_t)node_cb->index);
-			HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
-							HM_PEER_REPLAY_UPDATE_TYPE_NODE);
-			HM_PUT_LONG(replay_msg->tlv[index_filled].role,
-											(uint32_t)node_cb->role);
 
-			index_filled++;
-		}
-		else
-		{
-			/***************************************************************************/
-			/* Node is not running. Exclude it from update.						   */
-			/***************************************************************************/
-			TRACE_DETAIL(("Exclude from update. Not running!"));
-			continue;
-		}
+		/***************************************************************************/
+		/* It is necessary to communicate information of all the nodes that we know*/
+		/* about, running or not.												   */
+		/* This is because, later, if the node fails to start (during INIT), we    */
+		/* send out an update of FAILED Node, and the remote HM would not find an  */
+		/* entry for that node, causing trouble. 								   */
+		/***************************************************************************/
+		HM_PUT_LONG(replay_msg->tlv[index_filled].group,
+						(uint32_t)node_cb->group);
+		HM_PUT_LONG(replay_msg->tlv[index_filled].node_id,
+						(uint32_t)node_cb->index);
+		HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
+						HM_PEER_REPLAY_UPDATE_TYPE_NODE);
+		HM_PUT_LONG(replay_msg->tlv[index_filled].role,
+										(uint32_t)node_cb->role);
+		HM_PUT_LONG(replay_msg->tlv[index_filled].running, (node_cb->fsm_state));
+
+		index_filled++;
+
 		/***************************************************************************/
 		/* If we've filled enough TLVs at this point, send the message and prepare */
 		/* a new buffer for filling up.											   */
@@ -456,6 +482,20 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 	}
 	if(chunks_needed == 0)
 	{
+		/***************************************************************************/
+		/* If no more chunks are needed, verify that we've sent our previous msg   */
+		/***************************************************************************/
+		if(index_filled != 0)
+		{
+			TRACE_INFO(("No more message need be sent. Send the pending buffer and EOR!"));
+			HM_PUT_LONG(replay_msg->num_tlvs, index_filled);
+			if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+			{
+				TRACE_ERROR(("Error sending message to peer!"));
+				ret_val = HM_ERR;
+				goto EXIT_LABEL;
+			}
+		}
 		/***************************************************************************/
 		/* Send end of replay message.											   */
 		/***************************************************************************/
@@ -815,6 +855,8 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 		if(node_cb == NULL)
 		{
 			TRACE_ERROR(("Node %d does not exist in DB and its update was received.", node_id));
+			TRACE_ASSERT(FALSE);
+			/* This is temporary. The code is unhittable, but currently on upgrade path */
 			node_cb = hm_alloc_node_cb(FALSE);
 			if(node_cb == NULL)
 			{
@@ -833,7 +875,7 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 			}
 			else
 			{
-				node_cb->fsm_state = HM_NODE_FSM_STATE_FAILED;
+				node_cb->fsm_state = HM_NODE_FSM_STATE_FAILING;
 			}
 			/***************************************************************************/
 			/* Add node to system													   */
@@ -850,16 +892,30 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 			break;
 		}
 		HM_GET_LONG(status, node_update->status);
-		if(status == HM_PEER_ENTITY_STATUS_ACTIVE)
+		if((status == HM_PEER_ENTITY_STATUS_ACTIVE) && (node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE))
 		{
 			TRACE_DETAIL(("Node %d has become active.", node_id));
 			node_cb->fsm_state = HM_NODE_FSM_STATE_ACTIVE;
 			//TODO: Let remote nodes also be managed by the same FSM
 			//hm_node_fsm(HM_NODE_FSM_TERM, node_cb);
 		}
+		else if((status == HM_PEER_ENTITY_STATUS_ACTIVE) && (node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE))
+		{
+			TRACE_DETAIL(("Node %d has become active. But we know it already", node_id));
+		}
+		else if((status == HM_PEER_ENTITY_STATUS_INACTIVE) && (node_cb->fsm_state != HM_NODE_FSM_STATE_FAILED))
+		{
+			TRACE_DETAIL(("Node %d has failed.", node_id));
+			node_cb->fsm_state = HM_NODE_FSM_STATE_FAILING;
+		}
+		else if((status == HM_PEER_ENTITY_STATUS_INACTIVE) && (node_cb->fsm_state == HM_NODE_FSM_STATE_FAILED))
+		{
+			TRACE_DETAIL(("Node %d has failed. But we know it already", node_id));
+		}
 		else
 		{
-			node_cb->fsm_state = HM_NODE_FSM_STATE_FAILED;
+			TRACE_DETAIL(("Something happened to Node %d, but fail anyway.", node_id));
+			node_cb->fsm_state = HM_NODE_FSM_STATE_FAILING;
 		}
 		hm_global_node_update(node_cb);
 		break;
@@ -992,7 +1048,7 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 	int32_t ret_val = HM_OK;
 	int32_t end = FALSE;
 
-	int32_t hw_id, tlv_type, num_tlvs = 0;
+	int32_t tlv_type, num_tlvs = 0;
 
 	/***************************************************************************/
 	/* Use of i is necessary. We MUST traverse update in order only. Process   */
@@ -1016,6 +1072,7 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 	if(end)
 	{
 		TRACE_DETAIL(("End of replay message received."));
+		loc_cb->replay_in_progress = FALSE;
 		goto EXIT_LABEL;
 	}
 	/***************************************************************************/
@@ -1042,7 +1099,12 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
 			HM_GET_LONG(node_cb->group, msg->tlv[i].group);
 			HM_GET_LONG(node_cb->role, msg->tlv[i].role);
 
-			node_cb->fsm_state = HM_NODE_FSM_STATE_ACTIVE; /* Since it is replay */
+			HM_GET_LONG(node_cb->fsm_state, msg->tlv[i].running);
+			if(node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE)
+			{
+				TRACE_DETAIL(("Remote node not yet active. Do not trigger subscriptions yet!"));
+				node_cb->fsm_state = HM_NODE_FSM_STATE_WAITING;/* It may or may not succeed. */
+			}
 
 			/***************************************************************************/
 			/* Add node to system													   */
@@ -1192,8 +1254,8 @@ int32_t hm_cluster_send_update(void *cb)
 			ret_val = HM_ERR;
 			goto EXIT_LABEL;
 		}
-		proc_update = (HM_PEER_MSG_NODE_UPDATE *)msg->msg;
-		memset(proc_update, 0, sizeof(HM_PEER_MSG_NODE_UPDATE));
+		proc_update = (HM_PEER_MSG_PROCESS_UPDATE *)msg->msg;
+		memset(proc_update, 0, sizeof(HM_PEER_MSG_PROCESS_UPDATE));
 		HM_PUT_LONG(proc_update->hdr.hw_id, LOCAL.local_location_cb.index);
 		HM_PUT_LONG(proc_update->hdr.msg_type, HM_PEER_MSG_TYPE_PROCESS_UPDATE);
 		HM_PUT_LONG(proc_update->hdr.timestamp, 0);

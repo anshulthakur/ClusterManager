@@ -255,7 +255,7 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
 		TRACE_ERROR(("Update could not be propagated."));
 		ret_val = HM_ERR;
 	}
-	notify_cb->node_cb.process_cb = glob_cb;
+	notify_cb->node_cb.location_cb = glob_cb;
 	notify_cb->notification_type = notify;
 	/***************************************************************************/
 	/* Queue the notification CB 											   */
@@ -273,8 +273,6 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
 	 	TRACE_DETAIL(("Update cluster."));
 		hm_cluster_send_update(glob_cb);
 	*/
-
-EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/
@@ -513,6 +511,10 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb)
 	case HM_NODE_FSM_STATE_FAILING:
 		TRACE_DETAIL(("Node is no longer active. Send Notifications."));
 		notify = HM_NOTIFICATION_NODE_INACTIVE;
+		break;
+
+	case HM_NODE_FSM_STATE_FAILED:
+		TRACE_DETAIL(("Node is in failed state. Notifications must have been sent if required."));
 		break;
 
 	default:
@@ -1126,7 +1128,7 @@ int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *subs_cb)
 	/***************************************************************************/
 	/* Variable Declarations												   */
 	/***************************************************************************/
-	HM_LIST_BLOCK *greedy_node = NULL;
+	int32_t ret_val = HM_OK;
 	/***************************************************************************/
 	/* Sanity Checks														   */
 	/***************************************************************************/
@@ -1141,6 +1143,7 @@ int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *subs_cb)
 	/* Exit Level Checks													   */
 	/***************************************************************************/
 	TRACE_EXIT();
+	return ret_val;
 }/* hm_update_subscribers */
 
 /***************************************************************************/
@@ -1591,7 +1594,6 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
 		}
 	}
 
-EXIT_LABEL:
 	/***************************************************************************/
 	/* Exit Level Checks													   */
 	/***************************************************************************/

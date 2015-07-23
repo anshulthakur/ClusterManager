@@ -26,9 +26,9 @@
 </meta>
 
 <hm_instance_info>
-    <index>1</index>
+    <index>2</index>
     <heartbeat scope="node">
-        <period resolution="ms">60000</period>
+        <period resolution="ms">20000</period>
         <threshold>3</threshold>
     </heartbeat>
     <heartbeat scope="cluster">

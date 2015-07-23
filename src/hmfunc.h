@@ -54,6 +54,7 @@ int32_t hm_cluster_send_end_of_replay(HM_TRANSPORT_CB *);
 int32_t hm_receive_cluster_message(HM_SOCKET_CB *);
 int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *, HM_LOCATION_CB *);
 int32_t hm_cluster_send_update(void *);
+int32_t hm_cluster_send_init(HM_TRANSPORT_CB *);
 
 
 /* hmnodemgmt.c */
