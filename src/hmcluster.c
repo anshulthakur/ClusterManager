@@ -1,20 +1,23 @@
-/*
- * hmcluster.c
+/**
+ *  @file hmcluster.c
+ *  @brief Cluster Messaging Routines
  *
- *  Created on: 22-Jun-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None
  */
-
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	hm_cluster_check_location 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	void														   */
-/* Purpose: Checks if the Location ID contained in the Message is known. If*/
-/* not, then initiate connection with it. If yes, verify connection is up  */
-/***************************************************************************/
+/**
+ *  @brief Checks if the Location ID contained in the Message is known.
+ *
+ *  Purpose: Checks if the Location ID contained in the Message is known. If
+ *  not, then initiate connection with it. If yes, verify connection is up.
+ *
+ *  @param *msg Message received on Transport Layer
+ *  @param *sender Address of the sender (#SOCKADDR)
+ *  @return void
+ */
 void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
 {
 	/***************************************************************************/
@@ -138,13 +141,13 @@ EXIT_LABEL:
 	TRACE_EXIT();
 }/* hm_cluster_check_location */
 
-/***************************************************************************/
-/* Name:	hm_cluster_send_tick 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	void														   */
-/* Purpose: Sends out a Keepalive message on the multicast socket		   */
-/***************************************************************************/
+
+/**
+ *  @brief Sends out a Keepalive message on the multicast socket
+ *
+ *  @param None
+ *  @return void
+ */
 void hm_cluster_send_tick()
 {
 	/***************************************************************************/
@@ -251,13 +254,14 @@ void hm_cluster_send_tick()
 }/* hm_cluster_send_tick */
 
 
-/***************************************************************************/
-/* Name:	hm_cluster_send_init 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Send an INIT request to the cluster location			*/
-/***************************************************************************/
+/**
+ *  @brief Send an INIT request to the cluster location
+ *
+ *  @param *tprt_cb Transport Control Block of Peer to whom we would be sending
+ *  this INIT message (#HM_TRANSPORT_CB)
+ *
+ *  @return HM_OK if successful, HM_ERR otherwise.
+ */
 int32_t hm_cluster_send_init(HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -315,13 +319,13 @@ EXIT_LABEL:
 	return(ret_val);
 }/* hm_cluster_send_init */
 
-/***************************************************************************/
-/* Name:	hm_cluster_replay_info 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Replay complete local information to a peer.				   */
-/***************************************************************************/
+
+/**
+ *  @brief Replay complete local information to a peer.
+ *
+ *  @param tprt_cb  Transport Control Block of Peer to whom we would be sending
+ *  @return HM_OK if successful, HM_ERR otherwise
+ */
 int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -656,13 +660,13 @@ EXIT_LABEL:
 	return(ret_val);
 }/* hm_cluster_replay_info */
 
-/***************************************************************************/
-/* Name:	hm_cluster_send_end_of_replay 								   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Sends the end of replay message								   */
-/***************************************************************************/
+
+/**
+ *  @brief Sends the end of replay message
+ *
+ *  @param *tprt_cb Transport Control Block of Peer to whom we would be sending
+ *  @return HM_OK if successful, HM_ERR otherwise
+ */
 int32_t hm_cluster_send_end_of_replay(HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -720,13 +724,13 @@ EXIT_LABEL:
 	return(ret_val);
 }/* hm_cluster_send_end_of_replay */
 
-/***************************************************************************/
-/* Name:	hm_receive_cluster_message 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Receives and processes a cluster message					   */
-/***************************************************************************/
+
+/**
+ *  @brief Receives and processes a cluster message
+ *
+ *  @param *sock_cb Socket Control Block on which a Cluster message was received (#HM_SOCKET_CB)
+ *  @return HM_OK if successful, HM_ERR otherwise
+ */
 int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 {
 	/***************************************************************************/
@@ -1033,13 +1037,16 @@ EXIT_LABEL:
 	return(ret_val);
 }/* hm_receive_cluster_message */
 
-/***************************************************************************/
-/* Name:	hm_cluster_process_replay 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Processes an incoming Replay Message			*/
-/***************************************************************************/
+
+/**
+ *  @brief Processes an incoming Replay Message
+ *
+ *  @param *msg an #HM_PEER_MSG_REPLAY type message received on Transport
+ *  @param *loc_cb Location Control Block (#HM_LOCATION_CB) of the Location from
+ *  where message was received.
+ *
+ *  @return HM_OK if successful, HM_ERR otherwise
+ */
 int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -1185,6 +1192,14 @@ EXIT_LABEL:
 /* Return:	int32_t									*/
 /* Purpose: Sends out an update on the status of this entry in DB			*/
 /***************************************************************************/
+/**
+ *  @brief Sends out an update on the status of this entry in DB
+ *
+ *  @param *cb Control block for which Update needs to be sent.
+ *  It is of type @c void to allow some polymorphism in the type of Control Blocks
+ *
+ *  @return HM_OK if successful, HM_ERR otherwise.
+ */
 int32_t hm_cluster_send_update(void *cb)
 {
 	/***************************************************************************/

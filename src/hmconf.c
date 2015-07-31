@@ -1,20 +1,19 @@
-/*
- * hmconf.c
+/**
+ *  @file hmconf.c
+ *  @brief Routines to parse and/or write to configuration files that drive the HM
  *
- *  Routines to parse and/or write to configuration files that drive the HM
- *  Created on: 21-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None so far
  */
-
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	hm_get_attr_type 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	static int32_t									*/
-/* Purpose: Gets the attribute type value			*/
-/***************************************************************************/
+/**
+ *  @brief Gets the attribute type value
+ *
+ *  @param *value @c xmlChar type of array read from config file
+ *  @return int32_t A macro binding of the type of attribute passed in as per supported vocabulary
+ */
 static int32_t hm_get_attr_type(xmlChar *value)
 {
 	/***************************************************************************/
@@ -54,13 +53,13 @@ EXIT_LABEL:
 	return(ret_val);
 }/* hm_get_attr_type */
 
-/***************************************************************************/
-/* Name:	hm_get_node_type 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	static int32_t												   */
-/* Purpose: Gets the type of node from the vocabulary					   */
-/***************************************************************************/
+
+/**
+ *  @brief Gets the type of node from the vocabulary
+ *
+ *  @param *node @c xmlNode type of character array read from Config file.
+ *  @return int32_t Macro binding of the type of XML node from the available vocabulary
+ */
 static int32_t hm_get_node_type(xmlNode *node)
 {
 	/***************************************************************************/
@@ -153,13 +152,18 @@ static int32_t hm_get_node_type(xmlNode *node)
 	return ret_val;
 }/* hm_get_node_type */
 
-/***************************************************************************/
-/* Name:	hm_recurse_tree 											   */
-/* Parameters: Input - 		node: xmlNode								   */
-/*			   Input -		stack									   	   */
-/* Return:	static void													   */
-/* Purpose: Performs an in-depth traversal of the tree and writes config   */
-/***************************************************************************/
+
+/**
+ *  @brief Performs an in-depth traversal of the tree and writes config
+ *
+ *  @param *begin_node @c xmlNode type of structure returned by libxml library
+ *  		on parsing the xml config file.
+ * 	@param *stack	#HM_STACK type of value keeping track of the current configuration stack.
+ * 	@param *hm_config #HM_CONFIG_CB type of structure keeping the configuration parsed
+ * 			from Config file in system defined order.
+ *
+ *  @return H_OK if successful, HM_ERR otherwise.
+ */
 static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_CB *hm_config)
 {
 	/***************************************************************************/
@@ -1314,31 +1318,31 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_recurse_tree */
 
-/***************************************************************************/
-/* Name:	hm_parse_config 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Parses the file into the configuration structure			   */
-/*																		   */
-/*	Currently supported vocabulary:										   */
-/*  XML Node Names:														   */
-/*		config			: Root of config								   */
-/*		hm_instance_info: Config for HM Binary							   */
-/*		index			: Index value									   */
-/*		heartbeat		: Heartbeat Configuration						   */
-/*		period			: Timer Value			 						   */
-/*		threshold		: Maximum number of timeouts					   */
-/*		address			: Inet Address structure						   */
-/*		ip				: IP Address									   */
-/*		port			: Port Value									   */
-/*		group			: Multicast Group								   */
-/*		nodes			: Container of Nbase Nodes						   */
-/*		node			: Single Node in cluster						   */
-/*		name			: String Name									   */
-/*		role			: Active/Passive								   */
-/*		Group															   */
-/***************************************************************************/
+
+/**
+ *  @brief Parses the file into the configuration structure
+ *
+ *	Currently supported vocabulary:
+ *  XML Node Names:
+ *		config			: Root of config
+ *		hm_instance_info: Config for HM Binary
+ *		index			: Index value
+ *		heartbeat		: Heartbeat Configuration
+ *		period			: Timer Value
+ *		threshold		: Maximum number of timeouts
+ *		address			: Inet Address structure
+ *		ip				: IP Address
+ *		port			: Port Value
+ *		group			: Multicast Group
+ *		nodes			: Container of Nbase Nodes
+ *		node			: Single Node in cluster
+ *		name			: String Name
+ *		role			: Active/Passive
+ *		Group
+ *
+ *  @param *config_cb #HM_CONFIG_CB type of configuration Control Block
+ *  @return HM_OK if successful, HM_ERR otherwise
+ */
 int32_t hm_parse_config(HM_CONFIG_CB *config_cb, char *config_file)
 {
 	/***************************************************************************/
@@ -1386,20 +1390,6 @@ int32_t hm_parse_config(HM_CONFIG_CB *config_cb, char *config_file)
 	/***************************************************************************/
 	/* Parse HM Instance Specific Configuration								   */
 	/***************************************************************************/
-#if 0
-	/* Just testing my stack :P It works fine */
-	int a=10;
-	int b=100;
-	int c=134;
-	HM_STACK_PUSH(config_stack, &a);
-	HM_STACK_PUSH(config_stack, &b);
-	HM_STACK_PUSH(config_stack, &c);
-	int i;
-	for(i=0; i<3;i++)
-	{
-		TRACE_INFO(("%d", *(int *)HM_STACK_POP(config_stack)));
-	}
-#endif
 
 	/***************************************************************************/
 	/* Start parsing the XML Tree now and build configuration				   */

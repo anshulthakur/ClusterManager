@@ -1,36 +1,31 @@
-/*
- * hmstrc.h
+/**
+ *  @file hmstrc.h
+ *  @brief Structures for Hardware Manager
  *
- *  Purpose: Structures for Hardware Manager.
- *
- *  Created on: 29-Apr-2015
- *      Author: Anshul
- *
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMSTRC_H_
 #define SRC_HMSTRC_H_
 
 /***************************************************************************/
 /* Generic Utility Structure Composites									   */
 /***************************************************************************/
-
+/**
+ * @brief HM FSM Entry
+ *
+ */
 typedef struct hm_tprt_fsm_entry
 {
 	uint32_t next_state;
 	uint32_t path;
 }HM_TPRT_FSM_ENTRY;
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_STACK														 */
-/*                                                                           */
-/* Name:      hm_stack					 									 */
-/*                                                                           */
-/* Textname:  Stack Element	                                                 */
-/*                                                                           */
-/* Description: 						            						 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Stack Element
+ *
+ */
 typedef struct hm_stack
 {
 	/***************************************************************************/
@@ -55,16 +50,12 @@ typedef struct hm_stack
 } HM_STACK ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_CONFIG_NODE												 */
-/*                                                                           */
-/* Name:      hm_config_node			 									 */
-/*                                                                           */
-/* Textname:  Configuration Node                                             */
-/*                                                                           */
-/* Description: Configuration Node in XML file					             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Configuration Node
+ *
+ * Configuration Node in XML file
+ */
 typedef struct hm_config_node
 {
 	/***************************************************************************/
@@ -85,21 +76,17 @@ typedef struct hm_config_node
 } HM_CONFIG_NODE ;
 /**STRUCT-********************************************************************/
 
-/*****************************************************************************/
-/* compare function for trees.                                               */
-/*****************************************************************************/
+/**
+ * @brief compare function for trees.
+ */
 typedef int32_t(AVL3_COMPARE)(void *, void *);
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_LQE														 */
-/*                                                                           */
-/* Name:      hm_lqe			 										 	 */
-/*                                                                           */
-/* Textname:  Linear Queue Element	                                         */
-/*                                                                           */
-/* Description: A linear linked list element for circular queues.            */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Linear Queue Element
+ *
+ * A linear linked list element for circular queues.
+ */
 typedef struct hm_lqe
 {
     void *self;
@@ -109,16 +96,11 @@ typedef struct hm_lqe
 } HM_LQE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_AVL3_NODE													 */
-/*                                                                           */
-/* Name:      hm_avl3_node			 										 */
-/*                                                                           */
-/* Textname:  AVL Tree Node	                                                 */
-/*                                                                           */
-/* Description: A Balanced Binary Tree node.					             */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief AVL Tree Node
+ *
+ * A Balanced Binary Tree node.
+ */
 typedef struct hm_avl3_node {
 	struct hm_avl3_node *parent;
 
@@ -132,16 +114,10 @@ typedef struct hm_avl3_node {
 } HM_AVL3_NODE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_AVL3_TREE													 */
-/*                                                                           */
-/* Name:      hm_avl3_tree			 										 */
-/*                                                                           */
-/* Textname:  AVLL Tree root                                                 */
-/*                                                                           */
-/* Description: AVL Tree node							            		 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief AVLL Tree root
+ *
+ */
 typedef struct hm_avl3_tree {
 	HM_AVL3_NODE *root;
 	HM_AVL3_NODE *first;
@@ -149,11 +125,11 @@ typedef struct hm_avl3_tree {
 } HM_AVL3_TREE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_AVL3_TREE_INFO                                              */
-/*                                                                           */
-/* Description: AVL3 tree information.                                       */
-/*****************************************************************************/
+
+/**
+ * @brief AVL3 tree information.
+ *
+ */
 typedef struct hm_avl3_tree_info
 {
   AVL3_COMPARE *compare;
@@ -163,17 +139,13 @@ typedef struct hm_avl3_tree_info
 
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_AVL3_GEN_NODE												 */
-/*                                                                           */
-/* Name:      hm_avl3_gen_node			 									 */
-/*                                                                           */
-/* Textname:  AVL3 Generic Node                                              */
-/*                                                                           */
-/* Description: A generic Node to enable having a single node in multiple    */
-/* trees without having to put a AVL3_NODE explicitly in the structure.		 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief AVL3 Generic Node
+ *
+ * Description: A generic Node to enable having a single node in multiple
+ * trees without having to put a AVL3_NODE explicitly in the structure.
+ */
 typedef struct hm_avl3_gen_node
 {
 	/***************************************************************************/
@@ -193,17 +165,12 @@ typedef struct hm_avl3_gen_node
 } HM_AVL3_GEN_NODE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_LIST_BLOCK													 */
-/*                                                                           */
-/* Name:      hm_list_block			 										 */
-/*                                                                           */
-/* Textname:  HM List Block	                                                 */
-/*                                                                           */
-/* Description: A generic LQE block which can contain pointer to a different */
-/* location.																 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief HM List Block
+ *
+ * A generic LQE block which can contain pointer to a different location.
+ */
 typedef struct hm_list_block
 {
 	HM_LQE node;
@@ -218,17 +185,12 @@ typedef struct hm_list_block
 } HM_LIST_BLOCK ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_INET_ADDRESS												 */
-/*                                                                           */
-/* Name:      hm_inet_address			 									 */
-/*                                                                           */
-/* Textname:  Internet Address	                                             */
-/*                                                                           */
-/* Description: Internet address structure for internal consumption in a     */
-/* a generic manner.														 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Internet Address
+ *
+ * Internet address structure for internal consumption in a a generic manner.
+ */
 typedef struct hm_inet_address
 {
     struct sockaddr_storage address;
@@ -241,18 +203,18 @@ typedef struct hm_inet_address
 } HM_INET_ADDRESS ;
 /**STRUCT-********************************************************************/
 
+/**
+ * @brief Timer Callback Function
+ *
+ */
 typedef int32_t(HM_TIMER_CALLBACK)(void *timer_cb);
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_TIMER_CB													 */
-/*                                                                           */
-/* Name:      hm_timer_cb			 										 */
-/*                                                                           */
-/* Textname:  Timer Control Block                                            */
-/*                                                                           */
-/* Description: Represents a timer in the HM					             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Timer Control Block
+ *
+ * Represents a timer in the HM
+ */
 typedef struct hm_timer_cb
 {
 	/***************************************************************************/
@@ -297,16 +259,10 @@ typedef struct hm_timer_cb
 } HM_TIMER_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_SOCKADDR_UNION												 */
-/*                                                                           */
-/* Name:      hm_sockaddr_union			 									 */
-/*                                                                           */
-/* Textname:  Union of Sockaddr Types	                                     */
-/*                                                                           */
-/* Description: 						            						 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Union of Sockaddr Types
+ *
+ */
 typedef union hm_sockaddr_union
 {
 	struct sockaddr sock_addr;
@@ -318,16 +274,11 @@ typedef union hm_sockaddr_union
 /* Hardware Manager Implementation Specific Structures					   */
 /***************************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_MSG														 */
-/*                                                                           */
-/* Name:      hm_msg			 											 */
-/*                                                                           */
-/* Textname:  Hardware Manager internal queuing message header.	             */
-/*                                                                           */
-/* Description: 						            */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Hardware Manager internal queuing message header.
+ *
+ */
 typedef struct hm_msg
 {
 	/***************************************************************************/
@@ -355,17 +306,12 @@ typedef struct hm_msg
 } HM_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_SUBSCRIBER													 */
-/*                                                                           */
-/* Name:      hm_subscriber			 										 */
-/*                                                                           */
-/* Textname:  HM Subscriber	                                                 */
-/*                                                                           */
-/* Description: This is not a structure, but a union of subscriber types     */
-/* It exists only for convenience of casting.								 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HM Subscriber
+ *
+ * This is not a structure, but a union of subscriber types
+ * It exists only for convenience of casting.
+ */
 typedef union hm_subscriber
 {
 	/***************************************************************************/
@@ -405,18 +351,11 @@ typedef union hm_subscriber
 } HM_SUBSCRIBER ;
 /**STRUCT-********************************************************************/
 
-
-/**STRUCT+********************************************************************/
-/* Structure: HM_SOCKET_CB													 */
-/*                                                                           */
-/* Name:      hm_socket_cb			 										 */
-/*                                                                           */
-/* Textname:  Socket Connection Control Block.	                             */
-/*                                                                           */
-/* Description: This entity represents a socket connection CB. 				 */
-/*                                                                           */
-/*****************************************************************************/
-
+/**
+ * @brief Socket Connection Control Block
+ *
+ * This entity represents a socket connection CB.
+ */
 typedef struct hm_socket_cb {
 	/***************************************************************************/
 	/* Node element in a global connections list							   */
@@ -453,21 +392,14 @@ typedef struct hm_socket_cb {
 } HM_SOCKET_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_TRANSPORT_CB												 */
-/*                                                                           */
-/* Name:      hm_transport_cb			 									 */
-/*                                                                           */
-/* Textname:  Transport Connection Control Block                             */
-/*                                                                           */
-/* Description: This structure represents a network communication endpoint   */
-/* for rest of the application. There is at least a common Methods API which */
-/* is supported on all types of interface.									 */
-/* Further, it contains all the information about the current state of the   */
-/* connection.																 */
-/*                                                                           */
-/*****************************************************************************/
-
+/**
+ * @brief Transport Connection Control Block
+ *
+ * This structure represents a network communication endpoint for rest of
+ * the application. There is at least a common Methods API which is supported
+ * on all types of interfaces.
+ * Further, it contains all the information about the current state of the connection.
+ */
 typedef struct hm_transport_cb {
 	/***************************************************************************/
 	/* Type of Transport: One of HM_TRANSPORT_ADDR_TYPE						   */
@@ -536,29 +468,22 @@ typedef struct hm_transport_cb {
 } HM_TRANSPORT_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_LOCATION_CB												 */
-/*                                                                           */
-/* Name:      hm_location_cb			 									 */
-/*                                                                           */
-/* Textname:  Hardware Location Control Block	                             */
-/*                                                                           */
-/* Description: A Hardware Location Control Block represents a Physical      */
-/* Hardware Location on the cluster network.								 */
-/* A Hardware Location is uniquely determined by its Hardware Index			 */
-/* Which may be derived from the Slot ID on the board, or some Platform 	 */
-/* specific API. It MUST be unique for proper function and the user must 	 */
-/* ensure that.																 */
-/* A hardware location can contain many nodes, which are running software 	 */
-/* instances of processes of a certain service group.						 */
-/* These groups can be, for a routing solution, Control Plane, Management	 */
-/* Plane, Data Plane Software, Data Plane Platform, Fault Monitoring, etc.   */
-/* These nodes may be active or backup, based on the configuration			 */
-/* but usually, it would be the Role of the Management Plane which would	 */
-/* determine the role of its subordinate nodes.								 */
-/*                                                                           */
-/*****************************************************************************/
 
+/**
+ * @brief Hardware Manager Location Control Block
+ *
+ * A Hardware Location Control Block represents a Physical Hardware Location
+ * on the cluster network. A Hardware Location is uniquely determined by its
+ * Hardware Index which may be derived from the Slot ID on the board,
+ * or some Platform specific API. It MUST be unique for proper function and
+ * the user must ensure that.
+ * A hardware location can contain many nodes, which are running software
+ * instances of processes of a certain service group. These groups can be,
+ * for a routing solution, Control Plane, Management Plane, Data Plane Software,
+ * Data Plane Platform, Fault Monitoring, etc. These nodes may be active or backup,
+ * based on the configuration but usually, it would be the Role of the
+ * Management Plane which would	determine the role of its subordinate nodes.
+ */
 typedef struct hm_location_cb {
 	/***************************************************************************/
 	/* DB Index																   */
@@ -655,24 +580,18 @@ typedef struct hm_location_cb {
 } HM_LOCATION_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_NODE_CB													 */
-/*                                                                           */
-/* Name:      hm_node_cb			 										 */
-/*                                                                           */
-/* Textname:  HM Node Control Block	                                         */
-/*                                                                           */
-/* Description: Each Hardware Location CB can contain many Nodes on it which */
-/* are called Node Control Blocks. Each Node CB represents a Binary running  */
-/* NBASE instance. The nodes can overall be active/backups, though the role  */
-/* is governed by the Management Plane Node for now.						 */
-/* It is possible that a node on one Hardware Location has its MP on a 		 */
-/* different Hardware Location.												 */
-/* For each Node, the HM will have only one TCP connection with it over which*/
-/* it is going to pass control queries as well as heartbeats for liveness	 */
-/* detection.																 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief HM Node Control Block
+ *
+ * Each Hardware Location CB can contain many Nodes on it which are called
+ * Node Control Blocks. Each Node CB represents a Binary running NBASE instance.
+ * The nodes can overall be active/backups, though the role is governed by the
+ * Management Plane Node for now. It is possible that a node on one Hardware
+ * Location has its MP on a different Hardware Location.
+ * For each Node, the HM will have only one TCP connection with it over which
+ * it is going to pass control queries as well as heartbeats for liveness detection.
+ */
 typedef struct hm_node_cb {
 	/***************************************************************************/
 	/* DB Index																   */
@@ -771,16 +690,11 @@ typedef struct hm_node_cb {
 /**STRUCT-********************************************************************/
 
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PROCESS_CB													 */
-/*                                                                           */
-/* Name:      hm_process_cb			 										 */
-/*                                                                           */
-/* Textname:  Process Control Block                                          */
-/*                                                                           */
-/* Description: Represents a Process Entity in Hardware Manager Tables.      */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Process Control Block
+ *
+ * Represents a Process Entity in Hardware Manager Tables.
+ */
 typedef struct hm_process_cb
 {
 	/***************************************************************************/
@@ -847,16 +761,11 @@ typedef struct hm_process_cb
 } HM_PROCESS_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_INTERFACE_CB												 */
-/*                                                                           */
-/* Name:      hm_interface_cb											 	 */
-/*                                                                           */
-/* Textname:  Interface Control Block                                        */
-/*                                                                           */
-/* Description: 						            						 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Interface Conrol Block
+ *
+ */
 typedef struct hm_interface_cb
 {
 	/***************************************************************************/
@@ -892,16 +801,11 @@ typedef struct hm_interface_cb
 } HM_INTERFACE_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_GLOBAL_LOCATION_CB											 */
-/*                                                                           */
-/* Name:      hm_global_location_cb			 								 */
-/*                                                                           */
-/* Textname:  Global Location Control Block	                                 */
-/*                                                                           */
-/* Description: Represents a row in the Global Location CB Table             */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Global Location Control Block
+ *
+ * Represents a row in the Global Location CB Table
+ */
 typedef struct hm_global_location_cb
 {
 	/***************************************************************************/
@@ -947,16 +851,10 @@ typedef struct hm_global_location_cb
 } HM_GLOBAL_LOCATION_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_GLOBAL_NODE_CB												 */
-/*                                                                           */
-/* Name:      hm_global_node_cb			 									 */
-/*                                                                           */
-/* Textname:  Global Node Control Block                                      */
-/*                                                                           */
-/* Description: Represents a Node entry in Global DB						 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Global Node Control Block
+ *
+ */
 typedef struct hm_global_node_cb
 {
 	/***************************************************************************/
@@ -1012,16 +910,11 @@ typedef struct hm_global_node_cb
 } HM_GLOBAL_NODE_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_GLOBAL_PROCESS_CB											 */
-/*                                                                           */
-/* Name:      hm_global_process_cb			 								 */
-/*                                                                           */
-/* Textname:  Global Process Control Block	                                 */
-/*                                                                           */
-/* Description: Represents an entry in the global process tables.	         */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Global Process Control Block
+ *
+ * Represents an entry in the global process tables.
+ */
 typedef struct hm_global_process_cb
 {
 	/***************************************************************************/
@@ -1077,16 +970,12 @@ typedef struct hm_global_process_cb
 } HM_GLOBAL_PROCESS_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_GLOBAL_INTERFACE_CB										 */
-/*                                                                           */
-/* Name:      hm_global_interface_cb			 							 */
-/*                                                                           */
-/* Textname:  Global Interface Control Block                                 */
-/*																			 */
-/* Description: Represents an entry in global interface tree.	             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Global Interface Control Block
+ *
+ * Represents an entry in global interface tree.
+ */
 typedef struct hm_global_interface_cb
 {
 	/***************************************************************************/
@@ -1132,18 +1021,13 @@ typedef struct hm_global_interface_cb
 } HM_GLOBAL_INTERFACE_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_SUBSCRIPTION_CB											 */
-/*                                                                           */
-/* Name:      hm_subscription_cb			 								 */
-/*                                                                           */
-/* Textname:  Hardware Manager Subscription Control Block                    */
-/*                                                                           */
-/* Description: This structure represents a typical Relational Database Row  */
-/* It is Keyed by the TypeOfTable and idInTable fields which identify the 	 */
-/* subscription point on which other nodes/processes may subscribe on.		 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Hardware Manager Subscription Control Block
+ *
+ * This structure represents a typical Relational Database Row. It is Keyed
+ * by the TypeOfTable and idInTable fields which identify the subscription point
+ * on which other nodes/processes may subscribe on.
+ */
 typedef struct hm_subscription_cb
 {
 	/***************************************************************************/
@@ -1198,17 +1082,12 @@ typedef struct hm_subscription_cb
 } HM_SUBSCRIPTION_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_SUBSCRIBER_WILDCARD										 */
-/*                                                                           */
-/* Name:      hm_subscriber_wildcard			 							 */
-/*                                                                           */
-/* Textname:  Wild Card Subscriber	                                         */
-/*																			 */
-/* Description: Wildcard Subscribers. Those which are subscribed to every    */
-/* thing of a particular type.												 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Wild Card Subscriber
+ *
+ * Wildcard Subscribers. Those which are subscribed to every thing of a particular type.
+ */
 typedef struct hm_subscriber_wildcard
 {
 	/***************************************************************************/
@@ -1234,19 +1113,13 @@ typedef struct hm_subscriber_wildcard
 } HM_SUBSCRIBER_WILDCARD ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_NOTIFICATION_CB											 */
-/*                                                                           */
-/* Name:      hm_notification_cb			 								 */
-/*                                                                           */
-/* Textname:  Notification Control Block                                     */
-/*                                                                           */
-/* Description: A Notification Event which needs to be processed. This would */
-/* be used differently in different perspectives. The same notification can  */
-/* be used to broadcast an update to the peers and a notification to the 	 */
-/* subscribed nodes.														 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Notification Control Block
+ *
+ * A Notification Event which needs to be processed. This would be used
+ * differently in different perspectives. The same notification can be used to
+ * broadcast an update to the peers and a notification to the subscribed nodes.
+ */
 typedef struct hm_notification_cb
 {
 	/***************************************************************************/
@@ -1278,16 +1151,11 @@ typedef struct hm_notification_cb
 } HM_NOTIFICATION_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_CONFIG_ADDRESS_CB		*/
-/*                                                                           */
-/* Name:      hm_config_address_cb			 */
-/*                                                                           */
-/* Textname:  Configuration Address CB	                                     */
-/*                                                                           */
-/* Description: 						            */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Configuration Address CB
+ *
+ */
 typedef struct hm_config_address_cb
 {
 	/***************************************************************************/
@@ -1317,16 +1185,11 @@ typedef struct hm_config_address_cb
 } HM_CONFIG_ADDRESS_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_CONFIG_SUBSCRIPTION_CB										 */
-/*                                                                           */
-/* Name:      hm_config_subscription_cb			 							 */
-/*                                                                           */
-/* Textname:  Configuration Block for Subscription CB                        */
-/*                                                                           */
-/* Description: 						            						 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Configuration Block for Subscription CB
+ *
+ */
 typedef struct hm_config_subscription_cb
 {
 	/***************************************************************************/
@@ -1346,16 +1209,11 @@ typedef struct hm_config_subscription_cb
 } HM_CONFIG_SUBSCRIPTION_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_CONFIG_NODE_CB												 */
-/*                                                                           */
-/* Name:      hm_config_node_cb			 									 */
-/*                                                                           */
-/* Textname:  Configuration of a Node                                        */
-/*                                                                           */
-/* Description: 						            */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Configuration of a Node
+ *
+ */
 typedef struct hm_config_node_cb
 {
 	/***************************************************************************/
@@ -1372,16 +1230,10 @@ typedef struct hm_config_node_cb
 } HM_CONFIG_NODE_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_HEARTBEAT_CONFIG		*/
-/*                                                                           */
-/* Name:      hm_heartbeat_config			 */
-/*                                                                           */
-/* Textname:  Heartbeat configuration structure                              */
-/*                                                                           */
-/* Description: 						            */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Heartbeat Configration Structure
+ *
+ */
 typedef struct hm_heartbeat_config {
 	uint32_t scope;
 	uint32_t resolution;
@@ -1390,16 +1242,11 @@ typedef struct hm_heartbeat_config {
 } HM_HEARTBEAT_CONFIG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_CONFIG_CB													 */
-/*                                                                           */
-/* Name:      hm_config_cb			 										 */
-/*                                                                           */
-/* Textname:  HM Configuration Control Block                                 */
-/*                                                                           */
-/* Description: The data structure representing user configuration set.      */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HM Configuration Control Block
+ *
+ * The data structure representing user configuration set.
+ */
 typedef struct hm_config_cb
 {
 	struct hm_instance_info {
@@ -1435,6 +1282,10 @@ typedef struct hm_config_cb
 /**STRUCT-********************************************************************/
 
 
+/**
+ * @brief Attribute Mapping dictionary for XML Parsing vocabulary
+ *
+ */
 typedef struct attribute_map {
 	/***************************************************************************/
 	/* Character representation of attribute								   */
@@ -1446,18 +1297,13 @@ typedef struct attribute_map {
 	uint32_t type;
 } HM_ATTRIBUTE_MAP;
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_GLOBAL_DATA												 */
-/*                                                                           */
-/* Name:      hm_global_data			 									 */
-/*                                                                           */
-/* Textname:  Hardware Manager Global Data                                   */
-/*                                                                           */
-/* Description: Global Tables that serve as overall statistics and 			 */
-/* subscription base. These tables reflect the aggregated state information	 */
-/* of the overall system.													 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Hardware Manager Global Data
+ *
+ * Global Tables that serve as overall statistics and subscription base.
+ * These tables reflect the aggregated state information of the overall system.
+ */
 typedef struct hm_global_data
 {
 	/***************************************************************************/

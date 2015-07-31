@@ -1,10 +1,11 @@
-/*
- * hmpeerif.h
+/**
+ *  @file hmpeerif.h
+ *  @brief Hardware Manager Cluster Peering Interface File
  *
- *  Created on: 29-Apr-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMPEERIF_H_
 #define SRC_HMPEERIF_H_
 
@@ -38,277 +39,238 @@
 #define HM_PEER_ENTITY_STATUS_INACTIVE			((uint32_t) 0)
 #define HM_PEER_ENTITY_STATUS_ACTIVE			((uint32_t) 1)
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_HEADER											 */
-/*                                                                           */
-/* Name:      hm_peer_msg_hdr			 									 */
-/*                                                                           */
-/* Textname:  Hardware Manager Peer Message Header                           */
-/*                                                                           */
-/* Description: The commone Message Header that must be placed on top of each*/
-/* Peer Message.															 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Hardware Manager Peer Message Header
+ *
+ * The common Message Header that must be placed on top of each Peer Message
+ */
 typedef struct hm_peer_msg_hdr
 {
-	/***************************************************************************/
-	/* Message Type															   */
-	/***************************************************************************/
+	/*
+	 * Message Type
+	 */
 	uint8_t msg_type[4];
 
-	/***************************************************************************/
-	/* Hardware Manager Index												   */
-	/***************************************************************************/
+	/*
+	 * Hardware Manager Index
+	 */
 	uint8_t hw_id[4];
 
-	/***************************************************************************/
-	/* Timestamp of sending													   */
-	/* A time_t variable is a long int, so 8 bytes should suffice for most 	   */
-	/* purposes.															   */
-	/***************************************************************************/
+	/*
+	 * Timestamp of sending
+	 * A time_t variable is a long int, so 8 bytes should suffice for most
+	 * purposes.
+	 */
 	uint8_t timestamp[8];
 
 } HM_PEER_MSG_HEADER ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_INIT												 */
-/*                                                                           */
-/* Name:      hm_peer_msg_init			 									 */
-/*                                                                           */
-/* Textname:  HM Peer INIT Message                                           */
-/*                                                                           */
-/* Description: INIT Message Telling about HM Parameters.		             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief HM Peer INIT message
+ *
+ * INIT Message Telling about HM Parameters.
+ */
 typedef struct hm_peer_msg_init
 {
-	/***************************************************************************/
-	/* HM Header															   */
-	/***************************************************************************/
+	/*
+	 * HM Header
+	 */
 	HM_PEER_MSG_HEADER hdr;
 
-	/***************************************************************************/
-	/* Request/Response														   */
-	/***************************************************************************/
+	/*
+	 * Request/Response
+	 */
 	uint8_t request[4];
 
-	/***************************************************************************/
-	/* OK or not															   */
-	/* NOTE: This field was added to avoid size match on Node and Cluster Level*/
-	/***************************************************************************/
+	/*
+	 * OK or not
+	 * NOTE: This field was added to avoid size match on Node and Cluster Level
+	 */
 	uint8_t response_ok[4];
 
 } HM_PEER_MSG_INIT ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_KEEPALIVE											 */
-/*                                                                           */
-/* Name:      hm_peer_msg_keepalive			 								 */
-/*                                                                           */
-/* Textname:  HM Peer Keepalive Update Message                               */
-/*                                                                           */
-/* Description: Keepalive Tick sending a summary of own status and timestamps*/
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief HM Peer Keepalive Update Message
+ *
+ * Keepalive Tick sending a summary of own status and timestamps
+ */
 typedef struct hm_peer_msg_keepalive
 {
-	/***************************************************************************/
-	/* HM Header															   */
-	/***************************************************************************/
+	/*
+	 * HM Header
+	 */
 	HM_PEER_MSG_HEADER hdr;
 
-	/***************************************************************************/
-	/* Port on which listening												   */
-	/***************************************************************************/
+	/*
+	 * Port on which listening
+	 */
 	uint8_t listen_port[4];
 
-	/***************************************************************************/
-	/* Number of Active Nodes												   */
-	/***************************************************************************/
+	/*
+	 * Number of Active Nodes
+	 */
 	uint8_t num_nodes[4];
 
-	/***************************************************************************/
-	/* Number of active processes											   */
-	/***************************************************************************/
+	/*
+	 * Number of active processes
+	 */
 	uint8_t num_proc[4];
 
 } HM_PEER_MSG_KEEPALIVE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_REPLAY_TLV											 */
-/*                                                                           */
-/* Name:      hm_peer_replay_tlv			 								 */
-/*                                                                           */
-/* Textname:  HM Peer Replay TLV Chunk                                       */
-/*                                                                           */
-/* Description: A single chunk of information relayed.			             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief HM Peer Replay TVL Chunk
+ *
+ * A single chunk of information relayed.
+ */
 typedef struct hm_peer_replay_tlv
 {
-	/***************************************************************************/
-	/* Notify Type: Process/Node											   */
-	/***************************************************************************/
+	/*
+	 * Notify Type: Process/Node
+	 */
 	uint8_t update_type[4];
 
-	/***************************************************************************/
-	/* Node ID: Since a Process can be created on many nodes.				   */
-	/***************************************************************************/
+	/*
+	 * Node ID: Since a Process can be created on many nodes.
+	 */
 	uint8_t node_id[4];
 
-	/***************************************************************************/
-	/* ID of Process													   	   */
-	/***************************************************************************/
+	/*
+	 * ID of Process
+	 */
 	uint8_t pid[4];
 
-	/***************************************************************************/
-	/* Process Type/ Node Group Type										   */
-	/***************************************************************************/
+	/*
+	 * Process Type/ Node Group Type
+	 */
 	uint8_t group[4];
 
-	/***************************************************************************/
-	/* Role	Primary/Back: Only relevant for Nodes.							   */
-	/***************************************************************************/
+	/*
+	 * Role	Primary/Back: Only relevant for Nodes.
+	 */
 	uint8_t role[4];
 
-	/***************************************************************************/
-	/* Status: Running or not?												   */
-	/***************************************************************************/
+	/*
+	 * Status: Running or not?
+	 */
 	uint8_t running[4];
 } HM_PEER_REPLAY_TLV ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_REPLAY											 */
-/*                                                                           */
-/* Name:      hm_peer_msg_replay			 							     */
-/*                                                                           */
-/* Textname:  HM Peer Replay Message	                                     */
-/*                                                                           */
-/* Description: Replay Message							            		 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HM Peer Replay Message
+ *
+ */
 typedef struct hm_peer_msg_replay
 {
-	/***************************************************************************/
-	/* HM Header															   */
-	/***************************************************************************/
+	/*
+	 * HM Header
+	 */
 	HM_PEER_MSG_HEADER hdr;
 
-	/***************************************************************************/
-	/* Last in sequence														   */
-	/* Signals that it is the last message and contains no other data.		   */
-	/***************************************************************************/
+	/*
+	 * Last in sequence
+	 * Signals that it is the last message and contains no other data.
+	 */
 	uint8_t last[4];
 
-	/***************************************************************************/
-	/* Number of TLVs filled in												   */
-	/***************************************************************************/
+	/*
+	 * Number of TLVs filled in
+	 */
 	uint8_t num_tlvs[4];
 
 
-	/***************************************************************************/
-	/* Array of 5 TLVs														   */
-	/***************************************************************************/
+	/*
+	 * Array of TLVs [Maximum Number controlled by #HM_PEER_NUM_TLVS_PER_UPDATE]
+	 */
 	HM_PEER_REPLAY_TLV tlv[HM_PEER_NUM_TLVS_PER_UPDATE];
 
 } HM_PEER_MSG_REPLAY ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_NODE_UPDATE										 */
-/*                                                                           */
-/* Name:      hm_peer_msg_node_update			 							 */
-/*                                                                           */
-/* Textname:  HM Peer Node Update Message                                    */
-/*                                                                           */
-/* Description: Node Update Message								             */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HM Peer Node Update Message
+ *
+ */
 typedef struct hm_peer_msg_node_update
 {
-	/***************************************************************************/
-	/* HM Header															   */
-	/***************************************************************************/
+	/*
+	 * HM Header
+	 */
 	HM_PEER_MSG_HEADER hdr;
 
-	/***************************************************************************/
-	/* Node Status: UP(1)/DOWN(0)											   */
-	/***************************************************************************/
+	/*
+	 * Node Status: UP(1)/DOWN(0)
+	 */
 	uint8_t status[4];
 
-	/***************************************************************************/
-	/* Node ID																   */
-	/***************************************************************************/
+	/*
+	 * Node ID
+	 */
 	uint8_t node_id[4];
 
-	/***************************************************************************/
-	/* Node Group															   */
-	/***************************************************************************/
+	/*
+	 * Node Group
+	 */
 	uint8_t node_group[4];
 
-	/***************************************************************************/
-	/* Node Role															   */
-	/***************************************************************************/
+	/*
+	 *  Node Role
+	 */
 	uint8_t node_role[4];
 
 } HM_PEER_MSG_NODE_UPDATE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_PROCESS_UPDATE								     */
-/*                                                                           */
-/* Name:      hm_peer_msg_proc_update			 							 */
-/*                                                                           */
-/* Textname:  HM Peer Process Update Message                                 */
-/*                                                                           */
-/* Description: Process Update Message.						            	 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HM Peer Process Update Message
+ *
+ */
 typedef struct hm_peer_msg_proc_update
 {
-	/***************************************************************************/
-	/* HM Header															   */
-	/***************************************************************************/
+	/*
+	 *  HM Header
+	 */
 	HM_PEER_MSG_HEADER hdr;
 
-	/***************************************************************************/
-	/* Process Status: UP(1)/DOWN(0)										   */
-	/***************************************************************************/
+	/*
+	 * Process Status: UP(1)/DOWN(0)
+	 */
 	uint8_t status[4];
 
-	/***************************************************************************/
-	/* Process ID															   */
-	/***************************************************************************/
+	/*
+	 * Process ID
+	 */
 	uint8_t proc_id[4];
 
-	/***************************************************************************/
-	/* Process Type															   */
-	/***************************************************************************/
+	/*
+	 * Process Type
+	 */
 	uint8_t proc_type[4];
 
-	/***************************************************************************/
-	/* Node ID																   */
-	/***************************************************************************/
+	/*
+	 *  Node ID
+	 */
 	uint8_t node_id[4];
 } HM_PEER_MSG_PROCESS_UPDATE ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PEER_MSG_UNION												 */
-/*                                                                           */
-/* Name:      hm_peer_msg_union			 									 */
-/*                                                                           */
-/* Textname:  HM Peer Message Union                                          */
-/*                                                                           */
-/* Description: A Union of all Peer Interface Messages. This is mainly to    */
-/* implicitly determine the maximum occupancy among them all which would be	 */
-/* useful in receiving bytes into buffer.									 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief HM Peer Message Union
+ *
+ * A Union of all Peer Interface Messages. This is mainly to implicitly determine
+ * the maximum occupancy among them all which would be useful in receiving bytes
+ * into buffer.
+ */
 typedef struct hm_peer_msg_union
 {
 	HM_PEER_MSG_HEADER peer_header;

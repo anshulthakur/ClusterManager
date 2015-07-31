@@ -1,12 +1,11 @@
-/*
- * hmnodemgmt.c
+/**
+ *  @file hmnodemgmt.c
+ *  @brief Node Management Layer routines
  *
- *	Purpose: Node Management Layer
- *
- *  Created on: 07-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 #include <hmincl.h>
 
 
@@ -174,21 +173,94 @@ HM_TPRT_FSM_ENTRY hm_node_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STA
 	}
 };
 
-/**PROC+**********************************************************************/
-/* Name:     hm_node_fsm			  		                                 */
-/*                                                                           */
-/* Purpose:   FSM Routines for a local node on this HM.					   	 */
-/*                                                                           */
-/* Returns:   VOID  :											             */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	: input_signal - The Signal that was input to this FSM.  */
-/*            IN	: node_cb - Pointer to the Node CB to which this   		 */
-/*					 FSM belongs to.										 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+
+/**
+ *  @brief FSM Routines for a local node on this HM.
+ *
+ * FSM Description:
+ *
+ *FSM States:
+ *-----------------------------------------------------------------------------
+ *| S.No.	|	State Name				|		Remark						   |
+ *-----------------------------------------------------------------------------
+ *|	0	|	HM_NODE_FSM_STATE_NULL	|	No connection exists.			   	|
+ *|	1	|	HM_NODE_FSM_STATE_WAITING|	Node has been added.			   	|
+ *|		|							|	Waiting for INIT request			|
+ *|	2	|	HM_NODE_FSM_STATE_ACTIVE|	Received INIT request. 				|
+ *|		|							|	This is (should be) the first  		|
+ *|		|							|	message that is received. 			|
+ *|		|							|	The Node is now an active member	|
+ *|  3	|  HM_NODE_FSM_STATE_FAILING|   The Node is failing. Update info.	|
+ *|	4	|	HM_NODE_FSM_STATE_FAILED|	Node is down. Cleanup is underway 	|
+ *------------------------------------------------------------------------------
+ *State Table:
+ *-------------------------------------------------------
+ *|State		|NULL[0]|WAIT[1]|ACTV[2]|FAIL[3]|CLSE[4]|
+ *|Input		|		|		|		|		|		|
+ *|					Next State via Path			|		|
+ * ------------------------------------------------------
+ *|Create		|1	  A	|--- ERR|--- ERR|--- ERR|--- ERR|
+ *|INIT			|--- ERR|2	  B |--- ERR|--- ERR|--- ERR|
+ *|Data			|--- ERR|--- ERR|---  C |--- ERR|--- ERR|
+ *|Terminate	|--- ERR|--- ERR| 3   D |---  I |--- ---|
+ *|Close 		|--- ERR|--- ERR|--- ERR|--- ERR| 1  ---|
+ *|TimerPop 	|--- ERR| 3   E | 2   F |--- ERR|--- ERR|
+ *|TimeOut 		|--- ERR|--- ERR| 3   G |--- ERR|--- ERR|
+ *|Failed		|--- ERR|--- ERR|--- ERR| 4   J |--- ERR|
+ *|Active		|--- ERR|--- ERR|---  I |--- ERR|--- ERR|
+ *-------------------------------------------------------
+ *
+ *Path Descriptions:
+ *
+ *A.	Node Created :
+ *	A local Node has been created in the system. Start the wait timers. Assert
+ * that the node belongs to the local location only. Remote Nodes do not need an
+ * FSM.
+ *B.	Received INIT :
+ *	Assert that an appropriate Transport CB has been assigned to the node.
+ *  Reset the Timer for Timeout.
+ *	Send a response to the INIT message.
+ *  Send a keepalive message.
+ *	Set timer for Keepalive messages.
+ *	Update Global Tables for Nodes.
+ *C.	Data Arrived:
+ *	Some data arrived on the connection. Read this data into a buffer and
+ *	process it.
+ *  The Node may receive subscription/unsubscribe requests for PCT_TYPE
+ * 	or IF_ID, or GROUPS, or NODEs. Further, it may receive HA Specific requests.
+ *D.	Closing Connection:
+ *	The connection was either terminated by the other party or a request for
+ *	disconnection was made by a local sub-module. Both of these cases result
+ *	in disconnection and the socket descriptor is closed.
+ *	Free all resources associated in other layers and update global tables.
+ *E.	Timeout:
+ *	The node did not send an INIT request within the window period. Mark the
+ *  node as down, and send updates, if necessary. A local node failing to start
+ * is a relevant event.
+ *F.	Timer Popped:
+ *	The node timer popped. Check if the missed Keepalive coun has not exceeded
+ * the threshold value. If not, send a keepalive and increment the missed count.
+ * The incoming Keepalive may reset this counter each time.
+ *G. 	Keepalive Timeout:
+ *	Keepalive Timer Popped and threshold was exceeded.
+ *	The connection must be shut down and remote party declared as dead.
+ *H.	Closed:
+ * Connection was closed and resources freed.
+ *I.	Failed:
+ *	Node Down updates were propagated. Now release resources.
+ *  Node Active Signal
+ * Active signal (internally generated) to trigger global update. This signal
+ * was grafted to compensate for the lack of foresight during FSM design.
+ * While FSM Design, the path taken(the routine) must take into account the
+ * state of machine AT THAT time, and not the one it is transitioning into.
+ * J. Failing complete:
+ * Notifications have been sent. Release pending resources.
+ *
+ *
+ *  @param input_signal Incoming Signal into the FSM
+ *  @param *node_cb Node Control Block (#HM_NODE_CB) for which this instance of FSM is running.
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 {
 	uint32_t next_input = input_signal;
@@ -387,14 +459,15 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
 	return (ret_val);
 } /* hm_node_fsm */
 
-/***************************************************************************/
-/* Name:	hm_node_add 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Adds a node to its parent Location and does the subscription   */
-/* triggers.															   */
-/***************************************************************************/
+
+/**
+ *  @brief Adds a node to its parent Location and does the subscription triggers
+ *
+ *  @param *node_cb Node Control Block (#H_NODE_CB) to be added to the
+ *  @param *location_cb Location CB (#HM_LOCATION_CB) to which Node CB must be added to.
+ *  Location Control Block (#HM_LOCATION_CB)
+ *  @return return_value
+ */
 int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
 {
 	/***************************************************************************/
@@ -538,13 +611,13 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_node_add */
 
-/***************************************************************************/
-/* Name:	hm_node_remove 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Removes the node from the system			*/
-/***************************************************************************/
+
+/**
+ *  @brief Removes the node from the system
+ *
+ *  @param *node_cb Pointer to the Node CB (#HM_NODE_CB) that needs to be removed
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_node_remove(HM_NODE_CB *node_cb	)
 {
 	/***************************************************************************/
@@ -574,13 +647,13 @@ int32_t hm_node_remove(HM_NODE_CB *node_cb	)
 	return (ret_val);
 }/* hm_node_remove */
 
-/***************************************************************************/
-/* Name:	hm_node_keepalive_callback 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	void									*/
-/* Purpose: Keepalive callback for Keepalive timer pop			*/
-/***************************************************************************/
+
+/**
+ *  @brief Keepalive Callback for Keepalive Timer Pop
+ *
+ *  @param *cb Pointer to the Node CB (#HM_NODE_CB passed as @c void)
+ *  @return #HM_OK if successful, #HM_ERR otherwise,
+ */
 int32_t hm_node_keepalive_callback(void *cb)
 {
 	/***************************************************************************/

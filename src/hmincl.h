@@ -1,11 +1,11 @@
-/*
- * hmincl.h
+/**
+ *  @file hmincl.h
+ *  @brief Hardware Manager include files.
  *
- *	Single point of includes for Hardware Manager
- *  Created on: 29-Apr-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 31-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMINCL_H_
 #define SRC_HMINCL_H_
 //GENERIC INCLUDES

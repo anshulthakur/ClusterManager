@@ -1,12 +1,11 @@
-/*
- * hmfunc.h
+/**
+ *  @file hmfunc.h
+ *  @brief Hardware Manager Function Prototypes
  *
- * 	Hardware Manager Function Prototypes
- *
- *  Created on: 29-Apr-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug Anshul
  */
-
 #ifndef SRC_HMFUNC_H_
 #define SRC_HMFUNC_H_
 
@@ -94,7 +93,6 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *);
 
 int32_t hm_tprt_handle_improper_read(int32_t , HM_TRANSPORT_CB *);
 int32_t hm_receive_msg_hdr(char *);
-int32_t hm_receive_msg(char *);
 int32_t hm_node_send_init_rsp(HM_NODE_CB *);
 int32_t hm_queue_on_transport(HM_MSG *, HM_TRANSPORT_CB *);
 int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *);

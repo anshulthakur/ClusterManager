@@ -1,10 +1,11 @@
-/*
- * hmintf.h
+/**
+ *  @file hmnodeif.h
+ *  @brief Hardware Manager Local Nodes Interface Declarations
  *
- *  Created on: 29-Apr-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMNODEIF_H_
 #define SRC_HMNODEIF_H_
 
@@ -55,17 +56,11 @@
 #define HM_NOTIFY_ADDR_TYPE_TCP_v6			((uint32_t) AF_INET6)
 
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_MSG_HEADER													 */
-/*                                                                           */
-/* Name:      hm_msg_header			 										 */
-/*                                                                           */
-/* Textname:  HM Common Message Header                                       */
-/*                                                                           */
-/* Description: Common Message Header Segment that must be on top of each    */
-/* message from the cluster.												 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HM Common Message Header.
+ *
+ * Common Message Header Segment that must be on top of each mesage from the cluster
+ */
 typedef struct hm_msg_header
 {
 	/***************************************************************************/
@@ -96,17 +91,12 @@ typedef struct hm_msg_header
 } HM_MSG_HEADER ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_NODE_INIT_MSG												 */
-/*                                                                           */
-/* Name:      hm_node_init_msg			 									 */
-/*                                                                           */
-/* Textname:  Hardware Manager Node INIT Message.                            */
-/*                                                                           */
-/* Description: INIT Message to be sent by Local Nodes to their HMs for      */
-/* requesting monitoring support.											 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Hardware Manager Node INIT Message.
+ *
+ * INIT Message to be sent by Local Nodes to their HMs for requesting monitoring support.
+ */
 typedef struct hm_node_init_msg
 {
 	/***************************************************************************/
@@ -143,33 +133,24 @@ typedef struct hm_node_init_msg
 } HM_NODE_INIT_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_KEEPALIVE_MSG												 */
-/*                                                                           */
-/* Name:      hm_keepalive_msg			 									 */
-/*                                                                           */
-/* Textname:  Hardware Manager Keepalive Message.                            */
-/*                                                                           */
-/* Description: Keepalive messages exchanged between nodes in the cluster.   */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Hardware Manager Keepalive Message.
+ *
+ * Keepalive messages exchanged between nodes in the cluster.
+ */
 typedef struct hm_keepalive_msg
 {
 	HM_MSG_HEADER hdr;
 } HM_KEEPALIVE_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_PROCESS_UPDATE_MSG											 */
-/*                                                                           */
-/* Name:      hm_process_update_msg			 								 */
-/*                                                                           */
-/* Textname:  Process Update Message                                         */
-/*                                                                           */
-/* Description: Update Message from HM Stub to HM regarding change in status */
-/* of a process. Process may be created/destroyed.							 */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief Process Update Message
+ *
+ * Update Message from HM Stub to HM regarding change in status of a process.
+ * Process may be created/destroyed.
+ */
 typedef struct hm_process_update_msg
 {
 	/***************************************************************************/
@@ -208,17 +189,13 @@ typedef struct hm_process_update_msg
 } HM_PROCESS_UPDATE_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_REGISTER_TLV_CB											 */
-/*                                                                           */
-/* Name:      hm_register_tlv_cb			 								 */
-/*                                                                           */
-/* Textname:  Register TLV Block                                             */
-/*                                                                           */
-/* Description: A registration TLV Block defining the type of registration   */
-/* and subscribers information, if applicable.								 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Register TLV Block
+ *
+ * A registration TLV Block defining the type of registration and subscribers
+ * information, if applicable.
+ */
 typedef struct hm_register_tlv_cb
 {
 	/***************************************************************************/
@@ -232,17 +209,13 @@ typedef struct hm_register_tlv_cb
 } HM_REGISTER_TLV_CB ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_REGISTER_MSG												 */
-/*                                                                           */
-/* Name:      hm_register_msg			 									 */
-/*                                                                           */
-/* Textname:  Register Message                                               */
-/*                                                                           */
-/* Description: Generic register message to subscribe to notifications to a  */
-/* group, or PCT_TYPE, or a location index in particular					 */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Register Message
+ *
+ * Generic register message to subscribe to notifications to a group, or PCT_TYPE,
+ * or a location index in particular
+ */
 typedef struct hm_register_msg
 {
 	/***************************************************************************/
@@ -273,16 +246,12 @@ typedef struct hm_register_msg
 } HM_REGISTER_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_UNREGISTER_MSG												 */
-/*                                                                           */
-/* Name:      hm_unregister_msg			 									 */
-/*                                                                           */
-/* Textname:  Unregister Message	                                         */
-/*                                                                           */
-/* Description: Unregister from further notifications.			             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Unregister Message
+ *
+ * Unregister from further notifications.
+ */
 typedef struct hm_unregister_msg
 {
 	/***************************************************************************/
@@ -299,16 +268,12 @@ typedef struct hm_unregister_msg
 } HM_UNREGISTER_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_ADDRESS_INFO												 */
-/*                                                                           */
-/* Name:      hm_address_info			 									 */
-/*                                                                           */
-/* Textname:  Address Information	                                         */
-/*                                                                           */
-/* Description: Address Information for a node.					             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Address Information
+ *
+ * Address Information of a node.
+ */
 typedef struct hm_address_info
 {
 	/***************************************************************************/
@@ -344,16 +309,12 @@ typedef struct hm_address_info
 } HM_ADDRESS_INFO ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_NOTIFICATION_MSG											 */
-/*                                                                           */
-/* Name:      hm_notification_msg			 								 */
-/*                                                                           */
-/* Textname:  Notification Message	                                         */
-/*                                                                           */
-/* Description: Notification sent from HM to HM Stub			             */
-/*                                                                           */
-/*****************************************************************************/
+
+/**
+ * @brief Notification Message
+ *
+ * Notification sent from HM to HM Stub
+ */
 typedef struct hm_notification_msg
 {
 	/***************************************************************************/
@@ -397,16 +358,11 @@ typedef struct hm_notification_msg
 } HM_NOTIFICATION_MSG ;
 /**STRUCT-********************************************************************/
 
-/**STRUCT+********************************************************************/
-/* Structure: HM_HA_STATUS_UPDATE_MSG								 		 */
-/*                                                                           */
-/* Name:      hm_ha_status_update_msg			 						     */
-/*                                                                           */
-/* Textname:  HA Status Update Message                                       */
-/*                                                                           */
-/* Description: Master/Slave updates for overall nodes.			             */
-/*                                                                           */
-/*****************************************************************************/
+/**
+ * @brief HA Status Update Message
+ *
+ * Master/Slave updates for overall nodes.
+ */
 typedef struct hm_ha_status_update_msg
 {
 	/***************************************************************************/

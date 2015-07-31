@@ -1,19 +1,21 @@
-/*
- * hmprocmgmt.c
+/**
+ *  @file hmprocmgmt.c
+ *  @brief Hardware Manager Process Monitoring and Management Routines
  *
- *  Created on: 15-Jun-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	hm_process_add 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Adds the Process Control Block into its parent Node CB and 			*/
-/***************************************************************************/
+
+/**
+ *  @brief Adds the Process Control Block into its parent Node CB
+ *
+ *  @param *proc_cb Process Control Block (#HM_PROCESS_CB) to be added
+ *  @param *node_cb Node Control Block (#HM_NODE_CB) to which Process is to be added
+ *  @return #HM_OK if successful, #HM_ERR otherwise.
+ */
 int32_t hm_process_add(HM_PROCESS_CB *proc_cb, HM_NODE_CB *node_cb)
 {
 	/***************************************************************************/
@@ -111,13 +113,12 @@ EXIT_LABEL:
 	return (ret_val);
 }/* hm_process_add */
 
-/***************************************************************************/
-/* Name:	hm_process_update 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Updates the state of Process and causes triggers.			*/
-/***************************************************************************/
+/**
+ *  @brief Updates the state of Process and causes triggers.
+ *
+ *  @param *proc_cb Process CB that has been updated (#HM_PROCESS_CB)
+ *  @return #HM_OK on success, #HM_ERR otherwise.
+ */
 int32_t hm_process_update(HM_PROCESS_CB *proc_cb)
 {
 	/***************************************************************************/

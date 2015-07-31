@@ -1,20 +1,20 @@
-/*
- * hmcbs.c
+/** @file hmcbs.c
  *
- *  Purpose: Hardware Manager Control Block Allocation and Deallocation routines
+ *  @brief Hardware Manager Control Block Allocation and Deallocation routines
  *
- *  Created on: 07-May-2015
- *      Author: anshul
+ *  @date 07-May-2015
+ *  @author Anshul
+ *  @bug None detected so far.
  */
+
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	hm_alloc_config_cb 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Allocates and initializes Configuration CB for HM to defaults  */
-/***************************************************************************/
+/**
+ *  @brief Allocates and initializes configuration control blocks for HM to defaults
+ *
+ *  @param None
+ *  @return Pointer to Control block of type #HM_CONFIG_CB
+ */
 HM_CONFIG_CB * hm_alloc_config_cb()
 {
 	/***************************************************************************/
@@ -76,13 +76,12 @@ EXIT_LABEL:
 }/* hm_alloc_config_cb */
 
 
-/***************************************************************************/
-/* Name:	hm_alloc_transport_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_TRANSPORT_CB *									*/
-/* Purpose: Allocates a Transport Connection Control Block			*/
-/***************************************************************************/
+/**
+ *  @brief Allocates a Transport Connections Control Block
+ *
+ *  @param conn_type Connection Type: Whether it is a Listen/TCP/UDP type connection
+ *  @return Pointer to control block allocated of type #HM_TRANSPORT_CB , or NULL
+ */
 HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t conn_type)
 {
 	/***************************************************************************/
@@ -126,17 +125,18 @@ EXIT_LABEL:
 	return (transport_cb);
 }/* hm_alloc_transport_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_transport_cb 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Frees the Transport Connection Control Block				   */
-/* If the transport connection CB is being used by a location as well as   */
-/* node, and a node requests freeing the resources, do not free them.	   */
-/* Only the location may free the transport CB							   */
-/* This must be ensured by the calling function.						   */
-/***************************************************************************/
+
+/**
+ *  @brief Frees the Transport Connection Control Block
+ *
+ * If the transport connection CB is being used by a location as well as
+ * node, and a node requests freeing the resources, do not free them.
+ * Only the location may free the transport CB
+ * This must be ensured by the calling function.
+ *
+ *  @param tprt_cb Pointer to transport control block (#HM_TRANSPORT_CB)
+ *  @return HM_OK for success, otherwise HM_ERR
+ */
 int32_t hm_free_transport_cb(HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -162,13 +162,13 @@ int32_t hm_free_transport_cb(HM_TRANSPORT_CB *tprt_cb)
 	return ret_val;
 }/* hm_free_transport_cb */
 
-/***************************************************************************/
-/* Name:	hm_alloc_sock_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_SOCKET_CB *									*/
-/* Purpose: purpose			*/
-/***************************************************************************/
+
+/**
+ *  @brief Allocates a socket control block #HM_SOCKET_CB and initializes to defaults
+ *
+ *  @param None
+ *  @return Pointer to CB of type #HM_SOCKET_CB
+ */
 HM_SOCKET_CB * hm_alloc_sock_cb()
 {
 	/***************************************************************************/
@@ -204,13 +204,13 @@ EXIT_LABEL:
 	return sock_cb;
 }/* hm_alloc_sock_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_sock_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	void									*/
-/* Purpose: Frees the socket connection CB			*/
-/***************************************************************************/
+
+/**
+ *  @brief Frees the socket connection CB
+ *
+ *  @param sock_cb Socket Control Block to be freed (type #HM_SOCKET_CB)
+ *  @return void
+ */
 void hm_free_sock_cb(HM_SOCKET_CB *sock_cb)
 {
 	/***************************************************************************/
@@ -255,13 +255,12 @@ void hm_free_sock_cb(HM_SOCKET_CB *sock_cb)
 	TRACE_EXIT();
 }/* hm_free_sock_cb */
 
-/***************************************************************************/
-/* Name:	hm_alloc_location_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_LOCATION_CB *									*/
-/* Purpose: Allocates 			*/
-/***************************************************************************/
+/**
+ *  @brief Allocates a location control block of type #HM_LOCATION_CB
+ *
+ *  @param none
+ *  @return pointer to CB of type #HM_LOCATION_CB
+ */
 HM_LOCATION_CB * hm_alloc_location_cb()
 {
 	/***************************************************************************/
@@ -328,13 +327,13 @@ EXIT_LABEL:
 	return(loc_cb);
 }/* hm_alloc_location_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_location_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Frees the resources of a location control block			*/
-/***************************************************************************/
+
+/**
+ *  @brief Frees the resources of a location control block
+ *
+ *  @param loc_cb Location Control Block (#HM_LOCATION_CB)
+ *  @return HM_OK on success and HM_ERR on failure
+ */
 int32_t hm_free_location_cb(HM_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -369,14 +368,13 @@ int32_t hm_free_location_cb(HM_LOCATION_CB *loc_cb)
 	return(ret_val);
 }/* hm_free_location_cb */
 
-/***************************************************************************/
-/* Name:	hm_alloc_node_cb 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	HM_NODE_CB *												   */
-/* Purpose: Allocates a Node Control Block structure and initializes the   */
-/* default values.														   */
-/***************************************************************************/
+
+/**
+ *  @brief Allocates a Node Control Block structure and initializes the default values.
+ *
+ *  @param local Flag whether the node is Local or remote (True/False)
+ *  @return Control Block to allocated Node #HM_NODE_CB
+ */
 HM_NODE_CB * hm_alloc_node_cb(uint32_t local)
 {
 	/***************************************************************************/
@@ -446,13 +444,13 @@ EXIT_LABEL:
 	return (node_cb);
 }/* hm_alloc_node_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_node_cb 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Free the Node Control Block and its associated resources	   */
-/***************************************************************************/
+
+/**
+ *  @brief Free the Node Control Block and its associated resources
+ *
+ *  @param node_cb Node Control Block #HM_NODE_CB
+ *  @return HM_OK on success, HM_ERR on failure
+ */
 int32_t hm_free_node_cb(HM_NODE_CB *node_cb)
 {
 	/***************************************************************************/
@@ -524,13 +522,13 @@ EXIT_LABEL:
 	return (ret_val);
 }/* hm_free_node_cb */
 
-/***************************************************************************/
-/* Name:	hm_alloc_process_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_PROCESS_CB *									*/
-/* Purpose: Allocates a Process Control Block			*/
-/***************************************************************************/
+
+/**
+ *  @brief Allocates a Process Control Block
+ *
+ *  @param None
+ *  @return Control Block of allocated CB of type #HM_PROCESS_CB
+ */
 HM_PROCESS_CB * hm_alloc_process_cb()
 {
 	/***************************************************************************/
@@ -574,13 +572,13 @@ EXIT_LABEL:
 	return(proc_cb);
 }/* hm_alloc_process_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_process_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Frees the Process Control Block for a process			*/
-/***************************************************************************/
+
+/**
+ *  @brief Frees the Process Control Block for a process
+ *
+ *  @param proc_cb Process CB (#HM_PROCESS_CB) to be freed
+ *  @return HM_OK if successful, HM_ERR otherwise
+ */
 int32_t hm_free_process_cb(HM_PROCESS_CB *proc_cb)
 {
 	/***************************************************************************/
@@ -632,13 +630,12 @@ int32_t hm_free_process_cb(HM_PROCESS_CB *proc_cb)
 }/* hm_free_process_cb */
 
 
-/***************************************************************************/
-/* Name:	hm_alloc_subscription_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_SUBSCRIPTION_CB *									*/
-/* Purpose: Allocates a subscription CB			*/
-/***************************************************************************/
+/**
+ *  @brief Allocates a subscription CB
+ *
+ *  @param None
+ *  @return Pointer to allocated CB of type #HM_SUBSCRIPTION_CB
+ */
 HM_SUBSCRIPTION_CB * hm_alloc_subscription_cb()
 {
 	/***************************************************************************/
@@ -683,13 +680,13 @@ EXIT_LABEL:
 	return subscription;
 }/* hm_alloc_subscription_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_subscription_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	void									*/
-/* Purpose: Frees a subscription CB			*/
-/***************************************************************************/
+
+/**
+ *  @brief Frees a subscription CB
+ *
+ *  @param sub_cb Subscription to be freed (#HM_SUBSCRIPTION_CB)
+ *  @return void
+ */
 void hm_free_subscription_cb(HM_SUBSCRIPTION_CB *sub_cb)
 {
 	/***************************************************************************/
@@ -726,13 +723,13 @@ void hm_free_subscription_cb(HM_SUBSCRIPTION_CB *sub_cb)
 	TRACE_EXIT();
 }/* hm_free_subscription_cb */
 
-/***************************************************************************/
-/* Name:	hm_alloc_notify_cb 									           */
-/* Parameters: Input - 										               */
-/*			   Input/Output -								               */
-/* Return:	HM_NOTIFICATION_CB *									       */
-/* Purpose: Allocates and initializes a notification CB			           */
-/***************************************************************************/
+
+/**
+ *  @brief Allocates and initializes a notification CB
+ *
+ *  @param None
+ *  @return CB of allocated Notification CB (#HM_NOTIFICATION_CB)
+ */
 HM_NOTIFICATION_CB * hm_alloc_notify_cb()
 {
 	/***************************************************************************/
@@ -766,13 +763,13 @@ EXIT_LABEL:
 	return notify_cb;
 }/* hm_alloc_notify_cb */
 
-/***************************************************************************/
-/* Name:	hm_free_notify_cb 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	void									*/
-/* Purpose: Frees resources allocated for notification			*/
-/***************************************************************************/
+
+/**
+ *  @brief Frees resources allocated for notification
+ *
+ *  @param notify_cb Notification CB (#HM_NOTIFICATION_CB)
+ *  @return void
+ */
 void hm_free_notify_cb(HM_NOTIFICATION_CB *notify_cb)
 {
 	/***************************************************************************/

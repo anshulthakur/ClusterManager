@@ -6,15 +6,26 @@
  *  Created on: 06-May-2015
  *      Author: anshul
  */
-
+/**
+ *  @file hmtprt.c
+ *  @brief Hardware Manager Transport Routines
+ *
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
+ */
 #include <hmincl.h>
-/***************************************************************************/
-/* Name:	hm_open_socket 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Opens a non-blocking socket			*/
-/***************************************************************************/
+
+
+/**
+ *  @brief Opens a Non-Blocking Socket
+ *
+ *  @param *res a @t< struct addrinfo @t type of address structure containing parameters of connection
+ *  @param **saptr @c SOCKADDR type structure to write the @sockaddr structure into
+ *  @param *lenp Length of @p saptr structure (to distinguish @sockaddr_in from @sockaddr_in6
+ *
+ *  @return Descriptor of socket if successful, -1 otherwise
+ */
 static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t *lenp)
 {
 	/***************************************************************************/
@@ -111,13 +122,13 @@ EXIT_LABEL:
 	return sock_fd;
 }/* hm_open_socket */
 
-/***************************************************************************/
-/* Name:	hm_tprt_accept_connection 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_SOCKET_CB *									*/
-/* Purpose: Accepts the connection into a SOCKET_CB and returns the CB			*/
-/***************************************************************************/
+
+/**
+ *  @brief Accepts the connection into a SOCKET_CB and returns the CB
+ *
+ *  @param sock_fd Socket Descriptor
+ *  @return Socket Control Block (#HM_SOCKET_CB) if successful, @c NULL otherwise
+ */
 HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
 {
 	/***************************************************************************/
@@ -196,22 +207,15 @@ EXIT_LABEL:
 	return (sock_cb);
 }/* hm_tprt_accept_connection */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_tprt_open_connection 		                                 */
-/*                                                                           */
-/* Purpose:   Creates a non-blocking socket and returns its descriptor.      */
-/*                                                                           */
-/* Returns:   int32_t sock_fd :	Socket File descriptor of socket created.    */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 		: target: IP Address/Domain Name of target           */
-/*			  IN		: service: Port										 */
-/*			  IN		: conn_type: Connection Type requested.				 */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+
+/**
+ *  @brief Creates a non-blocking socket and returns its descriptor.
+ *
+ *  @param conn_type Type of connection to be opened
+ *  @param *params Structure containing paramters of request for destination.
+ *
+ *  @return Socket CB (#HM_SOCKET_CB) of the connection opened, else @c NULL
+ */
 HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 {
 	/***************************************************************************/
@@ -641,22 +645,17 @@ EXIT_LABEL:
 } /* hm_tprt_open_connection */
 
 
-/**PROC+**********************************************************************/
-/* Name:     hm_tprt_send_on_socket	                                         */
-/*                                                                           */
-/* Purpose: Send Message on socket					                         */
-/*                                                                           */
-/* Returns:   int32_t success :	Boolean TRUE/FALSE			                     */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN : sock_fd - Descriptor on which to sent data                */
-/*            IN : msg_buffer - Buffer which must be sent.	                 */
-/*			  IN: length - Length of the data to be sent.					 */
-/*                                                                           */
-/* Operation: Retry until all is sent.					                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
-
+/**
+ *  @brief Send Message on Socket
+ *
+ *  @param *ip a @t< struct sockaddr @t type of structure to which data must be sent.
+ *  @param sock_fd	Socket Descriptor on which to send data
+ *  @param sock_type Type of socket to determine sending mechanism
+ *  @param *msg_buffer A byte buffer to be sent
+ *  @param length 	Length of data to be sent from @p msg_buffer
+ *
+ *  @return Total number of bytes sent
+ */
 int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 						uint32_t sock_type,BYTE *msg_buffer, uint32_t length )
 {
@@ -797,22 +796,19 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 	return (success);
 } /* hm_tprt_send_on_socket */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_tprt_recv_on_socket  	                                     */
-/*                                                                           */
-/* Purpose:   Receives data from socket				                         */
-/*                                                                           */
-/* Returns:   int32_t total_read_bytes : Number of bytes read from socket.   */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	: sock_fd - Socket on which data is to be received.      */
-/*			  IN	: msg_buffer - Buffer to place data into.		         */
-/*			  IN	: length - Length of data to be received.			     */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
 
+/**
+ *  @brief Receives data from socket
+ *
+ *  @param sock_fd Socket Descriptor on which to receive data
+ *  @param sock_type Type of socket to determine method of receiving
+ *  @param *msg_buffer Message Buffer into which data must be written
+ *  @param length	Length of buffer
+ *  @param **src_addr A @c SOCKADDR type of structure where incoming connection
+ *  		parameters will be written if connection is Datagram based.
+ *
+ *  @return Total bytes read from the socket
+ */
 int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 							BYTE * msg_buffer, uint32_t length, SOCKADDR **src_addr)
 {
@@ -982,13 +978,12 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 } /* hm_tprt_recv_on_socket */
 
 
-/***************************************************************************/
-/* Name:	hm_tprt_close_connection 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Closes connection on the given transport CB			*/
-/***************************************************************************/
+/**
+ *  @brief Closes connection on the given transport CB
+ *
+ *  @param *tprt_cb Transport Control Block whose connection is to be closed (#HM_TRANSPORT_CB)
+ *  @return #HM_OK if successful, else #HM_ERR
+ */
 int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -1060,13 +1055,13 @@ int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
 	return(ret_val);
 }/* hm_tprt_close_connection */
 
-/***************************************************************************/
-/* Name:	hm_close_sock_connection 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	void 									*/
-/* Purpose: Closes a socket connection and releases its resources			*/
-/***************************************************************************/
+
+/**
+ *  @brief Closes a socket connection and releases its resources
+ *
+ *  @param *sock_cb Socket Control Block which must be closed (#HM_SOCKET_CB)
+ *  @return @c void
+ */
 void  hm_close_sock_connection(HM_SOCKET_CB *sock_cb)
 {
 	/***************************************************************************/

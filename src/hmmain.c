@@ -4,17 +4,24 @@
  *  Created on: 07-May-2015
  *      Author: anshul
  */
-
+/**
+ *  @file hmmain.c
+ *  @brief Main entry point routines and loop methods of module
+ *
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None
+ */
 #define HM_MAIN_DEFINE_VARS
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	main 														   */
-/* Parameters: Input - 	Stdargs											   */
-/*			   Input/Output -											   */
-/* Return:	int															   */
-/* Purpose: Main routine												   */
-/***************************************************************************/
+/**
+ *  @brief Main routine
+ *
+ *  @param argc
+ *  @param **argv
+ *  @return #HM_OK on normal exit, #HM_ERR on error
+ */
 int32_t main(int32_t argc, char **argv)
 {
 	/***************************************************************************/
@@ -167,13 +174,12 @@ EXIT_LABEL:
 }/* main */
 
 
-/***************************************************************************/
-/* Name:	hm_init_local 									*/
-/* Parameters: Input - 	config_cb: Configuration structure read			   */
-/*																		   */
-/* Return:	int32_t														   */
-/* Purpose: Initializes local data strcuture which houses all Global Data  */
-/***************************************************************************/
+/**
+ *  @brief Initializes local data strcuture which houses all Global Data
+ *
+ *  @param *config_cb A well formed Configuration CB obtained after parsing
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 {
 	/***************************************************************************/
@@ -475,8 +481,16 @@ EXIT_LABEL:
 /*			   Input/Output -											   */
 /* Return:	int32_t														   */
 /* Purpose: Initializes Transport Layer									   */
-/* 1. Set SIGIGN for dead sockets										   */
+/* 											   */
 /***************************************************************************/
+/**
+ *  @brief Initializes Transport Layer
+ *
+ * 1. Set SIGIGN for dead sockets
+ *
+ *  @param None
+ *  @return #HM_OK on success, #HM_ERR otherwise.
+ */
 int32_t hm_init_transport()
 {
 	/***************************************************************************/
@@ -596,14 +610,14 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_init_transport */
 
-/***************************************************************************/
-/* Name:	hm_run_main_thread 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	void														   */
-/* Purpose: The main select loop of this program that monitors incoming    */
-/* requests and/or schedules the rest of things.						   */
-/***************************************************************************/
+
+/**
+ *  @brief The main select loop of this program that monitors incoming requests
+ *  and/or schedules the rest of things.
+ *
+ *  @param None
+ *  @return @c void
+ */
 void hm_run_main_thread()
 {
 	/***************************************************************************/
@@ -1247,13 +1261,13 @@ EXIT_LABEL:
 	return;
 }/* hm_run_main_thread */
 
-/***************************************************************************/
-/* Name:	hm_init_location_layer 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Initialize Hardware Location Layer			*/
-/***************************************************************************/
+
+/**
+ *  @brief Initializes the Hardware Location Layer
+ *
+ *  @param None
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_init_location_layer()
 {
 	/***************************************************************************/
@@ -1334,7 +1348,15 @@ int32_t hm_init_location_layer()
 /* Operation: 											                     */
 /*                                                                           */
 /**PROC-**********************************************************************/
-
+/**
+ *  @brief Invoked when Ctrl+C or any event that triggers SIGINT happens. Closes the system properly.
+ *
+ *  @param sig Signal received from Kernel
+ *  @param *info @siginfo_t structure passed along
+ *  @param *data Additional data associated
+ *
+ *  @return @c void
+ */
 void hm_interrupt_handler(int32_t sig, siginfo_t *info, void *data)
 {
 	TRACE_ENTRY();
@@ -1352,22 +1374,13 @@ void hm_interrupt_handler(int32_t sig, siginfo_t *info, void *data)
 	return;
 } /* hm_interrupt_handler */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_terminate  		                                             */
-/*                                                                           */
-/* Purpose:  Initializes the closure of the module.                          */
-/*                                                                           */
-/* Returns:   VOID  :											             */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 							                                 */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: Calls into each of the sub-modules terminate functions, if     */
-/*			any, and later, exits from the code.							 */
-/*                                                                           */
-/**PROC-**********************************************************************/
-
+/**
+ *  @brief Calls into each of the sub-modules terminate functions, if any,
+ *  and later, exits from the code.
+ *
+ *  @param None
+ *  @return @c void
+ */
 void hm_terminate()
 {
 	TRACE_ENTRY();

@@ -1,19 +1,21 @@
-/*
- * hmmsg.c
+/**
+ *  @file hmmsg.c
+ *  @brief Transport Layer Message Processing Methods
  *
- *  Created on: 09-Jun-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
 
 #include <hmincl.h>
-/***************************************************************************/
-/* Name:	hm_recv_register 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Receives a REGISTER message and routes it to Node or		   */
-/* Process Layer.														   */
-/***************************************************************************/
+
+/**
+ *  @brief Receives a REGISTER (#HM_REGISTER_MSG) message and routes it to Node or Process Layer
+ *
+ *  @param *msg #HM_MSG type buffer received from the transport layer
+ *  @param *tprt_cb #HM_TRANSPORT_CB type of Transport Control Block on which message was received
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -131,13 +133,13 @@ EXIT_LABEL:
 	return (ret_val);
 }/* hm_recv_register */
 
-/***************************************************************************/
-/* Name:	hm_recv_proc_update 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Receives update on Process Creation/Destruction			*/
-/***************************************************************************/
+
+/**
+ *  @brief Receives update on Process Creation/Destruction
+ *
+ *  @param *msg #HM_MSG type of message buffer on which #HM_PROCESS_UPDATE_MSG was received
+ *  @return #HM_OK on success, #HM_ERR on failure.
+ */
 int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -251,14 +253,16 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_recv_proc_update */
 
-/***************************************************************************/
-/* Name:	hm_route_incoming_message 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t													 	   */
-/* Purpose: Determines where to send the incoming message. It assumes that */
-/* a message header has been received in the in_buffer. 				   */
-/***************************************************************************/
+
+/**
+ *  @brief Determines where to send the incoming message.
+ *  It assumes that a message header has been received in the in_buffer.
+ *
+ *  @param *sock_cb Socket Control Block #HM_SOCKET_CB) on which incoming message
+ *  		notification is received
+ *
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 {
 	/***************************************************************************/
@@ -464,14 +468,16 @@ EXIT_LABEL:
 	return (ret_val);
 }/* hm_route_incoming_message */
 
-/***************************************************************************/
-/* Name:	hm_tprt_handle_improper_read 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Handles the event of unsuccessful read on socket. Evaluates the*/
-/* errno property in conjunction with bytes read to determine what to do.  */
-/***************************************************************************/
+
+/**
+ *  @brief Handles the event of unsuccessful read on socket.
+ *
+ *  Evaluates the errno property in conjunction with bytes read to determine what to do.
+ *
+ *  @param bytes_rcvd Number of bytes received on the transport.
+ *  @param *tprt_cb Transport Control Block (#HM_TRANSPORT_CB) on which error condition was raised.
+ *  @return #HM_OK on successful handling of error condition, #HM_ERR otherwise
+ */
 int32_t hm_tprt_handle_improper_read(int32_t bytes_rcvd, HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -506,13 +512,13 @@ int32_t hm_tprt_handle_improper_read(int32_t bytes_rcvd, HM_TRANSPORT_CB *tprt_c
 	return(ret_val);
 }/* hm_tprt_handle_improper_read */
 
-/***************************************************************************/
-/* Name:	hm_receive_msg_hdr 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Receives the message header into the buffer provided		   */
-/***************************************************************************/
+
+/**
+ *  @brief Receives the message header into the buffer provided
+ *
+ *  @param *buf Message Byte Buffer into which the incoming message header is to be written
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_receive_msg_hdr(char *buf)
 {
 	/***************************************************************************/
@@ -536,43 +542,13 @@ int32_t hm_receive_msg_hdr(char *buf)
 	return ret_val;
 }/* hm_receive_msg_hdr */
 
-/***************************************************************************/
-/* Name:	hm_receive_msg 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Receives the message in the given buffer					   */
-/***************************************************************************/
-int32_t hm_receive_msg(char *buf)
-{
-	/***************************************************************************/
-	/* Variable Declarations												   */
-	/***************************************************************************/
-	int32_t ret_val = HM_OK;
-	/***************************************************************************/
-	/* Sanity Checks														   */
-	/***************************************************************************/
-	TRACE_ENTRY();
-	TRACE_ASSERT(buf != NULL);
 
-	/***************************************************************************/
-	/* Main Routine															   */
-	/***************************************************************************/
-
-	/***************************************************************************/
-	/* Exit Level Checks													   */
-	/***************************************************************************/
-	TRACE_EXIT();
-	return ret_val;
-}/* hm_receive_msg */
-
-/***************************************************************************/
-/* Name:	hm_node_send_init_rsp 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Sends a response to incoming INIT request			*/
-/***************************************************************************/
+/**
+ *  @brief Sends a response to incoming INIT request
+ *
+ *  @param *node_cb #HM_NODE_CB structure for which #HM_NODE_INIT_MSG was received
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
 {
 	/***************************************************************************/
@@ -631,13 +607,14 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
 
 }/* hm_node_send_init_rsp */
 
-/***************************************************************************/
-/* Name:	hm_queue_on_transport 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Queue the message on the given transport			*/
-/***************************************************************************/
+
+/**
+ *  @brief Queue the message on the given transport for sending.
+ *
+ *  @param *msg Message to be sent (of type #HM_MSG)
+ *  @param *tprt_cb Transport CB (#HM_TRANSPORT_CB) to which message is to be sent
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_queue_on_transport(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/
@@ -689,13 +666,13 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_queue_on_transport */
 
-/***************************************************************************/
-/* Name:	hm_tprt_process_outgoing_queue 								   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Tries to send all pending messages on the outgoing queue	   */
-/***************************************************************************/
+
+/**
+ *  @brief Tries to send all pending messages on the outgoing queue
+ *
+ *  @param *tprt_cb Transport CB (#HM_TRANSPORT_CB) whose pending outgoing messages need to be processed.
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *tprt_cb)
 {
 	/***************************************************************************/

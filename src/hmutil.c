@@ -1,39 +1,32 @@
-/*
- * hmutil.c
+/**
+ *  @file hmutil.c
+ *  @brief HM Utility functions (AVL Tree functions)
  *
- * Purpose: Generic Utility Functions for use in Hardware Manager
- *
- *  Created on: 29-Apr-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 
 /***************************************************************************/
 /* AVL Tree Functions													   */
 /***************************************************************************/
 #include <hmincl.h>
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_insert_or_find                                        	 */
-/*                                                                           */
-/* Purpose:   Insert the supplied node into the specified AVL3 tree if key   */
-/*            does not already exist, otherwise returning the existing node  */
-/*                                                                           */
-/* Returns:   VOID *          - Pointer to existing entry if found.      */
-/*                                  NULL if no such entry (implies node      */
-/*                                  successfully inserted)                   */
-/*                                                                           */
-/* Params:    IN/OUT tree         - a pointer to the AVL3 tree               */
-/*            IN/OUT node         - a pointer to the node to insert          */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/* Operation: Scan down the tree looking for the insert point, going left if */
-/*            the insert key is less than the key in the tree and right if   */
-/*            it is greater.  When the insert point is found insert the new  */
-/*            node and rebalance the tree if necessary.  Return the existing */
-/*            entry instead, if found                                        */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Insert the supplied node into the specified AVL3 tree if key does not already exist,
+ *  		otherwise returning the existing node
+ *
+ *  Scan down the tree looking for the insert point, going left if the insert key
+ *  is less than the key in the tree and right if it is greater.
+ *  When the insert point is found insert the new node and rebalance the tree if necessary.
+ *  Return the existing entry instead, if found.
+ *
+ *  @param *tree a pointer to the AVL3 tree
+ *  @param *node a pointer to the node to insert
+ *  @param *tree_info a pointer to the AVL3 tree info
+ *
+ *  @return Pointer to the tree node if previous entry exists, @c NULL otherwise
+ */
 VOID *avl3_insert_or_find(HM_AVL3_TREE *tree,
                                   HM_AVL3_NODE *node,
                                   const HM_AVL3_TREE_INFO *tree_info)
@@ -190,17 +183,14 @@ EXIT_LABEL:
 
 } /* avl3_insert_or_find */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_delete                                                	 */
-/*                                                                           */
-/* Purpose:   Delete the specified node from the specified AVL3 tree         */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN/OUT tree         - a pointer to the AVL3 tree               */
-/*            IN/OUT node         - a pointer to the node to delete          */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Delete the specified node from the specified AVL3 tree
+ *
+ *  @param *tree A pointer to the AVL3 Tree
+ *  @param *node a pointer to the node to delete
+ *
+ *  @return @c void
+ */
 VOID avl3_delete(HM_AVL3_TREE *tree, HM_AVL3_NODE *node)
 {
   /***************************************************************************/
@@ -451,24 +441,20 @@ VOID avl3_delete(HM_AVL3_TREE *tree, HM_AVL3_NODE *node)
 
 } /* avl3_delete */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_find                                                      */
-/*                                                                           */
-/* Purpose:   Find the node in the AVL3 tree with the supplied key           */
-/*                                                                           */
-/* Returns:   A pointer to the node                                          */
-/*            NULL if no node is found with the specified key                */
-/*                                                                           */
-/* Params:    IN     tree         - a pointer to the AVL3 tree               */
-/*            IN     key          - a pointer to the key                     */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/* Operation: Search down the tree going left if the search key is less than */
-/*            the node in the tree and right if the search key is greater.   */
-/*            When we run out of tree to search through either we've found   */
-/*            it or the node is not in the tree.                             */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Find the node in the AVL3 tree with the supplied key
+ *
+ *  Search down the tree going left if the search key is less than
+ *  the node in the tree and right if the search key is greater.
+ *  When we run out of tree to search through either we've found
+ *  it or the node is not in the tree.
+ *
+ *  @param *tree A pointer to the AVL3 tree
+ *  @param *key A pointer to the key to compare and find
+ *  @param *tree_info A pointer to AVL3 tree info
+ *
+ *  @return A pointer to the node. NULL if no node is found with the specified key
+ */
 VOID *avl3_find(HM_AVL3_TREE *tree,
 				VOID *key,
 				const HM_AVL3_TREE_INFO *tree_info)
@@ -540,17 +526,14 @@ VOID *avl3_find(HM_AVL3_TREE *tree,
 
 } /* avl3_find */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_first                                                 	 */
-/*                                                                           */
-/* Purpose:   Find the first entry in the AVL3 tree.                         */
-/*                                                                           */
-/* Returns:   A pointer to the first entry.  NULL if the tree is empty.      */
-/*                                                                           */
-/* Params:    IN     tree         - a pointer to the AVL3 tree               */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Find the first entry in the AVL3 tree.
+ *
+ *  @param *tree a pointer to the AVL3 tree
+ *  @param *tree_info a pointer to the AVL3 tree info
+ *
+ *  @return A pointer to the first entry.  @c NULL if the tree is empty.
+ */
 VOID *avl3_first(HM_AVL3_TREE *tree,
 				 const HM_AVL3_TREE_INFO *tree_info)
 {
@@ -584,17 +567,14 @@ VOID *avl3_first(HM_AVL3_TREE *tree,
 
 } /* avl3_first */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_last                                                  */
-/*                                                                           */
-/* Purpose:   Find the last entry in the AVL3 tree.                          */
-/*                                                                           */
-/* Returns:   A pointer to the last entry.  NULL if the tree is empty.       */
-/*                                                                           */
-/* Params:    IN     tree         - a pointer to the AVL3 tree               */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Find the last entry in the AVL3 tree.
+ *
+ *  @param *tree A pointer to the AVL3 Tree
+ *  @param *tree_info a pointer to the AVL3 tree info
+ *
+ *  @return A pointer to the last entry.  NULL if the tree is empty.
+ */
 VOID *avl3_last(HM_AVL3_TREE *tree,
                         const HM_AVL3_TREE_INFO *tree_info)
 {
@@ -628,22 +608,18 @@ VOID *avl3_last(HM_AVL3_TREE *tree,
 
 } /* avl3_last */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_next                                                  */
-/*                                                                           */
-/* Purpose:   Find next node in the AVL3 tree                                */
-/*                                                                           */
-/* Returns:   A pointer to the next node in the tree                         */
-/*                                                                           */
-/* Params:    IN     node         - a pointer to the current node in the     */
-/*                                  tree                                     */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/* Operation: If the specified node has a right-son then return the left-    */
-/*            most son of this.  Otherwise search back up until we find a    */
-/*            node of which we are in the left sub-tree and return that.     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Find next node in the AVL3 tree
+ *
+ *  If the specified node has a right-son then return the left-most son of this.
+ *  Otherwise search back up until we find a node of which we are in the
+ *  left sub-tree and return that.
+ *
+ *  @param *node a pointer to the current node in the tree
+ *  @param *tree_info a pointer to the AVL3 tree info
+ *
+ *  @return A pointer to the next node in the tree
+ */
 VOID *avl3_next(HM_AVL3_NODE *node,
 					const HM_AVL3_TREE_INFO *tree_info)
 {
@@ -704,22 +680,19 @@ VOID *avl3_next(HM_AVL3_NODE *node,
 
 } /* avl3_next */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_prev                                                  	 */
-/*                                                                           */
-/* Purpose:   Find previous node in the AVL3 tree                            */
-/*                                                                           */
-/* Returns:   A pointer to the previous node in the tree                     */
-/*                                                                           */
-/* Params:    IN     node         - a pointer to the current node in the     */
-/*                                  tree                                     */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/* Operation: If we have a left-son then the previous node is the right-most */
-/*            son of this.  Otherwise, look for a node of whom we are in the */
-/*            left subtree and return that.                                  */
-/*                                                                           */
-/**PROC-**********************************************************************/
+
+/**
+ *  @brief Find previous node in the AVL3 tree
+ *
+ * If we have a left-son then the previous node is the right-most
+ * son of this.  Otherwise, look for a node of whom we are in the
+ * left subtree and return that.
+ *
+ *  @param *node a pointer to the current node in the tree
+ *  @param *tree_info a pointer to the AVL3 tree info
+ *
+ *  @return A pointer to the previous node in the tree
+ */
 VOID *avl3_prev(HM_AVL3_NODE *node,
                         const HM_AVL3_TREE_INFO *tree_info)
 {
@@ -779,19 +752,13 @@ VOID *avl3_prev(HM_AVL3_NODE *node,
 
 } /* avl3_prev */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_balance_tree                                          */
-/*                                                                           */
-/* Purpose:   Rebalance the tree starting at the supplied node and ending at */
-/*            the root of the tree                                           */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN/OUT tree              - a pointer to the AVL3 tree          */
-/*            IN/OUT node              - a pointer to the node to start      */
-/*                                       balancing from                      */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Rebalance the tree starting at the supplied node and ending at the root of the tree
+ *
+ *  @param *tree   a pointer to the AVL3 tree
+ *  @param *node   a pointer to the node to start balancing from
+ *  @return None
+ */
 VOID avl3_balance_tree(HM_AVL3_TREE *tree,
                                HM_AVL3_NODE *node)
 {
@@ -860,17 +827,12 @@ VOID avl3_balance_tree(HM_AVL3_TREE *tree,
 
 } /* avl3_balance_tree */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_rebalance              	                                 */
-/*                                                                           */
-/* Purpose:   Rebalance a subtree of the AVL3 tree (if necessary)            */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN/OUT subtree           - a pointer to the subtree to         */
-/*                                       rebalance                           */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Rebalance a subtree of the AVL3 tree (if necessary)
+ *
+ *  @param **subtree a pointer to the subtree to rebalance
+ *  @return Nothing
+ */
 VOID avl3_rebalance(HM_AVL3_NODE **subtree)
 {
   /***************************************************************************/
@@ -967,16 +929,13 @@ VOID avl3_rebalance(HM_AVL3_NODE **subtree)
 
 } /* avl3_rebalance */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_rotate_right                                          */
-/*                                                                           */
-/* Purpose:   Rotate a subtree of the AVL3 tree right                        */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN/OUT subtree           - a pointer to the subtree to rotate  */
-/*                                                                           */
-/**PROC-**********************************************************************/
+
+/**
+ *  @brief Rotate a subtree of the AVL3 tree right
+ *
+ *  @param **subtree a pointer to the subtree to rotate
+ *  @return None
+ */
 VOID avl3_rotate_right(HM_AVL3_NODE **subtree)
 {
   /***************************************************************************/
@@ -1014,16 +973,12 @@ VOID avl3_rotate_right(HM_AVL3_NODE **subtree)
 
 } /* avl3_rotate_right */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_rotate_left                                           	 */
-/*                                                                           */
-/* Purpose:   Rotate a subtree of the AVL3 tree left                         */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN/OUT subtree           - a pointer to the subtree to rotate  */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Rotate a subtree of the AVL3 tree left
+ *
+ *  @param **subtree a pointer to the subtree to rotate
+ *  @return None
+ */
 VOID avl3_rotate_left(HM_AVL3_NODE **subtree)
 {
   /***************************************************************************/
@@ -1063,18 +1018,16 @@ VOID avl3_rotate_left(HM_AVL3_NODE **subtree)
 
 } /* avl3_rotate_left */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_swap_right_most                                       */
-/*                                                                           */
-/* Purpose:   Swap node with right-most descendent of subtree                */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN     tree              - a pointer to the tree               */
-/*            IN     subtree           - a pointer to the subtree            */
-/*            IN     node              - a pointer to the node to swap       */
-/*                                                                           */
-/**PROC-**********************************************************************/
+
+/**
+ *  @brief Swap node with right-most descendent of subtree
+ *
+ *  @param *tree a pointer to the tree
+ *  @param *subtree	a pointer to the subtree
+ *  @param *node a pointer to the node to swap
+ *
+ *  @return None
+ */
 VOID avl3_swap_right_most(HM_AVL3_TREE *tree,
                                   HM_AVL3_NODE *subtree,
                                   HM_AVL3_NODE *node)
@@ -1178,18 +1131,15 @@ VOID avl3_swap_right_most(HM_AVL3_TREE *tree,
 
 } /* avl3_swap_right_most */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_swap_left_most                                        */
-/*                                                                           */
-/* Purpose:   Swap node with left-most descendent of subtree                 */
-/*                                                                           */
-/* Returns:   Nothing                                                        */
-/*                                                                           */
-/* Params:    IN     tree              - a pointer to the tree               */
-/*            IN     subtree           - a pointer to the subtree            */
-/*            IN     node              - a pointer to the node to swap       */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Swap node with left-most descendent of subtree
+ *
+ *  @param *tree A pointer to the tree
+ *  @param *subtree a pointer to the subtree
+ *  @param *node a pointer to the node to swap
+ *
+ *  @return None
+ */
 VOID avl3_swap_left_most(HM_AVL3_TREE *tree,
                                  HM_AVL3_NODE *subtree,
                                  HM_AVL3_NODE *node)
@@ -1293,22 +1243,18 @@ VOID avl3_swap_left_most(HM_AVL3_TREE *tree,
 
 } /* avl3_swap_left_most */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_find_or_find_next                                     */
-/*                                                                           */
-/* Purpose:   Find the successor node to the supplied key in the AVL3 tree   */
-/*                                                                           */
-/* Returns:   A pointer to the node                                          */
-/*            NULL if no successor node to the supplied key is found         */
-/*                                                                           */
-/* Params:    IN     tree         - a pointer to the AVL3 tree               */
-/*            IN     key          - a pointer to the key                     */
-/*            IN     not_equal    - TRUE return a node strictly > key FALSE  */
-/*                                  return a node >= key                     */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/**PROC-**********************************************************************/
 
+/**
+ *  @brief Find the successor node to the supplied key in the AVL3 tree
+ *
+ *  @param *tree  a pointer to the AVL3 tree
+ *  @param *key a pointer to the key
+ *  @param not_equal TRUE return a node strictly > key
+ *  				 FALSE return a node >= key
+ *  @param *tree_info  a pointer to the AVL3 tree info
+ *
+ *  @return A pointer to the node. @c NULL if no successor node to the supplied key is found
+ */
 VOID *avl3_find_or_find_next(HM_AVL3_TREE *tree,
                                      VOID *key,
                                      uint32_t not_equal,
@@ -1419,18 +1365,13 @@ VOID *avl3_find_or_find_next(HM_AVL3_TREE *tree,
 
 } /* avl3_find_or_find_next */
 
-/**PROC+**********************************************************************/
-/* Name:      avl3_verify_tree                                           */
-/*                                                                           */
-/* Purpose:   To verify that an AVL3 tree is correctly sorted.               */
-/*                                                                           */
-/* Returns:   Nothing.                                                       */
-/*                                                                           */
-/* Params:    IN     tree         - a pointer to the AVL3 tree               */
-/*            IN     tree_info    - a pointer to the AVL3 tree info          */
-/*                                                                           */
-/**PROC-**********************************************************************/
-
+/**
+ *  @brief To verify that an AVL3 tree is correctly sorted.
+ *
+ *  @param *tree a pointer to the AVL3 tree
+ *  @param *tree_info  a pointer to the AVL3 tree info
+ *  @return None
+ */
 VOID avl3_verify_tree(HM_AVL3_TREE *tree,
                               const HM_AVL3_TREE_INFO *tree_info)
 {
@@ -1553,13 +1494,14 @@ VOID avl3_verify_tree(HM_AVL3_TREE *tree,
 
 } /* avl3_verify_tree */
 
-/***************************************************************************/
-/* Name:	hm_avl3_gen_init 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	HM_AVL3_GEN_NODE											   */
-/* Purpose: Allocates and sets up a generic AVL3_NODE					   */
-/***************************************************************************/
+/**
+ *  @brief Allocates and sets up a generic AVL3_NODE
+ *
+ *  @param *key Pointer to the key
+ *  @param *parent Parent container of this node
+ *
+ *  @return a #HM_AVL3_GEN_NODE if successful, @c NULL otherwise
+ */
 HM_AVL3_GEN_NODE * hm_avl3_gen_init(void *key, void *parent)
 {
 	/***************************************************************************/

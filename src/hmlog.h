@@ -1,10 +1,11 @@
-/*
- * hmlog.h
+/**
+ *  @file hmlog.h
+ *  @brief Logging Macros for the Module
  *
- *  Created on: 06-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMLOG_H_
 #define SRC_HMLOG_H_
 

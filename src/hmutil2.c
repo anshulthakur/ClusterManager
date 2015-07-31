@@ -1,23 +1,23 @@
-/*
- * hmutil2.c
+/**
+ *  @file hmutil2.c
+ *  @brief Hardware Manager Utility functions for Timers, Byte Conversions and Key Comparisons
  *
- *  Created on: 06-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 31-Jul-2015
+ *  @bug None
  */
-
 
 #include <hmincl.h>
 
 /***************************************************************************/
 /* Byte Ordering related functions										   */
 /***************************************************************************/
-/***************************************************************************/
-/* Name:	hm_hton64 													   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int64_t														   */
-/* Purpose: Converts from network byte order to host for 64 bit numbers	   */
-/***************************************************************************/
+/**
+ *  @brief Converts into network byte order from host for 64 bit numbers
+ *
+ *  @param num A 64 bit number to be converted to network order
+ *  @return Network order converted representatin of the given number
+ */
 int64_t hm_hton64(int64_t num)
 {
 	/***************************************************************************/
@@ -59,13 +59,13 @@ int64_t hm_hton64(int64_t num)
 
 }/* hm_hton64 */
 
-/***************************************************************************/
-/* Name:	hm_hton64 													   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int64_t														   */
-/* Purpose: Converts from network byte order to host for 64 bit numbers	   */
-/***************************************************************************/
+
+/**
+ *  @brief Converts from network byte order to host for 64 bit numbers
+ *
+ *  @param num Network Order representation of 64 bit number
+ *  @return Host Order representation for the given 64bit number
+ */
 int64_t hm_ntoh64(int64_t num)
 {
 	/***************************************************************************/
@@ -110,13 +110,15 @@ int64_t hm_ntoh64(int64_t num)
 /* Timer Related Functions												   */
 /***************************************************************************/
 
-/***************************************************************************/
-/* Name:	hm_timer_set_timer 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Sets the given time in ms on timer			*/
-/***************************************************************************/
+/**
+ *  @brief Sets the given time in ms on timer
+ *
+ *  @param timerID ID of timer as returned by Kernel
+ *  @param period	Time for which timer must be set
+ *  @param repeat Whether the timer is repeating or one time
+ *
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 static int32_t hm_timer_set_timer(timer_t timerID, int32_t period, int32_t repeat)
 {
 	int32_t rc = HM_OK;
@@ -175,25 +177,20 @@ EXIT_LABEL:
 	return (rc);
 }/* hm_timer_set_timer */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_base_timer_handler  		                                 */
-/*                                                                           */
-/* Purpose:  Function invoked when any timer of this module expires.         */
-/*                                                                           */
-/* Returns:   VOID  :									                     */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	: sig - Signal			                                 */
-/*			  IN	: si  - Signal Info containing the parameters of timer	 */
-/*			  IN	: uc  - Not used (additional data)						 */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: Finds the appropriate timer in the list of timers with the     */
-/*			 transport layer. If the Timer is of Connection Type, then the   */
-/*			 connection must be closed down on this timer's expiry.			 */
-/*			 If it is of Keepalive type, Call into the FSM with Keepalive as */
-/*           input signal                                                    */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Function invoked when any timer of this module expires.
+ *
+ * Finds the appropriate timer in the list of timers with the transport layer.
+ * If the Timer is of Connection Type, then the connection must be closed down
+ * on this timer's expiry. If it is of Keepalive type, Call into the FSM with
+ * Keepalive as input signal.
+ *
+ *  @param sig Signal received from kernel
+ *  @param *si a @t< siginfo_t @t type of signal structure returned by kernel
+ *  @param *uc Pointer to control block (not used here)
+ *
+ *  @return @c void
+ */
 VOID hm_base_timer_handler(int32_t sig, siginfo_t *si, void *uc )
 {
 	/***************************************************************************/
@@ -241,20 +238,16 @@ EXIT_LABEL:
 	TRACE_EXIT();
 }/* hm_base_timer_handler */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_timer_create		                                         */
-/*                                                                           */
-/* Purpose:   Creates a timer with the given parameters.                     */
-/*                                                                           */
-/* Returns:    int rc :											             */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	: name - Name of CB.	                                 */
-/*			  IN	: timerID - Unique ID of the structure					 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Creates a timer with the given parameters.
+ *
+ *  @param period Time in @c ms for which the timer must  be created initially.
+ *  @param repeat Whether the timer is one shot timer, or repeating.
+ *  @param *func  Callback function to be invoked on this timer popping
+ *  @param *parent Pointer to the parent structure of the timer control block.
+ *
+ *  @return a #HM_TIMER_CB control block representing the timer in the system
+ */
 HM_TIMER_CB * hm_timer_create(uint32_t period,
 								uint32_t repeat,
 								HM_TIMER_CALLBACK *func,
@@ -345,22 +338,13 @@ EXIT_LABEL:
 	return (timer_cb);
 } /* hm_timer_create */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_timer_start                                         		 */
-/*                                                                           */
-/* Purpose:   Arms the timer.						                         */
-/*                                                                           */
-/* Returns:   BOOL rc :									                     */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	:timer_ID – Reference to the timer that must be set.     */
-/*			  IN	: expireMS - Timer expires in (milliseconds)			 */
-/*            IN	: intervalMS - Repeats after (milliseconds)              */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+
+/**
+ *  @brief Arms the timer
+ *
+ *  @param *timer_cb Timer Control Block (#HM_TIMER_CB) of the timer in HM
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_timer_start(HM_TIMER_CB *timer_cb)
 {
 
@@ -380,22 +364,17 @@ int32_t hm_timer_start(HM_TIMER_CB *timer_cb)
 } /* hm_timer_start */
 
 
-/**PROC+**********************************************************************/
-/* Name:     hm_timer_modify                                         		 */
-/*                                                                           */
-/* Purpose:   Arms the timer with new value if running.                      */
-/*                                                                           */
-/* Returns:   BOOL rc :									                     */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	:timer_ID – Reference to the timer that must be set.     */
-/*			  IN	: expireMS - Timer expires in (milliseconds)			 */
-/*            IN	: intervalMS - Repeats after (milliseconds)              */
-/*            IN/OUT										                 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Arms the timer with new value if running.
+ *
+ *  @note Do not use this method to stop the timer by setting new time to 0.
+ *  Use #hm_timer_stop instead.
+ *
+ *  @param *timer_cb Timer Control Block (#HM_TIMER_CB) of the timer in HM
+ *  @param period New timer period.
+ *
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_timer_modify(HM_TIMER_CB *timer_cb, uint32_t period)
 {
 
@@ -418,13 +397,13 @@ int32_t hm_timer_modify(HM_TIMER_CB *timer_cb, uint32_t period)
 	return ret_val;
 } /* hm_timer_modify */
 
-/***************************************************************************/
-/* Name:	hm_timer_stop 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Stops the timer if it is running. Silently exits otherwise	   */
-/***************************************************************************/
+
+/**
+ *  @brief Stops the timer if it is running. Silently exits otherwise
+ *
+ *  @param *timer_cb Timer Control Block in HM
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_timer_stop(HM_TIMER_CB *timer_cb)
 {
 	/***************************************************************************/
@@ -456,19 +435,12 @@ int32_t hm_timer_stop(HM_TIMER_CB *timer_cb)
 	return ret_val;
 }/* hm_timer_stop */
 
-/**PROC+**********************************************************************/
-/* Name:     hm_timer_delete  	   	                                         */
-/*                                                                           */
-/* Purpose:   Deletes the timer.					                         */
-/*                                                                           */
-/* Returns:  VOID 										                     */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	:timer_ID – Reference to the timer that must be set.     */
-/*                                                                           */
-/* Operation: Deletes the timer and remove it from the timer list            */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief Deletes the timer
+ *
+ *  @param *timer_cb Reference to the timer CB (#HM_TIMER_CB) that must be deleted
+ *  @return @c void
+ */
 VOID hm_timer_delete(HM_TIMER_CB *timer_cb)
 {
 
@@ -494,13 +466,13 @@ VOID hm_timer_delete(HM_TIMER_CB *timer_cb)
 /***************************************************************************/
 /* Stack functions														   */
 /***************************************************************************/
-/***************************************************************************/
-/* Name:	hm_stack_init 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	HM_STACK *													   */
-/* Purpose: Initializes a stack with given size							   */
-/***************************************************************************/
+
+/**
+ *  @brief Initializes a stack with given size
+ *
+ *  @param size Size of stack
+ *  @return pointer to the stack (#HM_STACK)
+ */
 HM_STACK * hm_stack_init(int32_t size)
 {
 	/***************************************************************************/
@@ -556,13 +528,13 @@ EXIT_LABEL:
 	return stack;
 }/* hm_stack_init */
 
-/***************************************************************************/
-/* Name:	hm_stack_destroy 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	void														   */
-/* Purpose: Deallocate memory for the stack								   */
-/***************************************************************************/
+
+/**
+ *  @brief Deallocate memory for the stack
+ *
+ *  @param *stack Pointer to stack (#HM_STACK)
+ *  @return @c void
+ */
 void hm_stack_destroy(HM_STACK *stack)
 {
 	/***************************************************************************/
@@ -586,13 +558,15 @@ void hm_stack_destroy(HM_STACK *stack)
 	return;
 }/* hm_stack_destroy */
 
-/***************************************************************************/
-/* Name:	hm_stack_push 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Push the element to the stack								   */
-/***************************************************************************/
+
+/**
+ *  @brief Push the element to the stack
+ *
+ *  @param *stack_ptr Pointer to the stack (#HM_STACK)
+ *  @param *value Value (Pointer) to be pushed
+ *
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_stack_push(HM_STACK *stack_ptr, void *value)
 {
 	/***************************************************************************/
@@ -622,13 +596,13 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_stack_push */
 
-/***************************************************************************/
-/* Name:	hm_stack_pop 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	void *														   */
-/* Purpose: Pops an element from the stack								   */
-/***************************************************************************/
+
+/**
+ *  @brief Pops an element from the stack
+ *
+ *  @param *stack Pointer to the stack (#HM_STACK)
+ *  @return Pointer to the element (type is @c void)
+ */
 void * hm_stack_pop(HM_STACK *stack)
 {
 	/***************************************************************************/
@@ -661,14 +635,15 @@ EXIT_LABEL:
 	return element;
 }/* hm_stack_pop */
 
-/***************************************************************************/
-/* Name:	hm_compare_ulong 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Compares two ulong integers and gives -1,0, +1 on first being  */
-/*	smaller, equal or greater than second.								   */
-/***************************************************************************/
+
+/**
+ *  @brief Compares two ulong integers and gives -1,0, +1 on first being smaller, equal or greater than second.
+ *
+ *  @param *key1 Key provided for comparison
+ *  @param *key2 Second key to compare against
+ *
+ *  @return -1/0/1 on @p key1 being smaller/equal/greater than @p key2
+ */
 int32_t hm_compare_ulong(void *key1, void *key2)
 {
 	/***************************************************************************/
@@ -705,14 +680,14 @@ int32_t hm_compare_ulong(void *key1, void *key2)
 	return (ret_val);
 }/* hm_compare_ulong */
 
-/***************************************************************************/
-/* Name:	hm_compare_2_ulong 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Compares two ulong composite key and gives -1,0, +1 on first   */
-/*	being smaller, equal or greater than second.						   */
-/***************************************************************************/
+/**
+ *  @brief Compares two ulong composite key and gives -1,0, +1 on first being smaller, equal or greater than second.
+ *
+ *  @param *key1 Key provided for comparison
+ *  @param *key2 Second key to compare against
+ *
+ *  @return -1/0/1 on @p key1 being smaller/equal/greater than @p key2
+ */
 int32_t hm_compare_2_ulong(void *key1, void *key2)
 {
 	/***************************************************************************/
@@ -756,17 +731,18 @@ int32_t hm_compare_2_ulong(void *key1, void *key2)
 	return (ret_val);
 }/* hm_compare_ulong */
 
-
-/***************************************************************************/
-/* Name:	hm_aggregate_compare_node_id 								   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t													       */
-/* Purpose: Compares the composite key for node: ID and Node ID			   */
-/* Node IDs are unique currently, so it wouldn't have mattered if we had   */
-/* compared them directly with their Node IDs. But this may not hold in the*/
-/* future and we might need more info. Hence this function.			       */
-/***************************************************************************/
+/**
+ *  @brief Compares the composite key for node
+ *
+ *  Node IDs are unique currently, so it wouldn't have mattered if we had
+ *  compared them directly with their Node IDs. But this may not hold in the
+ *  future and we might need more info. Hence this function.
+ *
+ *  @param *key1 Key provided for comparison
+ *  @param *key2 Second key to compare against
+ *
+ *  @return -1/0/1 on @p key1 being smaller/equal/greater than @p key2
+ */
 int32_t hm_aggregate_compare_node_id(void *key1, void *key2)
 {
 	/***************************************************************************/
@@ -797,13 +773,15 @@ int32_t hm_aggregate_compare_node_id(void *key1, void *key2)
 	return ret_val;
 }/* hm_aggregate_compare_node_id */
 
-/***************************************************************************/
-/* Name:	hm_aggregate_compare_pid 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Compares the PID of two Process CBs			*/
-/***************************************************************************/
+/**
+ *  @brief Compares the PID of two Process CBs
+ *
+ *
+ *  @param *key1 Key provided for comparison
+ *  @param *key2 Second key to compare against
+ *
+ *  @return -1/0/1 on @p key1 being smaller/equal/greater than @p key2
+ */
 int32_t hm_aggregate_compare_pid(void *key1, void *key2)
 {
 	/***************************************************************************/
@@ -834,13 +812,16 @@ int32_t hm_aggregate_compare_pid(void *key1, void *key2)
 	return ret_val;
 }/* hm_aggregate_compare_pid */
 
-/***************************************************************************/
-/* Name:	hm_aggregate_compare_if_id 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Compares interface types								   	   */
-/***************************************************************************/
+
+/**
+ *  @brief Compares interface types
+ *
+ *
+ *  @param *key1 Key provided for comparison
+ *  @param *key2 Second key to compare against
+ *
+ *  @return -1/0/1 on @p key1 being smaller/equal/greater than @p key2
+ */
 int32_t hm_aggregate_compare_if_id(void *key1, void *key2)
 {
 	/***************************************************************************/
@@ -872,13 +853,14 @@ int32_t hm_aggregate_compare_if_id(void *key1, void *key2)
 }/* hm_aggregate_compare_if_id */
 
 
-/***************************************************************************/
-/* Name:	hm_get_buffer 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	HM_MSG *													   */
-/* Purpose: Allocates and initializes a buffer to be used for IPS Comm.	   */
-/***************************************************************************/
+/**
+ *  @brief Allocates and initializes a buffer to be used for IPS Comm.
+ *
+ *
+ *  @param size Size of buffer required
+ *
+ *  @return pointer to allocated message buffer (#HM_MSG type)
+ */
 HM_MSG * hm_get_buffer(uint32_t size)
 {
 	/***************************************************************************/
@@ -918,13 +900,18 @@ EXIT_LABEL:
 	return msg;
 }/* hm_get_buffer */
 
-/***************************************************************************/
-/* Name:	hm_grow_buffer 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_MSG *									*/
-/* Purpose: Increases the capacity of the buffer to new value			*/
-/***************************************************************************/
+
+/**
+ *  @brief Increases the capacity of the buffer to new value
+ *
+ *  @note The returned buffer may not be the same pointer as old one.
+ *  @note The @p size value must be greater than old size.
+ *
+ *  @param *buf Buffer whose capacity needs expansion
+ *  @param size New size of buffer
+ *
+ *  @return the grown buffer (#HM_MSG)
+ */
 HM_MSG * hm_grow_buffer(HM_MSG *buf, uint32_t size)
 {
 	/***************************************************************************/
@@ -974,13 +961,17 @@ EXIT_LABEL:
 }/* hm_grow_buffer */
 
 
-/***************************************************************************/
-/* Name:	hm_shrink_buffer 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	HM_MSG *									*/
-/* Purpose: Increases the capacity of the buffer to new value			*/
-/***************************************************************************/
+/**
+ *  @brief Decreases the capacity of the buffer to new value
+ *
+ *  @note The returned buffer may not be the same pointer as old one.
+ *  @note The @p size value must be less than old size.
+ *
+ *  @param *buf Buffer whose capacity needs expansion
+ *  @param size New size of buffer
+ *
+ *  @return the grown buffer (#HM_MSG)
+ */
 HM_MSG * hm_shrink_buffer(HM_MSG *buf, uint32_t size)
 {
 	/***************************************************************************/
@@ -1029,13 +1020,15 @@ EXIT_LABEL:
 	return msg;
 }/* hm_shrink_buffer */
 
-/***************************************************************************/
-/* Name:	hm_free_buffer 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Frees the buffer or decrements its reference count if in use   */
-/***************************************************************************/
+
+/**
+ *  @brief Frees the buffer or decrements its reference count if in use
+ *
+ *
+ *  @param *buf Buffer which must be freed (#HM_MSG)
+ *
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_free_buffer(HM_MSG *msg)
 {
 	/***************************************************************************/

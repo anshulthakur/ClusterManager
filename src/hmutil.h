@@ -1,10 +1,11 @@
-/*
- * hmutil.h
+/**
+ *  @file hmutil.h
+ *  @brief Hardware Manager Utility Defines and Prototypes
  *
- *  Created on: 06-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 31-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMUTIL_H_
 #define SRC_HMUTIL_H_
 

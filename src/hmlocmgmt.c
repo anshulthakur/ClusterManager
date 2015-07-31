@@ -1,14 +1,12 @@
-/*
- * hmlocmgmt.c
+/**
+ *  @file hmlocmgmt.c
+ *  @brief Location Management Layer Routines
  *
- *	Purpose: Location Management Layer
- *
- *  Created on: 07-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None
  */
-
 #include <hmincl.h>
-
 
 
 /********************************************************************************/
@@ -117,21 +115,66 @@ HM_TPRT_FSM_ENTRY hm_peer_fsm_table[HM_PEER_FSM_NUM_SIGNALS][HM_PEER_FSM_NUM_STA
 	}
 };
 
-/**PROC+**********************************************************************/
-/* Name:     hm_peer_fsm			  		                                 */
-/*                                                                           */
-/* Purpose:   FSM Routines for a local node on this HM.					   	 */
-/*                                                                           */
-/* Returns:   VOID  :											             */
-/*           				                                                 */
-/*                                                                           */
-/* Params:    IN 	: input_signal - The Signal that was input to this FSM.  */
-/*            IN	: node_cb - Pointer to the Node CB to which this   		 */
-/*					 FSM belongs to.										 */
-/*                                                                           */
-/* Operation: 											                     */
-/*                                                                           */
-/**PROC-**********************************************************************/
+/**
+ *  @brief FSM Routines for a local node on this HM.
+ *
+ *
+ * FSM Description:
+ *
+ *FSM States:
+ *-----------------------------------------------------------------------------
+ *| S.No.	|	State Name				|		Remark						   |
+ *-----------------------------------------------------------------------------
+ *|	0	|	HM_PEER_FSM_STATE_NULL	|	No connection exists.			   	|
+ *|	1	|	HM_PEER_FSM_STATE_INIT  |	A connect request has been sent to  |
+ *|		|							|	the Peer.			   				|
+ *|		|							|	Waiting for Connect to complete		|
+ *|	2	|	HM_PEER_FSM_STATE_ACTIVE|	Received INIT request/response.		|
+ *|		|							|	This is (should be) the first  		|
+ *|		|							|	message that is received. 			|
+ *|		|							|	The Node is now an active member	|
+ *|	3	|	HM_PEER_FSM_STATE_FAILED|	Peer is down. 					 	|
+ *------------------------------------------------------------------------------
+ *State Table:
+ *-----------------------------------------------
+ *|State		|NULL[0]|INIT[1]|ACTV[2]|FAIL[3]|
+ *|Input		|		|		|		|		|
+ *|					Next State via Path			|
+ * ----------------------------------------------
+ *|CONNECT		| 1	  A	|--- ERR|--- ERR|--- ERR|
+ *|INIT_RCVD	| 2   B | 2	  B |--- ERR| 2   B |
+ *|LOOP			|--- ERR|---  C |---  C |---  C |
+ *|CLOSE		|--- ERR| 3   D | 3   D |--- ERR|
+ *|CLOSED 		|--- ERR|--- ERR|--- ERR| 0  ---|
+ *|POP			|--- ERR|--- ERR|---  E |--- ERR|
+ *-----------------------------------------------
+ *
+ *Path Descriptions:
+ *
+ *A.	Peer Discovered on Multicast:
+ *	Connect request has been sent and we were waiting for it to complete.
+ * No update from Global DB will be made right now.
+ * If connect fails, the peer does not exist.
+ *B.	Received INIT :
+ *	INIT Message was received on transport, or Connect was successful.
+ * The Peer is now considered active and we may commence transactions with it.
+ *C.	Loop:
+ *	The state has changed and we need to react to that by sending out possible
+ * updates. So, we are looping in to call the update method on updated states.
+ * THIS MUST BE CALLED INTERNALLY ONLY.
+ *D.	Peer Disconnected:
+ *	The connection was either terminated by the other party or a request for
+ *	disconnection was made by a local sub-module or keepalive threshold was
+ *  breached.
+ *  Send out updates if necessary.
+ *E. Timer Pop:
+ * Send Keepalive if threshold has not been breached.
+ *
+ *  @param input_signal Signal into the FSM
+ *  @param *loc_cb Location CB whose FSM is running.
+ *
+ *  @return #HM_OK if successful, #HM_ERR otherwise
+ */
 int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 {
 	uint32_t next_input = input_signal;
@@ -301,13 +344,13 @@ int32_t hm_peer_fsm(uint32_t input_signal, HM_LOCATION_CB * loc_cb)
 } /* hm_peer_fsm */
 
 
-/***************************************************************************/
-/* Name:	hm_location_add 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Adds a location to trees			*/
-/***************************************************************************/
+/**
+ *  @brief Adds a location to trees
+ *
+ *  @param *loc_cb Location Control Block (#HM_LOCATION_CB) which needs to be added
+ *  	in local Locations tree
+ *  @return #HM_OK if successful, #HM_ERR otherwise
+ */
 int32_t hm_location_add(HM_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -337,13 +380,13 @@ int32_t hm_location_add(HM_LOCATION_CB *loc_cb)
 	return ret_val;
 }/* hm_location_add */
 
-/***************************************************************************/
-/* Name:	hm_location_update 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Update the Hardware Location CB			*/
-/***************************************************************************/
+
+/**
+ *  @brief Update the Hardware Location CB
+ *
+ *  @param *loc_cb Location CB (#HM_LOCATION_CB) of the location which was updated.
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_location_update(HM_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -404,13 +447,12 @@ int32_t hm_location_update(HM_LOCATION_CB *loc_cb)
 }/* hm_location_update */
 
 
-/***************************************************************************/
-/* Name:	hm_remove_location 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Removes the Location from the System			*/
-/***************************************************************************/
+/**
+ *  @brief Removes the Location from the System
+ *
+ *  @param *loc_cb Location CB (#HM_LOCATION_CB) that needs to be removed from the local system
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_remove_location(HM_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -435,13 +477,12 @@ int32_t hm_remove_location(HM_LOCATION_CB *loc_cb)
 }/* hm_remove_location */
 
 
-/***************************************************************************/
-/* Name:	hm_peer_keepalive_callback 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	void									*/
-/* Purpose: Keepalive callback for Keepalive timer pop			*/
-/***************************************************************************/
+/**
+ *  @brief Keepalive callback on Keepalive Timer Pop
+ *
+ *  @param *cb Control Block returned by the timer function
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_peer_keepalive_callback(void *cb)
 {
 	/***************************************************************************/

@@ -1,22 +1,22 @@
-/*
- * hmnotify.c
+/**
+ *  @file hmnotify.c
+ *  @brief Hardware Manager Notification Generating Routines
  *
- *  Created on: 08-Jun-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 30-Jul-2015
+ *  @bug None
  */
-
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	hm_service_notify_queue 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Services the notifications queued in the Notifications Queue   */
-/* NOTE:																   */
-/* This routine may be driven by a conditionally timed semaphore such that */
-/* every time a notification is added, a consumer thread is invoked.	   */
-/***************************************************************************/
+/**
+ *  @brief Services the notifications queued in the Notifications Queue
+ *
+ *  @note This routine may be driven by a conditionally timed semaphore such that
+ *  every time a notification is added, a consumer thread is invoked.
+ *
+ *  @param None
+ *  @return #HM_OK on success, #HM_ERR on failure.
+ */
 int32_t hm_service_notify_queue()
 {
 	/***************************************************************************/
@@ -346,16 +346,18 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_service_notify_queue */
 
-/***************************************************************************/
-/* Name:	hm_build_notify_message 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	HM_MSG *													   */
-/* Purpose: Builds a notification Message that must be sent to various 	   */
-/* subscribers of the subscription point. The message stays the same so    */
-/* we will store it in the opaque section of the notification CB until it  */
-/* has been transmitted to all the subscribers.							   */
-/***************************************************************************/
+
+/**
+ *  @brief Builds a notification Message
+ *
+ *  Builds a notification Message that must be sent to various subscribers
+ *  of the subscription point. The message stays the same so we will store it
+ *  in the opaque section of the notification CB until it has been transmitted
+ *  to all the subscribers.
+ *
+ *  @param *notify_cb Notification CB (#HM_NOTIFICATION_CB) for which message should be created
+ *  @return Pointer to a fully formed #HM_MSG message containing information on this notification.
+ */
 HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
 {
 	/***************************************************************************/

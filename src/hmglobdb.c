@@ -1,19 +1,20 @@
-/*
- * hmglobdb.c
+/**
+ *  @file hmglobdb.c
+ *  @brief Hardware Manager Global Database Operational routines
  *
- *  Created on: 29-May-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None
  */
-
 #include <hmincl.h>
 
-/***************************************************************************/
-/* Name:	hm_global_location_add 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Adds a Location to global trees for subscription processing	   */
-/***************************************************************************/
+/**
+ *  @brief Adds a Location to global trees for subscription processing
+ *
+ *  @param *loc_cb Location CB (#HM_LOCATION_CB) of the location to be added to Global DB
+ *  @param status Status of the Location (ACTIVE/INACTIVE)
+ *  @return #HM_OK on success, #HM_ERR otherwise.
+ */
 int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
 {
 	/***************************************************************************/
@@ -192,15 +193,18 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_global_location_add */
 
-/***************************************************************************/
-/* Name:	hm_global_location_update 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Looks into the Location structure of the Location for updates  */
-/*			and perform updates.										   */
-/* All spectacular things happen here.									   */
-/***************************************************************************/
+
+/**
+ *  @brief Looks into the Location structure of the Location for updates and perform updates.
+ *
+ *  @note The Status must have been updated in the passed #HM_LOCATION_CB structure
+ * before calling into this method.
+ *
+ *  @param *loc_cb Location CB of which status has been updated.
+ *
+ *
+ *  @return #HM_OK if successful, #HM_ERR otherwise.
+ */
 int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -280,13 +284,12 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
 	return ret_val;
 }/* hm_global_location_update */
 
-/***************************************************************************/
-/* Name:	hm_global_location_remove 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Removes the Location CB from global DB			*/
-/***************************************************************************/
+/**
+ *  @brief Removes the Location CB from global DB
+ *
+ *  @param *loc_cb Removes the global location CB (#HM_GLOBAL_LOCATION_CB) from DB
+ *  @return #HM_OK if sucsessful, else #HM_ERR
+ */
 int32_t hm_global_location_remove(HM_GLOBAL_LOCATION_CB *loc_cb)
 {
 	/***************************************************************************/
@@ -309,14 +312,13 @@ int32_t hm_global_location_remove(HM_GLOBAL_LOCATION_CB *loc_cb)
 	return ret_val;
 }/* hm_global_location_remove */
 
-/***************************************************************************/
-/* Name:	hm_global_node_add 											   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Adds the node to global aggregate trees and handles the 	   */
-/*	subscriptions processing.											   */
-/***************************************************************************/
+
+/**
+ *  @brief Adds the node to global aggregate trees and handles the subscriptions processing.
+ *
+ *  @param *node_cb Node CB pointer (#HM_NODE_CB) that needs to be added into global DB
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_global_node_add(HM_NODE_CB *node_cb)
 {
 	/***************************************************************************/
@@ -471,14 +473,15 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_global_node_add */
 
-/***************************************************************************/
-/* Name:	hm_global_node_update 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Updates the node control block and notifies the rest.		   */
-/* All spectacular things happen here.									   */
-/***************************************************************************/
+
+/**
+ *  @brief Updates the node control block and notifies the rest.
+ *
+ *  @note The State transition must have taken place already, we do not compare
+ *  old state with new state in this routine.
+ *  @param *node_cb Node CB whose state was updated.
+ *  @return return_value
+ */
 int32_t hm_global_node_update(HM_NODE_CB *node_cb)
 {
 	/***************************************************************************/
@@ -608,14 +611,13 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_global_node_update */
 
-/***************************************************************************/
-/* Name:	hm_global_node_remove 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Removes the node from global tables and carries out subscript- */
-/* -ion routines.														   */
-/***************************************************************************/
+
+/**
+ *  @brief Removes the node from global tables and carries out subscription routines
+ *
+ *  @param *node_cb #HM_NODE_CB control block of Node that must be removed from the system
+ *  @return #HM_OK if successfull, #HM_ERR otherwise
+ */
 int32_t hm_global_node_remove(HM_NODE_CB *node_cb)
 {
 	/***************************************************************************/
@@ -638,13 +640,12 @@ int32_t hm_global_node_remove(HM_NODE_CB *node_cb)
 }/* hm_global_node_remove */
 
 
-/***************************************************************************/
-/* Name:	hm_global_process_add 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Adds a Process to Global Tables			*/
-/***************************************************************************/
+/**
+ *  @brief Adds a Process to Global Tables
+ *
+ *  @param *proc_cb #HM_PROCESS_CB type structure that needs to be added to global DB
+ *  @return #HM_OK if successful, #HM_ERR otherwise.
+ */
 int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
 {
 	/***************************************************************************/
@@ -811,13 +812,13 @@ EXIT_LABEL:
 	return(ret_val);
 }/* hm_global_process_add */
 
-/***************************************************************************/
-/* Name:	hm_global_process_update 									   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Updates the status and does notification triggers of processes */
-/***************************************************************************/
+
+/**
+ *  @brief Updates the status and does notification triggers of processes
+ *
+ *  @param *proc_cb Process CB (#HM_PROCESS_CB) whose state has been updated.
+ *  @return #HM_OK if successful, #HM_ERR otherwise.
+ */
 int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb)
 {
 	/***************************************************************************/
@@ -957,13 +958,13 @@ EXIT_LABEL:
 	return (ret_val);
 }/* hm_global_process_update */
 
-/***************************************************************************/
-/* Name:	hm_global_process_remove 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Removes the node from global DBs			*/
-/***************************************************************************/
+
+/**
+ *  @brief Removes the node from global DBs
+ *
+ *  @param *proc_cb Process CB (#HM_PROCESS_CB) which needs to be removed from Global DB
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_global_process_remove(HM_PROCESS_CB *proc_cb)
 {
 	/***************************************************************************/
@@ -985,13 +986,13 @@ int32_t hm_global_process_remove(HM_PROCESS_CB *proc_cb)
 	return ret_val;
 }/* hm_global_process_remove */
 
-/***************************************************************************/
-/* Name:	hm_create_subscription_entry 								   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Makes an entry in subscription tree if no previous entry exists*/
-/***************************************************************************/
+
+/**
+ *  @brief Makes an entry in subscription tree if no previous entry exists
+ *
+ *  @param subs_type Subscription Type: Whether on Node/Process/Location/Process Group etc.
+ *  @return #HM_SUBSCRIPTION_CB pointer if successful @c NULL otherwise
+ */
 HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t value, void *row)
 {
 	/***************************************************************************/
@@ -1067,27 +1068,7 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
 #endif
 			tree_node->row_cb.void_cb = sub_cb->row_cb.void_cb;
 			tree_node->row_id = sub_cb->row_id;
-			//TODO
-#if 0
-			/***************************************************************************/
-			/* Move this subscription node into the active subscriptions tree.		   */
-			/* And also notify subscribers.											   */
-			/***************************************************************************/
-			HM_AVL3_DELETE(LOCAL.pending_subscriptions_tree, tree_node->node);
-			if(HM_AVL3_INSERT(LOCAL.active_subscriptions_tree, tree_node->node, subs_tree_by_db_id)!= TRUE)
-			{
-				TRACE_ERROR(("Error activating subscription."));
-				goto EXIT_LABEL;
-			}
 
-			/***************************************************************************/
-			/* Mark the subscription as active.										   */
-			/***************************************************************************/
-			tree_node->live = TRUE;
-
-			//TODO: Notify subscribers
-			TRACE_DETAIL(("Notifying Subscribers"));
-#endif
 			/***************************************************************************/
 			/* Found the node, no need to look any further							   */
 			/***************************************************************************/
@@ -1116,13 +1097,14 @@ EXIT_LABEL:
 	return sub_cb;
 }/* hm_create_subscription_entry */
 
-/***************************************************************************/
-/* Name:	hm_update_subscribers 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Updates the subscribers for a particular subscription point	   */
-/***************************************************************************/
+
+/**
+ *  @brief Updates the subscribers for a particular subscription point
+ *
+ *  @param *subs_cb Subscription Control Block #HM_SUBSCRIPTION_CB
+ *  		for which subscribers need to be updated
+ *  @return #HM_OK on success, #HM_ERR otherwise.
+ */
 int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *subs_cb)
 {
 	/***************************************************************************/
@@ -1146,17 +1128,17 @@ int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *subs_cb)
 	return ret_val;
 }/* hm_update_subscribers */
 
-/***************************************************************************/
-/* Name:	hm_subscribe 												   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Adds a subscription											   */
-/* Registers for a particular subscription type.						   */
-/* First traverse the active and pending subscription trees to see if we   */
-/* already have that kind of subscription point ready. If not, we make one */
-/* in the pending tree.													   */
-/***************************************************************************/
+
+/**
+ *  @brief Adds a subscription
+ *
+ *  First traverse the active and pending subscription trees to see if we
+ *  already have that kind of subscription point ready. If not, we make one
+ *  in the pending tree.
+ *
+ *  @param subs_type Subscription type
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
 int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
 {
 	/***************************************************************************/
@@ -1478,14 +1460,14 @@ EXIT_LABEL:
 	return ret_val;
 }/* hm_subscribe */
 
-/***************************************************************************/
-/* Name:	hm_subscription_insert 										   */
-/* Parameters: Input - 													   */
-/*			   Input/Output -											   */
-/* Return:	int32_t														   */
-/* Purpose: Inserts the subscription CB into the list, and triggers 	   */
-/* Notifications if appropriate.										   */
-/***************************************************************************/
+
+/**
+ *  @brief Inserts the subscription CB into the list, and triggers Notifications if appropriate.
+ *
+ *  @param *subs_cb Subscription CB (#HM_SUBSCRIPTION_CB) on which updation of subscription is to be done
+ *  @param *node Subscriber Node
+ *  @return #HM_OK if successful, #HM_ERR otherwise
+ */
 int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
 {
 	/***************************************************************************/
@@ -1602,13 +1584,14 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
 }/* hm_subscription_insert */
 
 
-/***************************************************************************/
-/* Name:	hm_compare_proc_tree_keys 									*/
-/* Parameters: Input - 										*/
-/*			   Input/Output -								*/
-/* Return:	int32_t									*/
-/* Purpose: Compare function for Global Process Tree Exact insertion			*/
-/***************************************************************************/
+/**
+ *  @brief Compare function for Global Process Tree Exact insertion
+ *
+ *  @param *key1 First Key (of the node under question)
+ *  @param *key2 Second Key (Usually from the table being traversed)
+ *
+ *  @return -1,0 or 1 depending on whether @p key1 is smaller/equal/greater than @p key2
+ */
 int32_t hm_compare_proc_tree_keys(void *key1, void *key2)
 {
 	/***************************************************************************/

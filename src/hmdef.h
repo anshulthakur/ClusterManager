@@ -1,12 +1,11 @@
-/*
- * hmdef.h
+/**
+ *  @file hmdef.h
+ *  @brief Hardware Manager Macros and Defines
  *
- *	Hardware Manager Macros and Defines
- *
- *  Created on: 29-Apr-2015
- *      Author: anshul
+ *  @author Anshul
+ *  @date 29-Jul-2015
+ *  @bug None
  */
-
 #ifndef SRC_HMDEF_H_
 #define SRC_HMDEF_H_
 
