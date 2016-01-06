@@ -8,13 +8,13 @@
  */
 
 /***************************************************************************/
-/* AVL Tree Functions													   */
+/* AVL Tree Functions                             */
 /***************************************************************************/
 #include <hmincl.h>
 
 /**
  *  @brief Insert the supplied node into the specified AVL3 tree if key does not already exist,
- *  		otherwise returning the existing node
+ *      otherwise returning the existing node
  *
  *  Scan down the tree looking for the insert point, going left if the insert key
  *  is less than the key in the tree and right if it is greater.
@@ -77,10 +77,10 @@ VOID *avl3_insert_or_find(HM_AVL3_TREE *tree,
                                              tree_info->node_offset +
                                              tree_info->key_offset),
 
-								(VOID *)((BYTE *)parent_node -
+                (VOID *)((BYTE *)parent_node -
                                              tree_info->node_offset +
                                              tree_info->key_offset)
-								);
+                );
 
     if (result > 0)
     {
@@ -242,7 +242,7 @@ VOID avl3_delete(HM_AVL3_TREE *tree, HM_AVL3_NODE *node)
     {
       /***********************************************************************/
       /* node was first in tree, so replace it                               */
-      /* Left-most element (lightest)										 */
+      /* Left-most element (lightest)                     */
       /***********************************************************************/
       TRACE_INFO(("replace first node in tree" ));
       tree->first = node->parent;
@@ -252,7 +252,7 @@ VOID avl3_delete(HM_AVL3_TREE *tree, HM_AVL3_NODE *node)
     {
       /***********************************************************************/
       /* node was last in tree, so replace it                                */
-      /* Right-most element (heaviest)										 */
+      /* Right-most element (heaviest)                     */
       /***********************************************************************/
       TRACE_INFO(("replace last node in tree" ));
       tree->last = node->parent;
@@ -456,8 +456,8 @@ VOID avl3_delete(HM_AVL3_TREE *tree, HM_AVL3_NODE *node)
  *  @return A pointer to the node. NULL if no node is found with the specified key
  */
 VOID *avl3_find(HM_AVL3_TREE *tree,
-				VOID *key,
-				const HM_AVL3_TREE_INFO *tree_info)
+        VOID *key,
+        const HM_AVL3_TREE_INFO *tree_info)
 {
   /***************************************************************************/
   /* find node with specified key                                            */
@@ -476,7 +476,7 @@ VOID *avl3_find(HM_AVL3_TREE *tree,
 #ifdef I_WANT_TO_DEBUG
   if(node== NULL)
   {
-	  TRACE_DETAIL(("Tree is empty!"));
+    TRACE_DETAIL(("Tree is empty!"));
   }
 #endif
   while (node != NULL)
@@ -489,7 +489,7 @@ VOID *avl3_find(HM_AVL3_TREE *tree,
                                 (VOID *)((BYTE *)node -
                                              tree_info->node_offset +
                                              tree_info->key_offset)
-								 );
+                 );
 
     if (result > 0)
     {
@@ -535,7 +535,7 @@ VOID *avl3_find(HM_AVL3_TREE *tree,
  *  @return A pointer to the first entry.  @c NULL if the tree is empty.
  */
 VOID *avl3_first(HM_AVL3_TREE *tree,
-				 const HM_AVL3_TREE_INFO *tree_info)
+         const HM_AVL3_TREE_INFO *tree_info)
 {
   /***************************************************************************/
   /* find first node in tree                                                 */
@@ -621,7 +621,7 @@ VOID *avl3_last(HM_AVL3_TREE *tree,
  *  @return A pointer to the next node in the tree
  */
 VOID *avl3_next(HM_AVL3_NODE *node,
-					const HM_AVL3_TREE_INFO *tree_info)
+          const HM_AVL3_TREE_INFO *tree_info)
 {
   /***************************************************************************/
   /* find next node in tree                                                  */
@@ -1023,7 +1023,7 @@ VOID avl3_rotate_left(HM_AVL3_NODE **subtree)
  *  @brief Swap node with right-most descendent of subtree
  *
  *  @param *tree a pointer to the tree
- *  @param *subtree	a pointer to the subtree
+ *  @param *subtree  a pointer to the subtree
  *  @param *node a pointer to the node to swap
  *
  *  @return None
@@ -1250,7 +1250,7 @@ VOID avl3_swap_left_most(HM_AVL3_TREE *tree,
  *  @param *tree  a pointer to the AVL3 tree
  *  @param *key a pointer to the key
  *  @param not_equal TRUE return a node strictly > key
- *  				 FALSE return a node >= key
+ *           FALSE return a node >= key
  *  @param *tree_info  a pointer to the AVL3 tree info
  *
  *  @return A pointer to the node. @c NULL if no successor node to the supplied key is found
@@ -1504,37 +1504,37 @@ VOID avl3_verify_tree(HM_AVL3_TREE *tree,
  */
 HM_AVL3_GEN_NODE * hm_avl3_gen_init(void *key, void *parent)
 {
-	/***************************************************************************/
-	/* Variable Declarations												   */
-	/***************************************************************************/
-	HM_AVL3_GEN_NODE *node = NULL;
-	/***************************************************************************/
-	/* Sanity Checks														   */
-	/***************************************************************************/
-	TRACE_ENTRY();
+  /***************************************************************************/
+  /* Variable Declarations                           */
+  /***************************************************************************/
+  HM_AVL3_GEN_NODE *node = NULL;
+  /***************************************************************************/
+  /* Sanity Checks                               */
+  /***************************************************************************/
+  TRACE_ENTRY();
 
-	TRACE_ASSERT(key != NULL);
-	TRACE_ASSERT(parent != NULL);
-	/***************************************************************************/
-	/* Main Routine															   */
-	/***************************************************************************/
-	node = (HM_AVL3_GEN_NODE *)malloc(sizeof(HM_AVL3_GEN_NODE));
-	if(node == NULL)
-	{
-		TRACE_ERROR(("Error allocating memory for node."));
-		goto EXIT_LABEL;
-	}
-	/***************************************************************************/
-	/* Have memory, fill values												   */
-	/***************************************************************************/
-	HM_AVL3_INIT_NODE(node->tree_node, node);
-	node->key = key;
-	node->parent = parent;
+  TRACE_ASSERT(key != NULL);
+  TRACE_ASSERT(parent != NULL);
+  /***************************************************************************/
+  /* Main Routine                                 */
+  /***************************************************************************/
+  node = (HM_AVL3_GEN_NODE *)malloc(sizeof(HM_AVL3_GEN_NODE));
+  if(node == NULL)
+  {
+    TRACE_ERROR(("Error allocating memory for node."));
+    goto EXIT_LABEL;
+  }
+  /***************************************************************************/
+  /* Have memory, fill values                           */
+  /***************************************************************************/
+  HM_AVL3_INIT_NODE(node->tree_node, node);
+  node->key = key;
+  node->parent = parent;
 
 EXIT_LABEL:
-	/***************************************************************************/
-	/* Exit Level Checks													   */
-	/***************************************************************************/
-	TRACE_EXIT();
-	return node;
+  /***************************************************************************/
+  /* Exit Level Checks                             */
+  /***************************************************************************/
+  TRACE_EXIT();
+  return node;
 }/* hm_avl3_gen_init */

@@ -36,7 +36,7 @@ HM_SUBSCRIPTION_CB * hm_alloc_subscription_cb();
 void hm_free_subscription_cb(HM_SUBSCRIPTION_CB *);
 HM_NOTIFICATION_CB * hm_alloc_notify_cb();
 void hm_free_notify_cb(HM_NOTIFICATION_CB *);
-//HM_TRANSPORT_CB * hm_init_transport_cb(	uint32_t );
+//HM_TRANSPORT_CB * hm_init_transport_cb(  uint32_t );
 
 /* hmlocmgmt.c */
 int32_t hm_peer_fsm(uint32_t , HM_LOCATION_CB *);
@@ -82,6 +82,12 @@ int32_t hm_subscribe(uint32_t, uint32_t , void *);
 int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *, HM_LIST_BLOCK *);
 int32_t hm_compare_proc_tree_keys(void *, void *);
 
+
+/* hmha.c */
+int32_t hm_recv_ha_update(HM_MSG *, HM_TRANSPORT_CB *);
+int32_t hm_cluster_send_ha_update(HM_NODE_CB *, HM_NODE_CB *, HM_NODE_CB *);
+int32_t hm_cluster_recv_ha_update(HM_PEER_MSG_HA_UPDATE *, HM_LOCATION_CB *);
+
 /* hmnotify.c */
 int32_t hm_service_notify_queue();
 HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *);
@@ -101,9 +107,9 @@ int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *);
 HM_SOCKET_CB * hm_tprt_accept_connection(int32_t);
 HM_SOCKET_CB * hm_tprt_open_connection(uint32_t, void *);
 int32_t hm_tprt_send_on_socket(struct sockaddr* ,int32_t ,
-						uint32_t, uint8_t *, uint32_t );
+            uint32_t, uint8_t *, uint32_t );
 int32_t hm_tprt_recv_on_socket(uint32_t , uint32_t ,
-							uint8_t * , uint32_t, struct sockaddr ** );
+              uint8_t * , uint32_t, struct sockaddr ** );
 int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *);
 void  hm_close_sock_connection(HM_SOCKET_CB *);
 
@@ -113,8 +119,8 @@ void avl3_rebalance(HM_AVL3_NODE **);
 void avl3_rotate_right(HM_AVL3_NODE **);
 void avl3_rotate_left(HM_AVL3_NODE **);
 void avl3_swap_right_most(HM_AVL3_TREE *,
-						  HM_AVL3_NODE *,
-						  HM_AVL3_NODE *);
+              HM_AVL3_NODE *,
+              HM_AVL3_NODE *);
 void avl3_swap_left_most(HM_AVL3_TREE *,
                                  HM_AVL3_NODE *,
                                  HM_AVL3_NODE *);

@@ -41,212 +41,212 @@ static unsigned int random_num(unsigned int min, unsigned int max)
 }
 
 /***************************************************************************/
-/* MAIN FUNCTION														   */
+/* MAIN FUNCTION                               */
 /***************************************************************************/
 int32_t main(int32_t argc, char **argv)
 {
-	int32_t ret_val = HM_OK;
-	SOCKADDR_IN addr;
+  int32_t ret_val = HM_OK;
+  SOCKADDR_IN addr;
 
-	int32_t cmd_opt;
-	/* Randomly select a group for subscription */
-	int32_t subs_group = random_num(0, 4);
-	int32_t node[2] = {random_num(1,4), random_num(1,4)};
+  int32_t cmd_opt;
+  /* Randomly select a group for subscription */
+  int32_t subs_group = random_num(0, 4);
+  int32_t node[2] = {random_num(1,4), random_num(1,4)};
 
-	int32_t pct_type = 0x75010001;
-	int32_t pid = 0x00000034;
+  int32_t pct_type = 0x75010001;
+  int32_t pid = 0x00000034;
 
-	extern char *optarg;
+  extern char *optarg;
 
-	while((cmd_opt = getopt(argc, argv, "l:")) != -1)
-	{
-		switch(cmd_opt)
-		{
-		case 'l':
-			TRACE_INFO(("Location Index: %s", optarg));
-			location_index = atoi(optarg);
-			break;
-		default:
-			printf("\nUsage: %s -l <location_number>", argv[0]);
-			break;
-		}
-	}
+  while((cmd_opt = getopt(argc, argv, "l:")) != -1)
+  {
+    switch(cmd_opt)
+    {
+    case 'l':
+      TRACE_INFO(("Location Index: %s", optarg));
+      location_index = atoi(optarg);
+      break;
+    default:
+      printf("\nUsage: %s -l <location_number>", argv[0]);
+      break;
+    }
+  }
 
-	if(location_index == 0)
-	{
-		TRACE_ERROR(("Did not find Location Index"));
-		goto EXIT_LABEL;
-	}
+  if(location_index == 0)
+  {
+    TRACE_ERROR(("Did not find Location Index"));
+    goto EXIT_LABEL;
+  }
 
-	pid = pid | (location_index << 24);
-	TRACE_INFO(("PID Assigned: 0x%x", pid));
+  pid = pid | (location_index << 24);
+  TRACE_INFO(("PID Assigned: 0x%x", pid));
 
-	/***************************************************************************/
-	/* Setup address														   */
-	/***************************************************************************/
-	memset(&addr, 0, sizeof(SOCKADDR));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(4999);
-	inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr.s_addr);
+  /***************************************************************************/
+  /* Setup address                               */
+  /***************************************************************************/
+  memset(&addr, 0, sizeof(SOCKADDR));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(4999);
+  inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr.s_addr);
 
-	/***************************************************************************/
-	/* Open Socket															   */
-	/***************************************************************************/
-	sock_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if(sock_fd < 0)
-	{
-		TRACE_PERROR(("Error opening socket"));
-		goto EXIT_LABEL;
-	}
+  /***************************************************************************/
+  /* Open Socket                                 */
+  /***************************************************************************/
+  sock_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if(sock_fd < 0)
+  {
+    TRACE_PERROR(("Error opening socket"));
+    goto EXIT_LABEL;
+  }
 
-	/***************************************************************************/
-	/* Send connect request													   */
-	/***************************************************************************/
-	ret_val = connect(sock_fd, (SOCKADDR *)&addr, (socklen_t)sizeof(SOCKADDR));
-	if(ret_val < 0)
-	{
-		TRACE_PERROR(("Error connecting to HM."));
-		goto EXIT_LABEL;
-	}
+  /***************************************************************************/
+  /* Send connect request                             */
+  /***************************************************************************/
+  ret_val = connect(sock_fd, (SOCKADDR *)&addr, (socklen_t)sizeof(SOCKADDR));
+  if(ret_val < 0)
+  {
+    TRACE_PERROR(("Error connecting to HM."));
+    goto EXIT_LABEL;
+  }
 
-	/***************************************************************************/
-	/* Connected! Go ahead, send an init									   */
-	/***************************************************************************/
-	init_msg.hdr.msg_id = 1;
-	init_msg.hdr.msg_len = sizeof(init_msg);
-	init_msg.hdr.msg_type = HM_MSG_TYPE_INIT;
-	init_msg.hdr.request = TRUE;
-	init_msg.hdr.response_ok = FALSE;
+  /***************************************************************************/
+  /* Connected! Go ahead, send an init                     */
+  /***************************************************************************/
+  init_msg.hdr.msg_id = 1;
+  init_msg.hdr.msg_len = sizeof(init_msg);
+  init_msg.hdr.msg_type = HM_MSG_TYPE_INIT;
+  init_msg.hdr.request = TRUE;
+  init_msg.hdr.response_ok = FALSE;
 
-	init_msg.hardware_num = 0;
-	init_msg.index = location_index;
-	init_msg.keepalive_period = 1000; /* ms */
-	init_msg.location_status = TRUE;
-	init_msg.service_group_index = location_index;
+  init_msg.hardware_num = 0;
+  init_msg.index = location_index;
+  init_msg.keepalive_period = 1000; /* ms */
+  init_msg.location_status = TRUE;
+  init_msg.service_group_index = location_index;
 
-	TRACE_INFO(("Sending INIT message!"));
-	ret_val = send(sock_fd, (char *)&init_msg, sizeof(init_msg), 0);
-	if(ret_val != sizeof(init_msg))
-	{
-		TRACE_PERROR(("Error sending complete message on socket!"));
-		goto EXIT_LABEL;
-	}
-	TRACE_INFO(("INIT Message sent."));
+  TRACE_INFO(("Sending INIT message!"));
+  ret_val = send(sock_fd, (char *)&init_msg, sizeof(init_msg), 0);
+  if(ret_val != sizeof(init_msg))
+  {
+    TRACE_PERROR(("Error sending complete message on socket!"));
+    goto EXIT_LABEL;
+  }
+  TRACE_INFO(("INIT Message sent."));
 
-	ret_val = recv(sock_fd, (char *)&init_msg, sizeof(init_msg), 0);
-	if(ret_val != sizeof(init_msg))
-	{
-		TRACE_WARN(("Partial Message Received!"));
-		goto EXIT_LABEL;
-	}
-	TRACE_INFO(("Message response received"));
-	if(init_msg.hdr.response_ok == TRUE)
-	{
-		TRACE_INFO(("Hardware Index is %d", init_msg.hardware_num));
-	}
+  ret_val = recv(sock_fd, (char *)&init_msg, sizeof(init_msg), 0);
+  if(ret_val != sizeof(init_msg))
+  {
+    TRACE_WARN(("Partial Message Received!"));
+    goto EXIT_LABEL;
+  }
+  TRACE_INFO(("Message response received"));
+  if(init_msg.hdr.response_ok == TRUE)
+  {
+    TRACE_INFO(("Hardware Index is %d", init_msg.hardware_num));
+  }
 
-	//TRACE_INFO(("Send Keepalive"));
-	//TODO: LATER
+  //TRACE_INFO(("Send Keepalive"));
+  //TODO: LATER
 
-	//Send Process UP Notification
-	proc_msg.hdr.msg_id = 1;
-	proc_msg.hdr.msg_len = sizeof(proc_msg);
-	proc_msg.hdr.msg_type = HM_MSG_TYPE_PROCESS_CREATE;
-	proc_msg.hdr.request = TRUE;
-	proc_msg.hdr.response_ok = FALSE;
+  //Send Process UP Notification
+  proc_msg.hdr.msg_id = 1;
+  proc_msg.hdr.msg_len = sizeof(proc_msg);
+  proc_msg.hdr.msg_type = HM_MSG_TYPE_PROCESS_CREATE;
+  proc_msg.hdr.request = TRUE;
+  proc_msg.hdr.response_ok = FALSE;
 
-	proc_msg.if_offset = 0;
-	snprintf(proc_msg.name, sizeof(proc_msg.name), "TEST");
-	proc_msg.pid = pid;
-	proc_msg.proc_type = pct_type;
+  proc_msg.if_offset = 0;
+  snprintf(proc_msg.name, sizeof(proc_msg.name), "TEST");
+  proc_msg.pid = pid;
+  proc_msg.proc_type = pct_type;
 
-	TRACE_INFO(("Sending PROCESS_CREATED message!"));
-	ret_val = send(sock_fd, (char *)&proc_msg, sizeof(proc_msg), 0);
-	if(ret_val != sizeof(proc_msg))
-	{
-		TRACE_PERROR(("Error sending complete message on socket!"));
-	}
-	TRACE_INFO(("PROCESS_CREATED Message sent."));
+  TRACE_INFO(("Sending PROCESS_CREATED message!"));
+  ret_val = send(sock_fd, (char *)&proc_msg, sizeof(proc_msg), 0);
+  if(ret_val != sizeof(proc_msg))
+  {
+    TRACE_PERROR(("Error sending complete message on socket!"));
+  }
+  TRACE_INFO(("PROCESS_CREATED Message sent."));
 
-	ret_val = recv(sock_fd, (char *)&proc_msg, sizeof(proc_msg), 0);
-	if(ret_val != sizeof(proc_msg))
-	{
-		TRACE_WARN(("Partial Message Received!"));
-	}
-	TRACE_INFO(("Message response received"));
+  ret_val = recv(sock_fd, (char *)&proc_msg, sizeof(proc_msg), 0);
+  if(ret_val != sizeof(proc_msg))
+  {
+    TRACE_WARN(("Partial Message Received!"));
+  }
+  TRACE_INFO(("Message response received"));
 
-	if(proc_msg.hdr.response_ok == TRUE)
-	{
-		TRACE_INFO(("Process Create Notification OK"));
-	}
+  if(proc_msg.hdr.response_ok == TRUE)
+  {
+    TRACE_INFO(("Process Create Notification OK"));
+  }
 
-	//Send REGISTER for Group
-//	TRACE_INFO(("Sending Register for Group %d", subs_group));
-	reg_msg = (HM_REGISTER_MSG *)malloc(sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB));
-	reg_msg->hdr.msg_id = 1;
-	reg_msg->hdr.msg_len = sizeof(HM_REGISTER_MSG) + 2* sizeof(HM_REGISTER_TLV_CB);
-	reg_msg->hdr.msg_type = HM_MSG_TYPE_REGISTER;
-	reg_msg->hdr.request = TRUE;
-	reg_msg->hdr.response_ok = FALSE;
+  //Send REGISTER for Group
+//  TRACE_INFO(("Sending Register for Group %d", subs_group));
+  reg_msg = (HM_REGISTER_MSG *)malloc(sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB));
+  reg_msg->hdr.msg_id = 1;
+  reg_msg->hdr.msg_len = sizeof(HM_REGISTER_MSG) + 2* sizeof(HM_REGISTER_TLV_CB);
+  reg_msg->hdr.msg_type = HM_MSG_TYPE_REGISTER;
+  reg_msg->hdr.request = TRUE;
+  reg_msg->hdr.response_ok = FALSE;
 
-	reg_msg->num_register = 2;
-	reg_msg->subscriber_pid = pid;
-	reg_msg->type = HM_REG_SUBS_TYPE_PROC;
+  reg_msg->num_register = 2;
+  reg_msg->subscriber_pid = pid;
+  reg_msg->type = HM_REG_SUBS_TYPE_PROC;
 
-	tlv = (HM_REGISTER_TLV_CB *)((char *)reg_msg + sizeof(HM_REGISTER_MSG));
-	tlv->id = pct_type;
+  tlv = (HM_REGISTER_TLV_CB *)((char *)reg_msg + sizeof(HM_REGISTER_MSG));
+  tlv->id = pct_type;
 
-	TRACE_INFO(("Sending PROCESS_REGISTER message!"));
-	ret_val = send(sock_fd, (char *)reg_msg, reg_msg->hdr.msg_len, 0);
-	if(ret_val != reg_msg->hdr.msg_len)
-	{
-		TRACE_PERROR(("Error sending complete message on socket!"));
-	}
-
-
-	TRACE_INFO(("Sent Register"));
-
-	//Receive REGISTER Response
-	memset((void *)reg_msg, 0, sizeof(reg_msg->hdr.msg_len));
-
-	ret_val = recv(sock_fd, (char *)reg_msg,
-					(sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB)), 0);
-	if(ret_val != (sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB)))
-	{
-		TRACE_WARN(("Partial Message Received!"));
-	}
-	TRACE_INFO(("Register response received"));
-
-	if(reg_msg->hdr.response_ok == TRUE)
-	{
-		TRACE_INFO(("Register OK"));
-	}
-
-	//Send Unregister
-
-	//Receive Unregister Response
-
-	//Send REGISTER for Nodes
-//	TRACE_INFO(("Sending Register for Nodes %d, %d", node[0], node[1]));
-
-	//Receive REGISTER Response
-
-	//Send Unregister
-
-	//Receive Unregister Response
+  TRACE_INFO(("Sending PROCESS_REGISTER message!"));
+  ret_val = send(sock_fd, (char *)reg_msg, reg_msg->hdr.msg_len, 0);
+  if(ret_val != reg_msg->hdr.msg_len)
+  {
+    TRACE_PERROR(("Error sending complete message on socket!"));
+  }
 
 
+  TRACE_INFO(("Sent Register"));
 
-	while(1)
-	{
-		continue;
-	}
+  //Receive REGISTER Response
+  memset((void *)reg_msg, 0, sizeof(reg_msg->hdr.msg_len));
+
+  ret_val = recv(sock_fd, (char *)reg_msg,
+          (sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB)), 0);
+  if(ret_val != (sizeof(HM_REGISTER_MSG) + 1* sizeof(HM_REGISTER_TLV_CB)))
+  {
+    TRACE_WARN(("Partial Message Received!"));
+  }
+  TRACE_INFO(("Register response received"));
+
+  if(reg_msg->hdr.response_ok == TRUE)
+  {
+    TRACE_INFO(("Register OK"));
+  }
+
+  //Send Unregister
+
+  //Receive Unregister Response
+
+  //Send REGISTER for Nodes
+//  TRACE_INFO(("Sending Register for Nodes %d, %d", node[0], node[1]));
+
+  //Receive REGISTER Response
+
+  //Send Unregister
+
+  //Receive Unregister Response
+
+
+
+  while(1)
+  {
+    continue;
+  }
 
 EXIT_LABEL:
-	if (sock_fd != -1)
-	{
-		close(sock_fd);
-		sock_fd = -1;
-	}
-	return ret_val;
+  if (sock_fd != -1)
+  {
+    close(sock_fd);
+    sock_fd = -1;
+  }
+  return ret_val;
 }

@@ -10,27 +10,27 @@
 #define SRC_HMGLOB_H_
 
 /***************************************************************************/
-/* Hardware Manager Global Data											   */
+/* Hardware Manager Global Data                         */
 /***************************************************************************/
 #ifdef HM_MAIN_DEFINE_VARS
 /**
  * @brief Dictionary Mapping of XML Tag attributes currently supported.
  */
 HM_ATTRIBUTE_MAP attribute_map[] = {
-		{"ms", 								HM_CONFIG_ATTR_RES_MIL_SEC},
-		{"s",								HM_CONFIG_ATTR_RES_SEC},
-		{"node",							HM_CONFIG_ATTR_SCOPE_NODE},
-		{"cluster",							HM_CONFIG_ATTR_SCOPE_CLUSTER},
-		{"tcp",								HM_CONFIG_ATTR_IP_TYPE_TCP},
-		{"udp",								HM_CONFIG_ATTR_IP_TYPE_UDP},
-		{"mcast",							HM_CONFIG_ATTR_IP_TYPE_MCAST},
-		{"local",							HM_CONFIG_ATTR_ADDR_TYPE_LOCAL},
-		{"remote",							HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER},
-		{"group",							HM_CONFIG_ATTR_SUBS_TYPE_GROUP},
-		{"process",							HM_CONFIG_ATTR_SUBS_TYPE_PROC},
-		{"interface",						HM_CONFIG_ATTR_SUBS_TYPE_IF},
-		{"4",								HM_CONFIG_ATTR_IP_VERSION_4},
-		{"6",								HM_CONFIG_ATTR_IP_VERSION_6},
+    {"ms",                 HM_CONFIG_ATTR_RES_MIL_SEC},
+    {"s",                HM_CONFIG_ATTR_RES_SEC},
+    {"node",              HM_CONFIG_ATTR_SCOPE_NODE},
+    {"cluster",              HM_CONFIG_ATTR_SCOPE_CLUSTER},
+    {"tcp",                HM_CONFIG_ATTR_IP_TYPE_TCP},
+    {"udp",                HM_CONFIG_ATTR_IP_TYPE_UDP},
+    {"mcast",              HM_CONFIG_ATTR_IP_TYPE_MCAST},
+    {"local",              HM_CONFIG_ATTR_ADDR_TYPE_LOCAL},
+    {"remote",              HM_CONFIG_ATTR_ADDR_TYPE_CLUSTER},
+    {"group",              HM_CONFIG_ATTR_SUBS_TYPE_GROUP},
+    {"process",              HM_CONFIG_ATTR_SUBS_TYPE_PROC},
+    {"interface",            HM_CONFIG_ATTR_SUBS_TYPE_IF},
+    {"4",                HM_CONFIG_ATTR_IP_VERSION_4},
+    {"6",                HM_CONFIG_ATTR_IP_VERSION_6},
 };
 
 uint32_t size_of_map = (sizeof(attribute_map)/sizeof(attribute_map[0]));
@@ -50,95 +50,95 @@ extern uint32_t size_of_map;
 
 #ifdef HM_MAIN_DEFINE_VARS
 HM_AVL3_TREE_INFO node_process_tree_by_proc_id = {
-	hm_compare_ulong, /**< pointer to function */
-	HM_OFFSETOF(HM_PROCESS_CB, pid)	, /**< key offset */
-	HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function */
+  HM_OFFSETOF(HM_PROCESS_CB, pid)  , /**< key offset */
+  HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO node_process_tree_by_proc_type_and_pid = {
-	hm_compare_2_ulong, /**< pointer to function */
-	HM_OFFSETOF(HM_PROCESS_CB, type)	, /**< key offset */
-	HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
+  hm_compare_2_ulong, /**< pointer to function */
+  HM_OFFSETOF(HM_PROCESS_CB, type)  , /**< key offset */
+  HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO global_process_tree_by_id = {
-	hm_compare_proc_tree_keys, /**< pointer to function*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /**< key offset*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
+  hm_compare_proc_tree_keys, /**< pointer to function*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO locations_tree_by_db_id = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, index)	, /**< key offset*/
-	HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, index)  , /**< key offset*/
+  HM_OFFSETOF(HM_GLOBAL_LOCATION_CB, node)  /**< node offset */
 };
 //TODO: Change to DB ID later
 HM_AVL3_TREE_INFO nodes_tree_by_db_id = {
-	/* hm_aggregate_compare_node_id,*/
-	hm_compare_ulong, /**< pointer to function */
-	HM_OFFSETOF(HM_GLOBAL_NODE_CB, index)	, /**< key offset*/
-	HM_OFFSETOF(HM_GLOBAL_NODE_CB, node)  /**< node offset */
+  /* hm_aggregate_compare_node_id,*/
+  hm_compare_ulong, /**< pointer to function */
+  HM_OFFSETOF(HM_GLOBAL_NODE_CB, index)  , /**< key offset*/
+  HM_OFFSETOF(HM_GLOBAL_NODE_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO nodes_tree_by_node_id = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_NODE_CB, index)	, /**< key offset*/
-	HM_OFFSETOF(HM_NODE_CB, index_node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_NODE_CB, index)  , /**< key offset*/
+  HM_OFFSETOF(HM_NODE_CB, index_node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO process_tree_by_db_id = {
-	hm_aggregate_compare_pid, /**< pointer to function*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /**< key offset*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
+  hm_aggregate_compare_pid, /**< pointer to function*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO process_tree_by_pid = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_PROCESS_CB, pid)	, /**< key offset*/
-	HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_PROCESS_CB, pid)  , /**< key offset*/
+  HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO interface_tree_by_db_id = {
-	hm_aggregate_compare_if_id, /**< pointer to function*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /**< key offset*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
+  hm_aggregate_compare_if_id, /**< pointer to function*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO interface_tree_by_if_id = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)	, /**< key offset*/
-	HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
+  HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO subs_tree_by_db_id = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_SUBSCRIPTION_CB, id)	, /**< key offset*/
-	HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_SUBSCRIPTION_CB, id)  , /**< key offset*/
+  HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO subs_tree_by_subs_type_and_val = {
-	hm_compare_2_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_SUBSCRIPTION_CB, table_type)	, /**< key offset*/
-	HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /**< node offset */
+  hm_compare_2_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_SUBSCRIPTION_CB, table_type)  , /**< key offset*/
+  HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /**< node offset */
 };
 HM_AVL3_TREE_INFO subs_tree_by_subs_type = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_SUBSCRIPTION_CB, table_type)	, /**< key offset*/
-	HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_SUBSCRIPTION_CB, table_type)  , /**< key offset*/
+  HM_OFFSETOF(HM_SUBSCRIPTION_CB, node)  /**< node offset */
 };
 /***************************************************************************/
-/* Signal Mask															   */
+/* Signal Mask                                 */
 /***************************************************************************/
 sigset_t mask;
 /***************************************************************************/
-/* Maximum descriptor value in the binary								   */
+/* Maximum descriptor value in the binary                   */
 /***************************************************************************/
 int32_t max_fd;
 
 /***************************************************************************/
-/* Global Socket descriptor set											   */
+/* Global Socket descriptor set                         */
 /***************************************************************************/
 fd_set hm_tprt_conn_set;
 fd_set hm_tprt_write_set;
 
 /***************************************************************************/
-/* Timers table															   */
+/* Timers table                                 */
 /***************************************************************************/
 HM_AVL3_TREE global_timer_table;
 HM_AVL3_TREE_INFO timer_table_by_handle = {
-	hm_compare_ulong, /**< pointer to function*/
-	HM_OFFSETOF(HM_TIMER_CB, handle), /**< key offset*/
-	HM_OFFSETOF(HM_TIMER_CB, node)  /**< node offset */
+  hm_compare_ulong, /**< pointer to function*/
+  HM_OFFSETOF(HM_TIMER_CB, handle), /**< key offset*/
+  HM_OFFSETOF(HM_TIMER_CB, node)  /**< node offset */
 };
 
 int32_t *var;
