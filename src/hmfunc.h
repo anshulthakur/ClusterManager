@@ -68,13 +68,13 @@ int32_t hm_process_update(HM_PROCESS_CB *);
 
 /* hmglobdb.c*/
 int32_t hm_global_location_add(HM_LOCATION_CB *, uint32_t);
-int32_t hm_global_location_update(HM_LOCATION_CB *);
+int32_t hm_global_location_update(HM_LOCATION_CB *, uint32_t);
 int32_t hm_global_location_remove(HM_GLOBAL_LOCATION_CB *);
 int32_t hm_global_node_add(HM_NODE_CB *);
-int32_t hm_global_node_update(HM_NODE_CB *);
+int32_t hm_global_node_update(HM_NODE_CB *, uint32_t);
 int32_t hm_global_node_remove(HM_NODE_CB *);
 int32_t hm_global_process_add(HM_PROCESS_CB *);
-int32_t hm_global_process_update(HM_PROCESS_CB *);
+int32_t hm_global_process_update(HM_PROCESS_CB *, uint32_t);
 int32_t hm_global_process_remove(HM_PROCESS_CB *);
 HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t, uint32_t, void *);
 int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *);
@@ -84,9 +84,11 @@ int32_t hm_compare_proc_tree_keys(void *, void *);
 
 
 /* hmha.c */
+int32_t hm_ha_role_update_callback(void *);
 int32_t hm_recv_ha_update(HM_MSG *, HM_TRANSPORT_CB *);
 int32_t hm_cluster_send_ha_update(HM_NODE_CB *, HM_NODE_CB *, HM_NODE_CB *);
 int32_t hm_cluster_recv_ha_update(HM_PEER_MSG_HA_UPDATE *, HM_LOCATION_CB *);
+void hm_ha_resolve_active_backup(HM_NODE_CB *);
 
 /* hmnotify.c */
 int32_t hm_service_notify_queue();

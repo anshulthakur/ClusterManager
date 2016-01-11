@@ -22,8 +22,9 @@
 /***************************************************************************/
 /* Group HM_NODE_ROLES: Node Roles                        */
 /***************************************************************************/
-#define NODE_ROLE_PASSIVE                         ((uint16_t)  0)
-#define NODE_ROLE_ACTIVE                          ((uint16_t)  1)
+#define NODE_ROLE_NONE                            ((uint16_t)  0)
+#define NODE_ROLE_PASSIVE                         ((uint16_t)  1)
+#define NODE_ROLE_ACTIVE                          ((uint16_t)  2)
 
 /***************************************************************************/
 /* Group Socket Type                             */
@@ -71,6 +72,8 @@
 #define HM_NOTIFICATION_UNSUBSCRIBE               ((uint16_t) 8)
 #define HM_NOTIFICATION_LOCATION_ACTIVE           ((uint16_t) 9)
 #define HM_NOTIFICATION_LOCATION_INACTIVE         ((uint16_t) 10)
+#define HM_NOTIFICATION_NODE_ROLE_ACTIVE          ((uint16_t) 11)
+#define HM_NOTIFICATION_NODE_ROLE_PASSIVE         ((uint16_t) 12)
 
 /***************************************************************************/
 /* Group HM Node FSM States                                                */
@@ -185,6 +188,7 @@
 #define   HM_CONFIG_GROUP                           ((uint32_t) 14)
 #define   HM_CONFIG_ROLE                            ((uint32_t) 15)
 #define   HM_CONFIG_SUBSCRIPTION_INSTANCE           ((uint32_t) 16)
+#define   HM_CONFIG_HA_SPECS                        ((uint32_t) 17)
 
 /***************************************************************************/
 /* Attribute values vocabulary                                             */
@@ -251,5 +255,11 @@
 #define HM_STATUS_DOWN                              ((uint32_t) 0)
 #define HM_STATUS_PENDING                           ((uint32_t) 1)
 #define HM_STATUS_RUNNING                           ((uint32_t) 2)
+
+/***************************************************************************/
+/* Update Operations on global tables.                                     */
+/***************************************************************************/
+#define HM_UPDATE_RUN_STATUS                        ((uint32_t) 0)
+#define HM_UPDATE_NODE_ROLE                         ((uint32_t) 1)
 
 #endif /* SRC_HMDEF_H_ */

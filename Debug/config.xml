@@ -26,9 +26,9 @@
 </meta>
 
 <hm_instance_info>
-    <index>2</index>
+    <index>1</index>
     <heartbeat scope="node">
-        <period resolution="ms">20000</period>
+        <period resolution="ms">60000</period>
         <threshold>3</threshold>
     </heartbeat>
     <heartbeat scope="cluster">
@@ -40,8 +40,8 @@
         <port>4999</port>
     </address>
     <address type="local" scope="cluster">
-        <ip version="4" type="tcp">192.168.3.178</ip>
-        <port>5496</port>
+        <ip version="4" type="tcp">127.0.0.1</ip>
+        <port>5497</port>
     </address>
     <address type="local" scope="cluster">
         <ip version="4" type="mcast">127.0.0.1</ip>

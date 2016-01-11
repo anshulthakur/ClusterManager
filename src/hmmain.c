@@ -206,13 +206,17 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
   /***************************************************************************/
   /* Initialize Trees                               */
   /***************************************************************************/
-  /* Aggregate Nodes Tree  */
+  /* Aggregate Locations Tree  */
   HM_AVL3_INIT_TREE(LOCAL.locations_tree, locations_tree_by_hardware_id);
   LOCAL.next_loc_tree_id = 1;
 
-  /* Aggregate Process Tree */
+  /* Aggregate Nodes Tree */
   HM_AVL3_INIT_TREE(LOCAL.nodes_tree, nodes_tree_by_db_id);
   LOCAL.next_node_tree_id = 1;
+
+  /* Aggregate Processes Tree */
+  HM_AVL3_INIT_TREE(LOCAL.process_tree, nodes_tree_by_db_id);
+  LOCAL.next_process_tree_id = 1;
 
   /* Aggregate PID Tree  */
   HM_AVL3_INIT_TREE(LOCAL.pid_tree, process_tree_by_db_id);
@@ -220,7 +224,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
 
   /* Aggregate Interfaces Tree */
   HM_AVL3_INIT_TREE(LOCAL.interface_tree, interface_tree_by_db_id);
-  LOCAL.next_pid_tree_id = 1;
+  LOCAL.next_interface_tree_id = 1;
 
   /* Active Joins Tree */
   HM_AVL3_INIT_TREE(LOCAL.active_subscriptions_tree, NULL);
@@ -270,6 +274,8 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
   LOCAL.peer_kickout_value = config_cb->instance_info.node.threshold;
   TRACE_INFO(("Peer Keepalive Threshold: %d",LOCAL.peer_kickout_value));
 
+  LOCAL.local_location_cb.ha_timer_wait_interval = config_cb->instance_info.ha_role.timer_val;
+  TRACE_INFO(("Wait for %d ms for HA Role update", LOCAL.local_location_cb.ha_timer_wait_interval));
   /* TCP Info */
   if(config_cb->instance_info.node_addr != NULL)
   {
@@ -461,6 +467,10 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
           goto EXIT_LABEL;
         }
       }
+      /***************************************************************************/
+      /* Try to resolve active-backup dependencies if any                        */
+      /***************************************************************************/
+      hm_ha_resolve_active_backup(node_config_cb->node_cb);
     }
   }
 
@@ -655,6 +665,17 @@ void hm_run_main_thread()
   /* Send Announce on Cluster marking its availability             */
   /***************************************************************************/
   hm_cluster_send_tick();
+
+  /***************************************************************************/
+  /* Start HA Role timer too                                                 */
+  /***************************************************************************/
+  TRACE_INFO(("Starting HA Role Wait timer."));
+  LOCAL.local_location_cb.ha_timer_cb =
+      HM_TIMER_CREATE(LOCAL.local_location_cb.ha_timer_wait_interval,
+                      TRUE,
+                      hm_ha_role_update_callback,
+                      (void *)&LOCAL.local_location_cb);
+  HM_TIMER_START(LOCAL.local_location_cb.ha_timer_cb);
 
   /***************************************************************************/
   /* Start Endless loop to process incoming data                 */

@@ -547,7 +547,7 @@ typedef struct hm_location_cb {
   uint32_t keepalive_period;
 
   /***************************************************************************/
-  /* Timer to send keepalive on cluster (For local only)             */
+  /* Timer to send keepalive on cluster (For local only)                     */
   /***************************************************************************/
   HM_TIMER_CB *timer_cb;
 
@@ -559,7 +559,7 @@ typedef struct hm_location_cb {
   /***************************************************************************/
   /* Number of active nodes                           */
   /***************************************************************************/
-  uint32_t active_nodes;
+  int32_t active_nodes;
 
   /***************************************************************************/
   /* Total Number of nodes on this location.                   */
@@ -569,14 +569,23 @@ typedef struct hm_location_cb {
   /***************************************************************************/
   /* Number of active processes                         */
   /***************************************************************************/
-  uint32_t active_processes;
+  int32_t active_processes;
 
   /***************************************************************************/
-  /* Replay is in progress                           */
-  /* TODO: This variable can be replaced by a state in Peer FSM.         */
+  /* Replay is in progress                                                   */
+  /* TODO: This variable can be replaced by a state in Peer FSM.             */
   /***************************************************************************/
   uint32_t replay_in_progress;
 
+  /***************************************************************************/
+  /* Timer to wait for HA Role updates (For local only)                      */
+  /***************************************************************************/
+  HM_TIMER_CB *ha_timer_cb;
+
+  /***************************************************************************/
+  /* Wait period for HA Timer                                                */
+  /***************************************************************************/
+  uint32_t ha_timer_wait_interval;
 } HM_LOCATION_CB ;
 /**STRUCT-********************************************************************/
 
@@ -660,7 +669,7 @@ typedef struct hm_node_cb {
   HM_AVL3_TREE interface_tree;
 
   /***************************************************************************/
-  /* Direct Partner (redundancy)                         */
+  /* Direct Partner (redundancy)                                             */
   /* Could be the active for backup, or backup for active             */
   /***************************************************************************/
   struct hm_node_cb *partner;
@@ -1263,7 +1272,7 @@ typedef struct hm_config_cb
     /***************************************************************************/
     /* Heartbeat configuration CBs                         */
     /***************************************************************************/
-    HM_HEARTBEAT_CONFIG node, cluster;
+    HM_HEARTBEAT_CONFIG node, cluster, ha_role;
 
     /***************************************************************************/
     /* Information on local TCP/UDP/Multicast Transports             */

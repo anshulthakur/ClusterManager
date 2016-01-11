@@ -178,7 +178,7 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
     /***************************************************************************/
     /* Send out update to cluster if cluster is enabled.             */
     /***************************************************************************/
-    if(hm_global_location_update(loc_cb)==HM_ERR)
+    if(hm_global_location_update(loc_cb, HM_UPDATE_RUN_STATUS)==HM_ERR)
     {
       TRACE_ERROR(("Error updating Global Location Tables."));
       ret_val = HM_ERR;
@@ -205,7 +205,7 @@ EXIT_LABEL:
  *
  *  @return #HM_OK if successful, #HM_ERR otherwise.
  */
-int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
+int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb, uint32_t op)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
@@ -230,23 +230,33 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb)
   TRACE_ASSERT(loc_cb->db_ptr != NULL);
   glob_cb = (HM_GLOBAL_LOCATION_CB *)loc_cb->db_ptr;
   glob_cb->status = glob_cb->loc_cb->fsm_state;
-  /***************************************************************************/
-  /* There are not going to be any notifications as such.             */
-  /* But we need to send out updates on cluster.                 */
-  /***************************************************************************/
-  switch(glob_cb->status)
+
+  switch (op)
   {
-  case HM_PEER_FSM_STATE_ACTIVE:
-    TRACE_DETAIL(("Location Active."));
-    notify = HM_NOTIFICATION_LOCATION_ACTIVE;
-    break;
-  case HM_PEER_FSM_STATE_FAILED:
-    TRACE_DETAIL(("Location Down."));
-    notify = HM_NOTIFICATION_LOCATION_INACTIVE;
-    break;
-  default:
-    TRACE_WARN(("Unknown HM Status %d", glob_cb->status));
-    TRACE_ASSERT(FALSE);
+    case HM_UPDATE_RUN_STATUS:
+      /***************************************************************************/
+      /* There are not going to be any notifications as such.             */
+      /* But we need to send out updates on cluster.                 */
+      /***************************************************************************/
+      switch(glob_cb->status)
+      {
+      case HM_PEER_FSM_STATE_ACTIVE:
+        TRACE_DETAIL(("Location Active."));
+        notify = HM_NOTIFICATION_LOCATION_ACTIVE;
+        break;
+      case HM_PEER_FSM_STATE_FAILED:
+        TRACE_DETAIL(("Location Down."));
+        notify = HM_NOTIFICATION_LOCATION_INACTIVE;
+        break;
+      default:
+        TRACE_WARN(("Unknown HM Status %d", glob_cb->status));
+        TRACE_ASSERT(FALSE);
+      }
+      break;
+
+    default:
+      TRACE_WARN(("Invalid Operation type specified: %d", op));
+      TRACE_ASSERT(FALSE);
   }
 
   /***************************************************************************/
@@ -481,9 +491,11 @@ EXIT_LABEL:
  *  @note The State transition must have taken place already, we do not compare
  *  old state with new state in this routine.
  *  @param *node_cb Node CB whose state was updated.
+ *  @param op Type of operation for which update is to be sent
+ *
  *  @return return_value
  */
-int32_t hm_global_node_update(HM_NODE_CB *node_cb)
+int32_t hm_global_node_update(HM_NODE_CB *node_cb, uint32_t op)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
@@ -501,29 +513,48 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb)
   /* Main Routine                                 */
   /***************************************************************************/
 
-  /***************************************************************************/
-  /* Look into the node state in its FSM variable to determine if an update  */
-  /* is needed or not.                             */
-  /***************************************************************************/
-  switch(node_cb->fsm_state)
+  switch(op)
   {
-  case HM_NODE_FSM_STATE_ACTIVE:
-    TRACE_DETAIL(("Node moved to active state. Send Notifications."));
-    notify = HM_NOTIFICATION_NODE_ACTIVE;
-    break;
+    case HM_UPDATE_RUN_STATUS:
+      /***************************************************************************/
+      /* Look into the node state in its FSM variable to determine if an update  */
+      /* is needed or not.                             */
+      /***************************************************************************/
+      switch(node_cb->fsm_state)
+      {
+        case HM_NODE_FSM_STATE_ACTIVE:
+          TRACE_DETAIL(("Node moved to active state. Send Notifications."));
+          TRACE_ASSERT(node_cb->parent_location_cb->active_nodes>=0);
+          notify = HM_NOTIFICATION_NODE_ACTIVE;
+          break;
 
-  case HM_NODE_FSM_STATE_FAILING:
-    TRACE_DETAIL(("Node is no longer active. Send Notifications."));
-    notify = HM_NOTIFICATION_NODE_INACTIVE;
-    break;
+        case HM_NODE_FSM_STATE_FAILING:
+          TRACE_DETAIL(("Node is no longer active. Send Notifications."));
+          TRACE_ASSERT(node_cb->parent_location_cb->active_nodes>=0);
+          notify = HM_NOTIFICATION_NODE_INACTIVE;
+          break;
 
-  case HM_NODE_FSM_STATE_FAILED:
-    TRACE_DETAIL(("Node is in failed state. Notifications must have been sent if required."));
-    break;
+        case HM_NODE_FSM_STATE_FAILED:
+          TRACE_DETAIL(("Node is in failed state. Notifications must have been sent if required."));
+          break;
 
-  default:
-    TRACE_WARN(("Unknown state of Node %d", node_cb->fsm_state));
-    TRACE_ASSERT(FALSE);
+        default:
+          TRACE_WARN(("Unknown state of Node %d", node_cb->fsm_state));
+          TRACE_ASSERT(FALSE);
+      }
+      break;
+
+      case HM_UPDATE_NODE_ROLE:
+        TRACE_DETAIL(("Node Role update."));
+        TRACE_DETAIL(("Node must be %s",
+            (node_cb->role== NODE_ROLE_PASSIVE)?"passive":"active"));
+        notify = (node_cb->role== NODE_ROLE_PASSIVE)?
+            HM_NOTIFICATION_NODE_ROLE_PASSIVE:HM_NOTIFICATION_NODE_ROLE_ACTIVE;
+        break;
+
+      default:
+        TRACE_WARN(("Unknown operation: %d", op));
+        TRACE_ASSERT(FALSE);
   }
 
   if(!notify)
@@ -575,6 +606,11 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb)
     glob_cb->sub_cb->live = TRUE;
   }
   glob_cb->status = node_cb->fsm_state;
+  if(op==HM_UPDATE_NODE_ROLE)
+  {
+    TRACE_DETAIL(("Update Role in Global Tables"));
+    glob_cb->role = node_cb->current_role;
+  }
   /***************************************************************************/
   /* Allocate a Notification CB and Add that notification CB to Notify Queue */
   /***************************************************************************/
@@ -660,19 +696,19 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
   HM_LIST_BLOCK *list_member = NULL;
   uint32_t *processed = NULL;
   /***************************************************************************/
-  /* Sanity Checks                               */
+  /* Sanity Checks                                                           */
   /***************************************************************************/
   TRACE_ENTRY();
   TRACE_ASSERT(proc_cb!= NULL);
 
   /***************************************************************************/
-  /* Main Routine                                 */
+  /* Main Routine                                                            */
   /***************************************************************************/
   /***************************************************************************/
-  /* Allocate a global location CB                       */
-  /*                                       */
+  /* Allocate a global location CB                                           */
+  /*                                                                         */
   /* Owing to a composite comapre function, we first allocate a Global Proc  */
-  /* CB and fill in the keys for comparison.                   */
+  /* CB and fill in the keys for comparison.                                 */
   /***************************************************************************/
   temp_cb = (HM_GLOBAL_PROCESS_CB *)malloc(sizeof(HM_GLOBAL_PROCESS_CB));
   TRACE_ASSERT(temp_cb != NULL);
@@ -688,10 +724,10 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
 
   /***************************************************************************/
   /* First search for a node with same Process ID. If not found, grant the CB*/
-  /* a new ID, and insert it in the tree.                     */
-  /*                                       */
+  /* a new ID, and insert it in the tree.                                    */
+  /*                                                                         */
   /* We need to insert the node by its proc_type, node_id and PID for unique-*/
-  /* -ness constraint. As such db_id is of no use here.             */
+  /* -ness constraint. As such db_id is of no use here.                      */
   /***************************************************************************/
   insert_cb = (HM_GLOBAL_PROCESS_CB *)HM_AVL3_FIND(LOCAL.process_tree,
                       temp_cb,
@@ -720,12 +756,11 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
     /***************************************************************************/
     /* Now fill in the rest                             */
     /***************************************************************************/
-    insert_cb->id = LOCAL.next_node_tree_id++;
+    insert_cb->id = LOCAL.next_process_tree_id++;
 
     HM_AVL3_INIT_NODE(insert_cb->node, insert_cb);
     HM_INIT_ROOT(insert_cb->subscriptions);
     insert_cb->table_type = HM_TABLE_TYPE_PROCESS;
-
   }
   insert_cb->proc_cb = proc_cb;
   insert_cb->status = proc_cb->running;
@@ -821,7 +856,7 @@ EXIT_LABEL:
  *  @param *proc_cb Process CB (#HM_PROCESS_CB) whose state has been updated.
  *  @return #HM_OK if successful, #HM_ERR otherwise.
  */
-int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb)
+int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb, uint32_t op)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
@@ -839,19 +874,30 @@ int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb)
   /* Main Routine                                 */
   /***************************************************************************/
 
-  /***************************************************************************/
-  /* Look into the node state in its FSM variable to determine if an update  */
-  /* is needed or not.                             */
-  /***************************************************************************/
-  if(proc_cb->running)
+  switch (op)
   {
-    TRACE_DETAIL(("Process active. Send Notifications."));
-    notify = HM_NOTIFICATION_PROCESS_CREATED;
-  }
-  else
-  {
-    TRACE_DETAIL(("Process is no longer active. Send Notifications."));
-    notify = HM_NOTIFICATION_PROCESS_DESTROYED;
+    case HM_UPDATE_RUN_STATUS:
+    /***************************************************************************/
+    /* Look into the node state in its FSM variable to determine if an update  */
+    /* is needed or not.                             */
+    /***************************************************************************/
+    if(proc_cb->running)
+    {
+      TRACE_DETAIL(("Process active. Send Notifications."));
+      notify = HM_NOTIFICATION_PROCESS_CREATED;
+      TRACE_ASSERT(proc_cb->parent_node_cb->parent_location_cb->active_processes >=0);
+    }
+    else
+    {
+      TRACE_DETAIL(("Process is no longer active. Send Notifications."));
+      notify = HM_NOTIFICATION_PROCESS_DESTROYED;
+      TRACE_ASSERT(proc_cb->parent_node_cb->parent_location_cb->active_processes >=0);
+    }
+    break;
+
+    default:
+      TRACE_WARN(("Unknown operation: %d", op));
+      TRACE_ASSERT(FALSE);
   }
 
   if(!notify)
@@ -1140,6 +1186,9 @@ int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *subs_cb)
  *  in the pending tree.
  *
  *  @param subs_type Subscription type
+ *  @param value Value of subscription index
+ *  @param *cb A Control block of the subscribing entity
+ *
  *  @return #HM_OK on success, #HM_ERR otherwise
  */
 int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
@@ -1164,6 +1213,8 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
   TRACE_ENTRY();
 
   TRACE_ASSERT(cb != NULL);
+
+  TRACE_DETAIL(("Subscription Type: %d. Value= %d", subs_type, value));
   /***************************************************************************/
   /* Main Routine                                 */
   /***************************************************************************/
@@ -1413,16 +1464,35 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
     processed = (uint32_t *)list_member->opaque;
     *processed = 0;
 
-    subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIND(LOCAL.active_subscriptions_tree,
-                              keys,
-                              subs_tree_by_subs_type );
+    subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIRST(LOCAL.active_subscriptions_tree,
+                                                        subs_tree_by_db_id );
+    while(subscription!=NULL)
+    {
+      if(subscription->table_type == keys[0] && subscription->value==keys[1])
+      {
+        TRACE_DETAIL(("Found subscription at id %d", subscription->id));
+        break;
+      }
+      subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_NEXT(subscription->node,
+                                                          subs_tree_by_db_id );
+    }
     if(subscription == NULL)
     {
       TRACE_DETAIL(("Try to find in Pending subscriptions"));
+
       /* FIXME: Possibly redundant. We always check in pending list in create_entry method */
-      subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIND(LOCAL.pending_subscriptions_tree,
-                                  keys,
-                                  subs_tree_by_subs_type );
+      subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_FIRST(LOCAL.pending_subscriptions_tree,
+                                                          subs_tree_by_db_id );
+      while(subscription!=NULL)
+      {
+        if(subscription->table_type == keys[0] && subscription->value==keys[1])
+        {
+          TRACE_DETAIL(("Found subscription at id %d", subscription->id));
+          break;
+        }
+        subscription = (HM_SUBSCRIPTION_CB *)HM_AVL3_NEXT(subscription->node,
+                                                            subs_tree_by_db_id );
+      }
     }
     if(subscription == NULL)
     {
@@ -1505,7 +1575,7 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
     {
       TRACE_WARN(("Duplicate Subscription!"));
       exists = TRUE;
-      ret_val = HM_ERR;
+      ret_val = HM_OK; /* It is not wrong to re-subscribe. Just log it somewhere*/
       break;
     }
   }
@@ -1517,6 +1587,7 @@ int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *subs_cb, HM_LIST_BLOCK *node)
     /* Increment the subscribers count                                         */
     /***************************************************************************/
     subs_cb->num_subscribers++;
+    TRACE_DETAIL(("Subscribers increments to %d", subs_cb->num_subscribers));
     /***************************************************************************/
     /* If subscription is active, create a notification response to the subscr-*/
     /* -iber. Other subscribers already know it. This one might need update.   */

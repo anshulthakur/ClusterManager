@@ -23,7 +23,7 @@
 #define HM_PEER_MSG_TYPE_PROCESS_UPDATE   ((uint32_t) 3) /* Process Create/Destroy Update to HM */
 #define HM_PEER_MSG_TYPE_NODE_UPDATE      ((uint32_t) 4) /* Node Create/Destroy update to HM */
 #define HM_PEER_MSG_TYPE_HA_UPDATE        ((uint32_t) 5) /* Updates on HA roles */
-#define HM_PEER_MSG_TYPE_REPLAY           ((uint32_t) 6) /* Updates on HA roles */
+#define HM_PEER_MSG_TYPE_REPLAY           ((uint32_t) 6) /* Replay messages */
 /***************************************************************************/
 
 /***************************************************************************/

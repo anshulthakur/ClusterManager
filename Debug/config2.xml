@@ -26,9 +26,9 @@
 </meta>
 
 <hm_instance_info>
-    <index>1</index>
+    <index>2</index>
     <heartbeat scope="node">
-        <period resolution="ms">60000</period>
+        <period resolution="ms">20000</period>
         <threshold>3</threshold>
     </heartbeat>
     <heartbeat scope="cluster">
@@ -37,11 +37,11 @@
     </heartbeat>
     <address type="local" scope="node">
         <ip version="4" type="tcp">127.0.0.1</ip>
-        <port>5000</port>
+        <port>4999</port>
     </address>
     <address type="local" scope="cluster">
-        <ip version="4" type="tcp">127.0.0.1</ip>
-        <port>5497</port>
+        <ip version="4" type="tcp">192.168.3.178</ip>
+        <port>5496</port>
     </address>
     <address type="local" scope="cluster">
         <ip version="4" type="mcast">127.0.0.1</ip>
@@ -59,7 +59,7 @@
 
 <nodes>
     <node>
-        <index>5</index>
+        <index>1</index>
         <name>nbase-stub</name>
         <role>active</role>
         <group>1</group>
@@ -68,7 +68,7 @@
         </subscriptions>
     </node>
     <node>
-        <index>6</index>
+        <index>2</index>
         <name>cDotCPSrvr</name>
         <role>active</role>
         <group>2</group>
@@ -78,7 +78,7 @@
         </subscriptions>
     </node>
     <node>
-        <index>7</index>
+        <index>3</index>
         <name>cDotDPSrvr</name>
         <role>active</role>
         <group>3</group>
@@ -89,7 +89,7 @@
         </subscriptions>
     </node>
     <node>
-        <index>8</index>
+        <index>4</index>
         <name>cDotFMSrvr</name>
         <role>active</role>
         <group>4</group>

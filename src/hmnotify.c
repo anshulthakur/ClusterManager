@@ -402,6 +402,62 @@ int32_t hm_service_notify_queue()
       TRACE_INFO(("Location Inactive"));
       break;
 
+    case HM_NOTIFICATION_NODE_ROLE_ACTIVE:
+    case HM_NOTIFICATION_NODE_ROLE_PASSIVE:
+      TRACE_INFO(("Location Role Notification."));
+      /* This message is not to be sent to subscribers but to node itself */
+      msg = hm_build_notify_message(notify_cb);
+      if(msg == NULL)
+      {
+        TRACE_ERROR(("Error building Notification."));
+        ret_val = HM_ERR;
+        goto EXIT_LABEL;
+      }
+      /***************************************************************************/
+      /* Have message, update reference count                     */
+      /***************************************************************************/
+      notify_cb->ref_count = 1 ;
+
+      /***************************************************************************/
+      /* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
+      /* will be notified.                             */
+      /* Later, this must be improved (by using switch case on the table_type    */
+      /* field, to allow location to node, or node to locations subs.         */
+      /***************************************************************************/
+      subscriber.node_cb = (HM_GLOBAL_NODE_CB *)affected_node.node_cb;
+
+      TRACE_ASSERT(subscriber.node_cb != NULL);
+      TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+
+      /***************************************************************************/
+      /* Append the message to the outgoing message queue on the transport of the*/
+      /* node.                                   */
+      /***************************************************************************/
+      if(subscriber.node_cb->node_cb->transport_cb != NULL)
+      {
+        block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+        if(block == NULL)
+        {
+          TRACE_ASSERT(FALSE);
+          TRACE_ERROR(("Error allocating memory for Sending notification queuing!"));
+          ret_val = HM_ERR;
+          goto EXIT_LABEL;
+        }
+        HM_INIT_LQE(block->node, block);
+
+        block->target = msg;
+
+        HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+        msg->ref_count++; /* This is more important */
+        hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+      }
+      else
+      {
+        TRACE_WARN(("Transport CB Missing!"));
+        TRACE_ASSERT(FALSE);
+      }
+      break;
+
     default:
       TRACE_WARN(("Unknown Notification Type"));
       TRACE_ASSERT(FALSE);
@@ -450,13 +506,13 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
   HM_SOCKADDR_UNION *addr=NULL;
 
   /***************************************************************************/
-  /* Sanity Checks                               */
+  /* Sanity Checks                                                           */
   /***************************************************************************/
   TRACE_ENTRY();
   TRACE_ASSERT(notify_cb != NULL);
 
   /***************************************************************************/
-  /* Main Routine                                 */
+  /* Main Routine                                                            */
   /***************************************************************************/
   msg  = hm_get_buffer(sizeof(HM_NOTIFICATION_MSG));
   if(msg == NULL)
@@ -672,6 +728,128 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
   case HM_NOTIFICATION_INTERFACE_DELETE:
     TRACE_INFO(("Interface Deleted"));
     break;
+
+  case HM_NOTIFICATION_NODE_ROLE_ACTIVE:
+    TRACE_INFO(("Node Role Active"));
+    TRACE_INFO(("Node %d role change to %s", affected_node.node_cb->index,
+        (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?"Active":"Passive"));
+    notify_msg->hdr.msg_type = HM_MSG_TYPE_HA_UPDATE;
+
+    notify_msg->type = (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?
+                            HM_HA_NODE_ROLE_ACTIVE:HM_HA_NODE_ROLE_PASSIVE;
+    notify_msg->id = 0;
+    notify_msg->proc_type = 0;
+
+    TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb != NULL);
+    /* For active node, there may or may not be a passive node on cluster */
+    if(affected_node.node_cb->node_cb->partner != NULL)
+    {
+      TRACE_DETAIL(("Node partner present."));
+      if(affected_node.node_cb->node_cb->partner->transport_cb->sock_cb != NULL)
+      {
+        addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->partner->transport_cb->sock_cb->addr);
+        if((affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_IN) ||
+          (affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_OUT))
+        {
+          TRACE_DETAIL(("Node has IPv4 type of connection."));
+          notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
+          memcpy(notify_msg->addr_info.addr,
+              &addr->in_addr.sin_addr.s_addr,
+            sizeof(struct in_addr));
+          notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
+        }
+        else if((affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_IPv6_IN)||
+            (affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_IPv6_OUT))
+        {
+          TRACE_DETAIL(("Node has IPv6 type of connection"));
+          notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v6;
+          memcpy(notify_msg->addr_info.addr,
+            &addr->in6_addr.sin6_addr,
+            sizeof(struct in6_addr));
+          notify_msg->addr_info.port = (uint32_t)addr->in6_addr.sin6_port;
+        }
+        else
+        {
+          TRACE_WARN(("Unknown Transport Type"));
+        }
+      }
+      else
+      {
+        /* Possible point of bug. */
+        TRACE_WARN(("Node Partner present without transport connection."));
+        TRACE_ASSERT(FALSE);
+      }
+      notify_msg->addr_info.group = affected_node.node_cb->node_cb->partner->group;
+      notify_msg->addr_info.hw_index = affected_node.node_cb->node_cb->partner->parent_location_cb->index;
+      notify_msg->addr_info.node_id = affected_node.node_cb->node_cb->partner->index;
+      notify_msg->if_id = TRUE;
+    }
+    else
+    {
+      TRACE_DETAIL(("Node partner not present"));
+      notify_msg->if_id = FALSE;
+    }
+
+    break;
+
+  case HM_NOTIFICATION_NODE_ROLE_PASSIVE:
+    TRACE_INFO(("Node Role Passive"));
+    TRACE_INFO(("Node %d role change to %s", affected_node.node_cb->index,
+        (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?"Active":"Passive"));
+    notify_msg->hdr.msg_type = HM_MSG_TYPE_HA_UPDATE;
+
+    notify_msg->type = (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?
+                            HM_HA_NODE_ROLE_ACTIVE:HM_HA_NODE_ROLE_PASSIVE;
+    notify_msg->id = 0;
+    notify_msg->if_id = 0;
+    notify_msg->proc_type = 0;
+
+    TRACE_ASSERT(affected_node.node_cb->node_cb->transport_cb != NULL);
+    /* For a passive node, there must always be an active node on the cluster */
+    TRACE_ASSERT(affected_node.node_cb->node_cb->partner != NULL);
+    TRACE_DETAIL(("Node partner present."));
+    if(affected_node.node_cb->node_cb->partner->transport_cb->sock_cb != NULL)
+    {
+      addr = (HM_SOCKADDR_UNION *)&(affected_node.node_cb->node_cb->partner->transport_cb->sock_cb->addr);
+      if((affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_IN) ||
+        (affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_OUT))
+      {
+        TRACE_DETAIL(("Node has IPv4 type of connection."));
+        notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v4;
+        memcpy(notify_msg->addr_info.addr,
+            &addr->in_addr.sin_addr.s_addr,
+          sizeof(struct in_addr));
+        notify_msg->addr_info.port = (uint32_t)addr->in_addr.sin_port;
+      }
+      else if((affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_IPv6_IN)||
+          (affected_node.node_cb->node_cb->partner->transport_cb->type == HM_TRANSPORT_TCP_IPv6_OUT))
+      {
+        TRACE_DETAIL(("Node has IPv6 type of connection"));
+        notify_msg->addr_info.addr_type = HM_NOTIFY_ADDR_TYPE_TCP_v6;
+        memcpy(notify_msg->addr_info.addr,
+          &addr->in6_addr.sin6_addr,
+          sizeof(struct in6_addr));
+        notify_msg->addr_info.port = (uint32_t)addr->in6_addr.sin6_port;
+      }
+      else
+      {
+        TRACE_WARN(("Unknown Transport Type"));
+      }
+    }
+    else
+    {
+      /* Possible point of bug. */
+      TRACE_WARN(("Node Partner present without transport connection."));
+      TRACE_ASSERT(FALSE);
+    }
+
+    notify_msg->addr_info.group = affected_node.node_cb->node_cb->partner->group;
+    notify_msg->addr_info.hw_index = affected_node.node_cb->node_cb->partner->parent_location_cb->index;
+    notify_msg->addr_info.node_id = affected_node.node_cb->node_cb->partner->index;
+
+    notify_msg->if_id = TRUE;
+    break;
+
   default:
     TRACE_ERROR(("Unknown notification type"));
     TRACE_ASSERT(FALSE);

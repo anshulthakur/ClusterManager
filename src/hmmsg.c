@@ -103,6 +103,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   for(i=0; i< reg->num_register; i++)
   {
     tlv = (HM_REGISTER_TLV_CB *)tprt_cb->in_buffer + i;
+    /* TODO: Possible BUG, It should be a global table entry? */
     if(hm_subscribe(reg->type, tlv->id, (void *)tprt_cb->node_cb) != HM_OK)
     {
       TRACE_ERROR(("Error creating subscriptions."));

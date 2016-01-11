@@ -588,7 +588,6 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
     /***************************************************************************/
     /* Do not loopback the packets                         */
     /***************************************************************************/
-    /*
     {
       TRACE_DETAIL(("Setting Loopback to off."));
       u_char flag;
@@ -599,7 +598,6 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
         TRACE_PERROR(("Error setting loopback option on Multicast socket"));
       }
     }
-    */
     LOCAL.mcast_addr->sock_cb = sock_cb;
     LOCAL.mcast_addr->location_cb = &LOCAL.local_location_cb;
 

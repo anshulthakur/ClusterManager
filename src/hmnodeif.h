@@ -12,8 +12,8 @@
 /***************************************************************************/
 /* Message Types to be used in msg_type field of HM_MSG_HEADER             */
 /***************************************************************************/
-#define HM_MSG_TYPE_INIT                ((uint32_t) 1)      /* INIT Message*/
-#define HM_MSG_TYPE_KEEPALIVE           ((uint32_t) 2)   /* Keepalive Tick */
+#define HM_MSG_TYPE_INIT                ((uint32_t) 1) /* INIT Message*/
+#define HM_MSG_TYPE_KEEPALIVE           ((uint32_t) 2) /* Keepalive Tick */
 #define HM_MSG_TYPE_PROCESS_CREATE      ((uint32_t) 3) /* Process Create Update to HM */
 #define HM_MSG_TYPE_PROCESS_DESTROY     ((uint32_t) 4) /* Process Destroy update to HM */
 #define HM_MSG_TYPE_REGISTER            ((uint32_t) 5) /* Register for Notifications from HM*/
@@ -367,6 +367,8 @@ typedef struct hm_notification_msg
   /***************************************************************************/
   /* Interface Type of reported process                                      */
   /* used only in interface messages.                                        */
+  /* Also used as a flag for presence of information in addr_info in case of */
+  /* HA Updates.                                                             */
   /***************************************************************************/
   uint32_t if_id;
 

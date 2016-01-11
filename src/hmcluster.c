@@ -114,14 +114,17 @@ void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
     {
       TRACE_DETAIL(("Replay not in progress. Check consistency!"));
       HM_GET_LONG(temp_var, keepalive_msg->num_nodes);
+      TRACE_DETAIL(("Active Nodes reported: %d", temp_var));
       if(temp_var != glob_cb->loc_cb->active_nodes)
       {
         TRACE_WARN(("States inconsistent, initiate replay."));
         hm_cluster_replay_info(glob_cb->loc_cb->peer_listen_cb);
         glob_cb->loc_cb->replay_in_progress = TRUE;
       }
+
       temp_var = 0;
       HM_GET_LONG(temp_var, keepalive_msg->num_proc);
+      TRACE_DETAIL(("Active Processes reported: %d", temp_var));
       if(temp_var != glob_cb->loc_cb->active_processes)
       {
         TRACE_WARN(("States inconsistent, initiate replay."));
@@ -443,8 +446,17 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
             (uint32_t)node_cb->index);
     HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
             HM_PEER_REPLAY_UPDATE_TYPE_NODE);
-    HM_PUT_LONG(replay_msg->tlv[index_filled].role,
+    if(node_cb->role != NODE_ROLE_NONE)
+    {
+      HM_PUT_LONG(replay_msg->tlv[index_filled].role,
+                    (uint32_t)node_cb->current_role);
+    }
+    else
+    {
+      TRACE_DETAIL(("Node role resolution not completed. Use desired role"));
+      HM_PUT_LONG(replay_msg->tlv[index_filled].role,
                     (uint32_t)node_cb->role);
+    }
     HM_PUT_LONG(replay_msg->tlv[index_filled].running, (node_cb->fsm_state));
 
     index_filled++;
@@ -897,21 +909,30 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
       break;
     }
     HM_GET_LONG(status, node_update->status);
-    if((status == HM_PEER_ENTITY_STATUS_ACTIVE) && (node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE))
+    TRACE_DETAIL(("Current state of node: %d",node_cb->fsm_state));
+    if((status == HM_PEER_ENTITY_STATUS_ACTIVE) && (node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE))
     {
       TRACE_DETAIL(("Node %d has become active.", node_id));
       node_cb->fsm_state = HM_NODE_FSM_STATE_ACTIVE;
+      TRACE_ASSERT(node_cb->parent_location_cb->active_nodes >=0);
+      node_cb->parent_location_cb->active_nodes++;
       //TODO: Let remote nodes also be managed by the same FSM
       //hm_node_fsm(HM_NODE_FSM_TERM, node_cb);
     }
-    else if((status == HM_PEER_ENTITY_STATUS_ACTIVE) && (node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE))
+    else if((status == HM_PEER_ENTITY_STATUS_ACTIVE) && (node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE))
     {
       TRACE_DETAIL(("Node %d has become active. But we know it already", node_id));
+    }
+    else if((status == HM_PEER_ENTITY_STATUS_INACTIVE) && (node_cb->fsm_state == HM_NODE_FSM_STATE_WAITING))
+    {
+      TRACE_DETAIL(("Node %d has failed to start.", node_id));
+      node_cb->fsm_state = HM_NODE_FSM_STATE_FAILING;
     }
     else if((status == HM_PEER_ENTITY_STATUS_INACTIVE) && (node_cb->fsm_state != HM_NODE_FSM_STATE_FAILED))
     {
       TRACE_DETAIL(("Node %d has failed.", node_id));
       node_cb->fsm_state = HM_NODE_FSM_STATE_FAILING;
+      node_cb->parent_location_cb->active_nodes--;
     }
     else if((status == HM_PEER_ENTITY_STATUS_INACTIVE) && (node_cb->fsm_state == HM_NODE_FSM_STATE_FAILED))
     {
@@ -921,8 +942,9 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
     {
       TRACE_DETAIL(("Something happened to Node %d, but fail anyway.", node_id));
       node_cb->fsm_state = HM_NODE_FSM_STATE_FAILING;
+      node_cb->parent_location_cb->active_nodes--;
     }
-    hm_global_node_update(node_cb);
+    hm_global_node_update(node_cb, HM_UPDATE_RUN_STATUS);
     break;
 
   case HM_PEER_MSG_TYPE_PROCESS_UPDATE:
@@ -1111,7 +1133,7 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
       HM_GET_LONG(node_cb->index, msg->tlv[i].node_id);
       TRACE_DETAIL(("Node ID: %d", node_cb->index));
       HM_GET_LONG(node_cb->group, msg->tlv[i].group);
-      HM_GET_LONG(node_cb->role, msg->tlv[i].role);
+      HM_GET_LONG(node_cb->current_role, msg->tlv[i].role);
 
       HM_GET_LONG(node_cb->fsm_state, msg->tlv[i].running);
       if(node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE)
@@ -1129,6 +1151,10 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg, HM_LOCATION_CB *loc_c
         ret_val = HM_ERR;
         goto EXIT_LABEL;
       }
+      /***************************************************************************/
+      /* Resolve active-backup if we have suitable candidates                    */
+      /***************************************************************************/
+      hm_ha_resolve_active_backup(node_cb);
       break;
 
     case HM_PEER_REPLAY_UPDATE_TYPE_PROC:

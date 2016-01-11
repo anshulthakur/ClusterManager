@@ -432,7 +432,7 @@ int32_t hm_location_update(HM_LOCATION_CB *loc_cb)
     TRACE_ASSERT(FALSE);
   }
 
-  if(hm_global_location_update(loc_cb) != HM_OK)
+  if(hm_global_location_update(loc_cb, HM_UPDATE_RUN_STATUS) != HM_OK)
   {
     TRACE_ERROR(("Error occurred while updating Hardware Location."));
     ret_val = HM_ERR;

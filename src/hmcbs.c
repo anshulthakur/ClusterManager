@@ -404,7 +404,7 @@ HM_NODE_CB * hm_alloc_node_cb(uint32_t local)
 
   node_cb->group = 0;
   node_cb->role = NODE_ROLE_PASSIVE;
-  node_cb->current_role = NODE_ROLE_PASSIVE;
+  node_cb->current_role = NODE_ROLE_NONE;
   memset(&node_cb->name, '\0', sizeof(node_cb->name));
   node_cb->transport_cb = NULL;
   node_cb->parent_location_cb = NULL;

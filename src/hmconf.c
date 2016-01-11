@@ -144,6 +144,10 @@ static int32_t hm_get_node_type(xmlNode *node)
   {
     ret_val = HM_CONFIG_ROLE;
   }
+  else if(strstr((const char *)node->name, "ha") != NULL)
+  {
+    ret_val = HM_CONFIG_HA_SPECS;
+  }
 
   /***************************************************************************/
   /* Exit Level Checks                             */
@@ -481,12 +485,67 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
       case HM_CONFIG_PERIOD:
 
         parent_node = HM_STACK_POP(stack);
-        TRACE_ASSERT(parent_node->type == HM_CONFIG_HEARTBEAT);
+        TRACE_ASSERT( parent_node->type == HM_CONFIG_HEARTBEAT||
+                      parent_node->type == HM_CONFIG_HA_SPECS);
         if (parent_node->type == HM_CONFIG_HEARTBEAT)
         {
           TRACE_DETAIL(("Parent Instance is Hardware Manager Keepalive"));
           hb_config = (HM_HEARTBEAT_CONFIG *)parent_node->opaque;
           if((ret_val = hm_get_attr_type(xmlGetProp(current_node, (const xmlChar *)"resolution")))== HM_ERR)
+          {
+            TRACE_WARN(("Error finding attribute type value. Ignoring!"));
+          }
+          else
+          {
+            switch (ret_val)
+            {
+            case HM_CONFIG_ATTR_RES_MIL_SEC:
+              TRACE_INFO(("Heartbeat resolution is in milliseconds"));
+              hb_config->resolution = HM_CONFIG_ATTR_RES_MIL_SEC;
+              break;
+            case HM_CONFIG_ATTR_RES_SEC:
+              TRACE_INFO(("Heartbeat resolution is in seconds"));
+              hb_config->resolution = HM_CONFIG_ATTR_RES_MIL_SEC;
+              break;
+            default:
+              TRACE_ERROR(("Unknown type %d", ret_val));
+            }
+          }
+          ret_val = HM_STACK_PUSH(stack, parent_node);
+          if(ret_val == HM_ERR)
+          {
+            TRACE_ERROR(("Error pushing parent node back on stack"));
+            free(parent_node);
+            free(config_node);
+            parent_node = NULL;
+            config_node = NULL;
+            goto EXIT_LABEL;
+          }
+          /***************************************************************************/
+          /* Set pointer to parent's memory                       */
+          /***************************************************************************/
+          config_node->opaque = (void *)hb_config;
+          /***************************************************************************/
+          /* We expect its value to come next                       */
+          /***************************************************************************/
+          ret_val = HM_STACK_PUSH(stack, config_node);
+          if(ret_val == HM_ERR)
+          {
+            TRACE_ERROR(("Error pushing config node back on stack"));
+            free(parent_node);
+            free(config_node);
+            parent_node = NULL;
+            config_node = NULL;
+            goto EXIT_LABEL;
+          }
+          TRACE_INFO(("[Attribute] resolution:  %s",xmlGetProp(current_node, (const xmlChar *)"resolution")));
+        }
+        else if(parent_node->type == HM_CONFIG_HA_SPECS)
+        {
+          TRACE_DETAIL(("Hardware Manager Initial Delay"));
+          hb_config = (HM_HEARTBEAT_CONFIG *)&hm_config->instance_info.ha_role;
+          if((ret_val = hm_get_attr_type(xmlGetProp(current_node,
+                                (const xmlChar *)"resolution")))== HM_ERR)
           {
             TRACE_WARN(("Error finding attribute type value. Ignoring!"));
           }
@@ -969,6 +1028,21 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
           continue;
         }
         break;
+
+      case HM_CONFIG_HA_SPECS:
+        TRACE_DETAIL(("HA Specifications."));
+
+        ret_val = HM_STACK_PUSH(stack, config_node);
+        if(ret_val == HM_ERR)
+        {
+          TRACE_ERROR(("Error pushing config node back on stack"));
+          free(config_node);
+          config_node = NULL;
+          goto EXIT_LABEL;
+        }
+        config_node->opaque = &hm_config->instance_info.ha_role;
+        break;
+
       default:
         /***************************************************************************/
         /* UNHITTABLE                                 */
@@ -1069,10 +1143,29 @@ static int32_t hm_recurse_tree(xmlNode *begin_node, HM_STACK *stack, HM_CONFIG_C
 
         case HM_CONFIG_PERIOD:
           parent_node = HM_STACK_POP(stack);
-          TRACE_ASSERT(parent_node->type == HM_CONFIG_HEARTBEAT);
+          TRACE_ASSERT((parent_node->type == HM_CONFIG_HEARTBEAT)||
+                              (parent_node->type == HM_CONFIG_HA_SPECS));
           if (parent_node->type == HM_CONFIG_HEARTBEAT)
           {
             TRACE_DETAIL(("Parent Instance is Hardware Manager Keepalive"));
+            ret_val = HM_STACK_PUSH(stack, parent_node);
+            if(ret_val == HM_ERR)
+            {
+              TRACE_ERROR(("Error pushing parent node back on stack"));
+              free(parent_node);
+              free(config_node);
+              parent_node = NULL;
+              config_node = NULL;
+              goto EXIT_LABEL;
+            }
+
+            hb_config = (HM_HEARTBEAT_CONFIG *)config_node->opaque;
+            hb_config->timer_val = atoi((const char *)current_node->content);
+            TRACE_INFO(("Heartbeat period: %d", hb_config->timer_val));
+          }
+          else if(parent_node->type == HM_CONFIG_HA_SPECS)
+          {
+            TRACE_DETAIL(("Parent instance is HA Specification."));
             ret_val = HM_STACK_PUSH(stack, parent_node);
             if(ret_val == HM_ERR)
             {

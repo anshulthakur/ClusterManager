@@ -123,7 +123,9 @@ HM_TPRT_FSM_ENTRY hm_node_fsm_table[HM_NODE_FSM_NUM_SIGNALS][HM_NODE_FSM_NUM_STA
   //HM_NDOE_FSM_TERM
   {                  //Next State        Path
 /* HM_NODE_FSM_STATE_NULL  */    {  HM_NODE_FSM_STATE_NULL    ,  FSM_ERR  },
-/* HM_NODE_FSM_STATE_WAITING */   {  HM_NODE_FSM_STATE_WAITING  ,  FSM_ERR  },
+/* FIXME: Arises when Node Up was not received from remote, but then remote HM Goes down. */
+/* HM_NODE_FSM_STATE_WAITING */   /*{  HM_NODE_FSM_STATE_WAITING  ,  FSM_ERR  },*/
+/* HM_NODE_FSM_STATE_WAITING */   {  HM_NODE_FSM_STATE_FAILING  ,  ACT_D  },
 /* HM_NODE_FSM_STATE_ACTIVE  */    {  HM_NODE_FSM_STATE_FAILING  ,  ACT_D  },
 /* HM_NODE_FSM_STATE_FAILING*/    {  HM_NODE_FSM_STATE_FAILING  ,  ACT_I  },
 /* HM_NODE_FSM_STATE_FAILED */    {  HM_NODE_FSM_STATE_FAILED  ,  ACT_NO  }
@@ -325,7 +327,7 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
       HM_TIMER_START(node_cb->timer_cb);
 
       /***************************************************************************/
-      /* Increment Parent Location's active node count               */
+      /* Increment Parent Location's active node count                           */
       /***************************************************************************/
       node_cb->parent_location_cb->active_nodes++;
       TRACE_INFO(("Parent location %d's active nodes now %d",
@@ -393,7 +395,7 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
     case ACT_I:
       TRACE_DETAIL(("Act I"));
       TRACE_DETAIL(("Node status changed. Notify subscribers."));
-      hm_global_node_update(node_cb);
+      hm_global_node_update(node_cb, HM_UPDATE_RUN_STATUS);
       if(node_cb->fsm_state == HM_NODE_FSM_STATE_FAILING)
       {
         next_input = HM_NODE_FSM_FAILED;
@@ -592,7 +594,8 @@ int32_t hm_node_add(HM_NODE_CB *node_cb, HM_LOCATION_CB *location_cb)
    {
      if(node_cb->fsm_state == HM_NODE_FSM_STATE_ACTIVE)
      {
-       if(hm_global_node_update(node_cb)!= HM_OK)
+       node_cb->parent_location_cb->active_nodes++;
+       if(hm_global_node_update(node_cb, HM_UPDATE_RUN_STATUS)!= HM_OK)
        {
          TRACE_ERROR(("Error propagating node update"));
          ret_val = HM_ERR;

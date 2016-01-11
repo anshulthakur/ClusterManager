@@ -85,7 +85,7 @@ int32_t hm_process_add(HM_PROCESS_CB *proc_cb, HM_NODE_CB *node_cb)
   /* Inherit the role of its parent node.                     */
   /***************************************************************************/
   insert_cb->role = insert_cb->parent_node_cb->role;
-
+  insert_cb->running = TRUE;
   /***************************************************************************/
   /* Create a Global Process CB Entry                       */
   /***************************************************************************/
@@ -103,7 +103,7 @@ int32_t hm_process_add(HM_PROCESS_CB *proc_cb, HM_NODE_CB *node_cb)
   /* means that process actually has been created, in that case, subscribers */
   /* must know.                                 */
   /***************************************************************************/
-  hm_global_process_update(insert_cb);
+  hm_global_process_update(insert_cb, HM_UPDATE_RUN_STATUS);
 
 EXIT_LABEL:
   /***************************************************************************/
@@ -148,7 +148,7 @@ int32_t hm_process_update(HM_PROCESS_CB *proc_cb)
   /***************************************************************************/
   /* Update the Global Tables                           */
   /***************************************************************************/
-  hm_global_process_update(proc_cb);
+  hm_global_process_update(proc_cb, HM_UPDATE_RUN_STATUS);
 
   /***************************************************************************/
   /* TODO: UPDATE Interfaces tables too                     */
