@@ -68,41 +68,52 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   /* Allocate Memory to receive the rest of Register TLVs             */
   /***************************************************************************/
   TRACE_DETAIL(("Need extra memory for %d registers.[%d/block]",
-                reg->num_register,sizeof(HM_REGISTER_TLV_CB) ));
+                reg->num_register -1 ,sizeof(HM_REGISTER_TLV_CB) ));
 
-  msg_size = msg_size + (reg->num_register * sizeof(HM_REGISTER_TLV_CB));
-  msg = hm_grow_buffer(msg, msg_size);
-  if(msg == NULL)
+  if((msg_size + ((reg->num_register - 1) * sizeof(HM_REGISTER_TLV_CB)))>msg_size)
   {
-    TRACE_ERROR(("Error allocating buffers for Incoming Message."));
-    ret_val = HM_ERR;
-    /* THIS is a terminal error. ABORT! ABORT! ABORT!*/
-    TRACE_ASSERT(FALSE);
-    goto EXIT_LABEL;
+    msg_size = msg_size + ((reg->num_register - 1) * sizeof(HM_REGISTER_TLV_CB));
+    msg = hm_grow_buffer(msg, msg_size);
+    if(msg == NULL)
+    {
+      TRACE_ERROR(("Error allocating buffers for Incoming Message."));
+      ret_val = HM_ERR;
+      /* THIS is a terminal error. ABORT! ABORT! ABORT!*/
+      TRACE_ASSERT(FALSE);
+      goto EXIT_LABEL;
+    }
+    /***************************************************************************/
+    /* Got Buffer. Set incoming buffer pointer to it and receive.         */
+    /***************************************************************************/
+    reg = (HM_REGISTER_MSG *)msg->msg;
+    tprt_cb->in_buffer = (char *)msg->msg+ sizeof(HM_REGISTER_MSG);
+    bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
+                      tprt_cb->sock_cb->sock_type,
+                      (uint8_t *)tprt_cb->in_buffer,
+                      ((reg->num_register-1) * sizeof(HM_REGISTER_TLV_CB)),
+                      &udp_sender);
+    if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB)))
+    {
+      TRACE_WARN(("Bytes received (%d) less than expected %d",
+                  bytes_rcvd, sizeof(HM_REGISTER_MSG)));
+      hm_tprt_handle_improper_read(bytes_rcvd, tprt_cb);
+      goto EXIT_LABEL;
+    }
   }
+
   /***************************************************************************/
-  /* Got Buffer. Set incoming buffer pointer to it and receive.         */
+  /* Hold transport from sending out any subscription notifications before   */
+  /* response.                                                               */
   /***************************************************************************/
-  reg = (HM_REGISTER_MSG *)msg->msg;
-  tprt_cb->in_buffer = (char *)msg->msg+ sizeof(HM_REGISTER_MSG);
-  bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
-                    tprt_cb->sock_cb->sock_type,
-                    (uint8_t *)tprt_cb->in_buffer,
-                    (reg->num_register * sizeof(HM_REGISTER_TLV_CB)),
-                    &udp_sender);
-  if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB)))
-  {
-    TRACE_WARN(("Bytes received (%d) less than expected %d",
-                bytes_rcvd, sizeof(HM_REGISTER_MSG)));
-    hm_tprt_handle_improper_read(bytes_rcvd, tprt_cb);
-    goto EXIT_LABEL;
-  }
+  TRACE_INFO(("Acquire Transport Lock!"));
+  tprt_cb->hold = TRUE;
+
   /***************************************************************************/
-  /* Have TLVs. Handle Subscription.                       */
+  /* Have TLVs. Handle Subscription.                                         */
   /***************************************************************************/
   for(i=0; i< reg->num_register; i++)
   {
-    tlv = (HM_REGISTER_TLV_CB *)tprt_cb->in_buffer + i;
+    tlv = (HM_REGISTER_TLV_CB *)reg->data + i;
     /* TODO: Possible BUG, It should be a global table entry? */
     if(hm_subscribe(reg->type, tlv->id, (void *)tprt_cb->node_cb) != HM_OK)
     {
@@ -123,9 +134,8 @@ EXIT_LABEL:
   if(ret_val == HM_OK)
   {
     TRACE_DETAIL(("Send Response"));
-    ret_val = hm_queue_on_transport(msg, tprt_cb);
+    ret_val = hm_queue_on_transport(msg, tprt_cb, TRUE);
     tprt_cb->in_buffer = NULL;
-
   }
   /***************************************************************************/
   /* Exit Level Checks                             */
@@ -245,7 +255,7 @@ EXIT_LABEL:
   if(ret_val == HM_OK)
   {
     TRACE_DETAIL(("Send Response"));
-    ret_val = hm_queue_on_transport(msg,tprt_cb);
+    ret_val = hm_queue_on_transport(msg,tprt_cb, TRUE);
     tprt_cb->in_buffer = NULL;
   }
   /***************************************************************************/
@@ -295,7 +305,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
 
   /***************************************************************************/
   /* If associated transport has a node_cb associated with it, it is a Node  */
-  /* connection. Else, it is a cluster connection/Location Connection.     */
+  /* connection. Else, it is a cluster connection/Location Connection.       */
   /***************************************************************************/
   if(sock_cb->tprt_cb->node_cb != NULL)
   {
@@ -355,6 +365,8 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
       /***************************************************************************/
       /* First copy the header from in_buffer                     */
       memcpy(msg_buf->msg, sock_cb->tprt_cb->in_buffer, sizeof(HM_MSG_HEADER));
+      memset(&sock_cb->tprt_cb->header, 0, sizeof(sock_cb->tprt_cb->header));
+
       /* Now align the in_buffer pointer to it and receive message         */
       sock_cb->tprt_cb->in_buffer = (char *)((char *)msg_buf->msg + sizeof(HM_MSG_HEADER));
       size  = sizeof(HM_REGISTER_MSG)-sizeof(HM_MSG_HEADER);
@@ -377,6 +389,8 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
         TRACE_ASSERT(FALSE);
         goto EXIT_LABEL;
       }
+      /* Cannot call free here as realloc may change pointers */
+      //hm_free_buffer(msg_buf);
       break;
 
     case HM_MSG_TYPE_UNREGISTER:
@@ -419,6 +433,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
         TRACE_ASSERT(FALSE);
         goto EXIT_LABEL;
       }
+      hm_free_buffer(msg_buf);
       break;
     case HM_MSG_TYPE_PROCESS_DESTROY:
       TRACE_DETAIL(("Received Process Destruction Message"));
@@ -458,10 +473,11 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
         TRACE_ASSERT(FALSE);
         goto EXIT_LABEL;
       }
+      hm_free_buffer(msg_buf);
       break;
 
     default:
-      TRACE_WARN(("Unknown Message Type"));
+      TRACE_WARN(("Unknown Message Type %d",msg_hdr->msg_type));
       TRACE_ASSERT(FALSE);
     }
   }//If message is from Node
@@ -631,9 +647,9 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
   init_msg->keepalive_period = node_cb->keepalive_period;
 
   /***************************************************************************/
-  /* Made message, now queue on transport and send if possible         */
+  /* Made message, now queue on transport and send if possible               */
   /***************************************************************************/
-  ret_val = hm_queue_on_transport(msg, node_cb->transport_cb);
+  ret_val = hm_queue_on_transport(msg, node_cb->transport_cb, TRUE);
   node_cb->transport_cb->in_buffer = NULL;
 
 
@@ -654,7 +670,7 @@ int32_t hm_node_send_init_rsp(HM_NODE_CB *node_cb)
  *  @param *tprt_cb Transport CB (#HM_TRANSPORT_CB) to which message is to be sent
  *  @return #HM_OK on success, #HM_ERR otherwise
  */
-int32_t hm_queue_on_transport(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
+int32_t hm_queue_on_transport(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb, uint32_t priority)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
@@ -689,7 +705,16 @@ int32_t hm_queue_on_transport(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   /* INIT Response should be the first thing that is sent on this queue. So, */
   /* add it to the head, not the tail.                       */
   /***************************************************************************/
-  HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+  if(priority)
+  {
+    HM_INSERT_AFTER(tprt_cb->pending, block->node);
+    TRACE_INFO(("Release Transport Lock!"));
+    tprt_cb->hold = FALSE;
+  }
+  else
+  {
+    HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+  }
   tprt_cb->in_buffer = NULL;
 
   /***************************************************************************/
@@ -734,6 +759,12 @@ int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *tprt_cb)
   if(tprt_cb->sock_cb == NULL)
   {
     TRACE_DETAIL(("No connection exists yet. Keep in pending buffers"));
+    ret_val = HM_OK;
+    goto EXIT_LABEL;
+  }
+  if(tprt_cb->hold==TRUE)
+  {
+    TRACE_DETAIL(("Message sending locked on transport. Keep in pending buffers."));
     ret_val = HM_OK;
     goto EXIT_LABEL;
   }

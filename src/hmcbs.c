@@ -114,6 +114,7 @@ HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t conn_type)
 
   transport_cb->in_buffer = NULL;
   transport_cb->out_buffer = NULL;
+  transport_cb->hold = FALSE;
 
   HM_INIT_ROOT(transport_cb->pending);
 

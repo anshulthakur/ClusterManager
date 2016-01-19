@@ -741,6 +741,7 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
       TRACE_DETAIL(("Message sent in full"));
       buf = NULL;
       success = TRUE;
+      total_bytes_sent +=bytes_sent;
       break;
     }
     else if (bytes_sent == -1)
@@ -882,6 +883,16 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
     if(bytes_rcvd == length)
     {
       TRACE_DETAIL(("Message received in full"));
+#ifdef I_WANT_TO_DEBUG
+      {
+        uint32_t debug_length;
+        TRACE_INFO(("Buffer:"));
+        for(debug_length=0; debug_length<length; debug_length++)
+        {
+          TRACE_INFO(("%02X", *((unsigned char *)buf+debug_length)));
+        }
+      }
+#endif
       buf = NULL;
       op_complete = TRUE;
       total_bytes_rcvd +=bytes_rcvd;

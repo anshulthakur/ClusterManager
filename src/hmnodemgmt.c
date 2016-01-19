@@ -299,9 +299,15 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
       HM_TIMER_MODIFY(node_cb->timer_cb, LOCAL.node_keepalive_period);
       node_cb->keepalive_period = LOCAL.node_keepalive_period;
       /***************************************************************************/
-      /* Arm the timer to receive a INIT request.                  */
+      /* Arm the timer to receive a INIT request.                                */
       /***************************************************************************/
       HM_TIMER_START(node_cb->timer_cb);
+      /***************************************************************************/
+      /* Lock out sending notifications on this system.                          */
+      /***************************************************************************/
+      TRACE_INFO(("Acquire Transport Lock!"));
+      node_cb->transport_cb->hold = TRUE;
+
       break;
 
     case ACT_B:

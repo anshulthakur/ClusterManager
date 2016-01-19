@@ -452,18 +452,23 @@ typedef struct hm_transport_cb {
   /***************************************************************************/
   /* A single MSG_HEADER structure pre-allocated so that we always have some */
   /* memory available to read the message header. Saves two small mallocs on */
-  /* demand                                   */
+  /* demand                                                                  */
   /* When descriptor is set, we write the header from socket into this memory*/
   /* and then, on demand, we allocate the mentioned data size memory and copy*/
   /* this message header into the beginning of that memory and rest of the   */
-  /* message in the remaining buffer.  This is better than malloc-ing a header*/
+  /* message in the remaining buffer. This is better than malloc-ing a header*/
   /* sized memory when data arrives, and then a bigger chunk later when the  */
-  /* header is parsed.                             */
+  /* header is parsed.                                                       */
   /***************************************************************************/
   union msg_header{
     HM_MSG_HEADER node_header;
     HM_PEER_MSG_UNION peer_msg;
   } header;
+
+  /***************************************************************************/
+  /* Hold sending data on socket                                             */
+  /***************************************************************************/
+  uint32_t hold;
 
 } HM_TRANSPORT_CB ;
 /**STRUCT-********************************************************************/

@@ -245,7 +245,7 @@ void hm_cluster_send_tick()
   /***************************************************************************/
   /* Message created. Now, add it to outgoing queue and try to send       */
   /***************************************************************************/
-  if(hm_queue_on_transport(msg, LOCAL.mcast_addr)!= HM_OK)
+  if(hm_queue_on_transport(msg, LOCAL.mcast_addr, FALSE)!= HM_OK)
   {
     TRACE_ERROR(("Error occured while sending Tick"));
   }
@@ -307,7 +307,7 @@ int32_t hm_cluster_send_init(HM_TRANSPORT_CB *tprt_cb)
   HM_PUT_LONG(init_msg->request, TRUE);
   HM_PUT_LONG(init_msg->response_ok, FALSE);
 
-  if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+  if(hm_queue_on_transport(msg, tprt_cb, TRUE)!= HM_OK)
   {
     TRACE_ERROR(("Error sending message to peer!"));
     ret_val = HM_ERR;
@@ -471,7 +471,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
       /***************************************************************************/
       /* Made message, now queue on transport and send if possible         */
       /***************************************************************************/
-      if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+      if(hm_queue_on_transport(msg, tprt_cb, FALSE)!= HM_OK)
       {
         TRACE_ERROR(("Error sending message to peer!"));
         ret_val = HM_ERR;
@@ -505,7 +505,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
     {
       TRACE_INFO(("No more message need be sent. Send the pending buffer and EOR!"));
       HM_PUT_LONG(replay_msg->num_tlvs, index_filled);
-      if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+      if(hm_queue_on_transport(msg, tprt_cb, FALSE)!= HM_OK)
       {
         TRACE_ERROR(("Error sending message to peer!"));
         ret_val = HM_ERR;
@@ -615,7 +615,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
         /***************************************************************************/
         /* Made message, now queue on transport and send if possible         */
         /***************************************************************************/
-        if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+        if(hm_queue_on_transport(msg, tprt_cb, FALSE)!= HM_OK)
         {
           TRACE_ERROR(("Error sending message to peer!"));
           ret_val = HM_ERR;
@@ -647,7 +647,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
     /***************************************************************************/
     /* Made message, now queue on transport and send if possible         */
     /***************************************************************************/
-    if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+    if(hm_queue_on_transport(msg, tprt_cb, FALSE)!= HM_OK)
     {
       TRACE_ERROR(("Error sending message to peer!"));
       ret_val = HM_ERR;
@@ -720,7 +720,7 @@ int32_t hm_cluster_send_end_of_replay(HM_TRANSPORT_CB *tprt_cb)
   /* Not the last message */
   HM_PUT_LONG(replay_msg->last, 1);
 
-  if(hm_queue_on_transport(msg, tprt_cb)!= HM_OK)
+  if(hm_queue_on_transport(msg, tprt_cb, FALSE)!= HM_OK)
   {
     TRACE_ERROR(("Error sending message to peer!"));
     ret_val = HM_ERR;
@@ -815,7 +815,7 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
       /***************************************************************************/
       /* Queue on port                               */
       /***************************************************************************/
-      if(hm_queue_on_transport(msg, sock_cb->tprt_cb)!= HM_OK)
+      if(hm_queue_on_transport(msg, sock_cb->tprt_cb, TRUE)!= HM_OK)
       {
         TRACE_ERROR(("Error while sending INIT response."));
         TRACE_ASSERT(FALSE);
@@ -1370,7 +1370,7 @@ int32_t hm_cluster_send_update(void *cb)
         /***************************************************************************/
         TRACE_DETAIL(("Skipping %d", loc_cb->index));
       }
-      ret_val = hm_queue_on_transport(msg, loc_cb->loc_cb->peer_listen_cb);
+      ret_val = hm_queue_on_transport(msg, loc_cb->loc_cb->peer_listen_cb, FALSE);
     }
     /***************************************************************************/
     /* We've sent/queued message on all transports. Release buffer on our side */

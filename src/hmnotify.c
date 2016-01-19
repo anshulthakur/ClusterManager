@@ -643,12 +643,12 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
     break;
 
   case HM_NOTIFICATION_PROCESS_CREATED:
-    TRACE_INFO(("Process Created"));
+
     notify_msg->type = HM_NOTIFY_TYPE_PROC_AVAILABLE;
     notify_msg->id = affected_node.process_cb->pid;
     notify_msg->if_id = 0;
     notify_msg->proc_type = affected_node.process_cb->type;
-
+    TRACE_INFO(("Process  %x Created", notify_msg->id ));
     TRACE_ASSERT(affected_node.process_cb->proc_cb->parent_node_cb->transport_cb != NULL);
 
     addr = (HM_SOCKADDR_UNION *)&(
@@ -854,9 +854,6 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
     TRACE_ERROR(("Unknown notification type"));
     TRACE_ASSERT(FALSE);
   }
-
-  notify_msg->id = 0;
-  notify_msg->if_id = 0;
 
 EXIT_LABEL:
   /***************************************************************************/

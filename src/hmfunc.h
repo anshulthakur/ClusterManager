@@ -102,7 +102,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *);
 int32_t hm_tprt_handle_improper_read(int32_t , HM_TRANSPORT_CB *);
 int32_t hm_receive_msg_hdr(char *);
 int32_t hm_node_send_init_rsp(HM_NODE_CB *);
-int32_t hm_queue_on_transport(HM_MSG *, HM_TRANSPORT_CB *);
+int32_t hm_queue_on_transport(HM_MSG *, HM_TRANSPORT_CB *, uint32_t);
 int32_t hm_tprt_process_outgoing_queue(HM_TRANSPORT_CB *);
 
 /* hmtprt.c */

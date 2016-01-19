@@ -302,7 +302,7 @@ int32_t hm_cluster_send_ha_update(HM_NODE_CB *master_node, HM_NODE_CB *slave_nod
   /***************************************************************************/
   /* Message created. Now, add it to outgoing queue and try to send          */
   /***************************************************************************/
-  if(hm_queue_on_transport(msg, dest_node->transport_cb)!= HM_OK)
+  if(hm_queue_on_transport(msg, dest_node->transport_cb, FALSE)!= HM_OK)
   {
     TRACE_ERROR(("Error occured while sending HA Update"));
     ret_val = HM_ERR;

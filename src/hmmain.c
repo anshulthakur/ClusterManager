@@ -1132,7 +1132,7 @@ void hm_run_main_thread()
               sock_cb->tprt_cb = node_cb.proper_node_cb->transport_cb;
 
               /***************************************************************************/
-              /* Call into Node FSM signifying an INIT receive message.           */
+              /* Call into Node FSM signifying an INIT receive message.                  */
               /***************************************************************************/
               hm_node_fsm(HM_NODE_FSM_INIT, node_cb.proper_node_cb);
 
@@ -1221,7 +1221,7 @@ void hm_run_main_thread()
                 HM_PUT_LONG(peer_init_msg->request, FALSE );
                 HM_PUT_LONG(peer_init_msg->response_ok, TRUE);
 
-                if(hm_queue_on_transport(buf, sock_cb->tprt_cb)!= HM_OK)
+                if(hm_queue_on_transport(buf, sock_cb->tprt_cb, TRUE)!= HM_OK)
                 {
                   TRACE_ERROR(("Error sending INIT response!"));
                   TRACE_ASSERT((FALSE));
