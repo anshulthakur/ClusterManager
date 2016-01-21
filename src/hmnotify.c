@@ -732,11 +732,18 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
   case HM_NOTIFICATION_NODE_ROLE_ACTIVE:
     TRACE_INFO(("Node Role Active"));
     TRACE_INFO(("Node %d role change to %s", affected_node.node_cb->index,
-        (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?"Active":"Passive"));
+        (affected_node.node_cb->role==NODE_ROLE_PASSIVE)?"Passive":"Active/None"));
     notify_msg->hdr.msg_type = HM_MSG_TYPE_HA_UPDATE;
 
-    notify_msg->type = (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?
+    if(affected_node.node_cb->role != HM_HA_NODE_ROLE_NONE)
+    {
+      notify_msg->type = (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?
                             HM_HA_NODE_ROLE_ACTIVE:HM_HA_NODE_ROLE_PASSIVE;
+    }
+    else
+    {
+      notify_msg->type = HM_HA_NODE_ROLE_NONE;
+    }
     notify_msg->id = 0;
     notify_msg->proc_type = 0;
 
@@ -793,13 +800,20 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
     break;
 
   case HM_NOTIFICATION_NODE_ROLE_PASSIVE:
-    TRACE_INFO(("Node Role Passive"));
+    TRACE_INFO(("Node Role Passive or None"));
     TRACE_INFO(("Node %d role change to %s", affected_node.node_cb->index,
-        (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?"Active":"Passive"));
+        (affected_node.node_cb->role==NODE_ROLE_PASSIVE)?"Passive":"Active/None"));
     notify_msg->hdr.msg_type = HM_MSG_TYPE_HA_UPDATE;
 
-    notify_msg->type = (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?
+    if(affected_node.node_cb->role != HM_HA_NODE_ROLE_NONE)
+    {
+      notify_msg->type = (affected_node.node_cb->role==NODE_ROLE_ACTIVE)?
                             HM_HA_NODE_ROLE_ACTIVE:HM_HA_NODE_ROLE_PASSIVE;
+    }
+    else
+    {
+      notify_msg->type = HM_HA_NODE_ROLE_NONE;
+    }
     notify_msg->id = 0;
     notify_msg->if_id = 0;
     notify_msg->proc_type = 0;

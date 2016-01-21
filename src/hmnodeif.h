@@ -45,6 +45,7 @@
 /***************************************************************************/
 /* HA Roles used in HA_UPDATE_MSG                       */
 /***************************************************************************/
+#define HM_HA_NODE_ROLE_NONE                ((uint32_t) 0) /* Node must become active */
 #define HM_HA_NODE_ROLE_ACTIVE              ((uint32_t) 1) /* Node must become active */
 #define HM_HA_NODE_ROLE_PASSIVE             ((uint32_t) 2) /* Node must become passive */
 /***************************************************************************/
@@ -384,6 +385,11 @@ typedef struct hm_notification_msg
  * @brief HA Status Update Message
  *
  * Master/Slave updates for overall nodes.
+ *
+ * @detail This message is a unidirectional message that is sent by a HM-Partner
+ * to the HM informing that the User has set the role explicitly.
+ *
+ * For HA Role updates from HM to HM Interface users, Notification is used.
  */
 typedef struct hm_ha_status_update_msg
 {

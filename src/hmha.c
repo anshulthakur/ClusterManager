@@ -52,12 +52,21 @@ int32_t hm_ha_role_update_callback(void *location_cb)
     if(node_cb->current_role == NODE_ROLE_NONE)
     {
       TRACE_DETAIL(("Node %d did not receive any update on cluster.", node_cb->index));
-      /* Set role to that set in desired role field (role)*/
-      node_cb->current_role = node_cb->role;
+      /* Set role to that set in desired role field (role) if it is active. */
+      /* If it is set to passive, then we cannot promote it to active.      */
+      if(node_cb->role == NODE_ROLE_PASSIVE)
+      {
+        TRACE_WARN(("Cannot set Node to passive without any active."));
+        continue;
+      }
+      else
+      {
+        node_cb->current_role = node_cb->role;
+      }
     }
     /* Else if it was updated, we'll send that value only.*/
     TRACE_DETAIL(("Set node as %s",
-                  (node_cb->role==NODE_ROLE_ACTIVE? "active": "passive")));
+                  (node_cb->current_role==NODE_ROLE_PASSIVE?"Passive":"Active/None")));
     /***************************************************************************/
     /* Check if the node is running or not.                                    */
     /* If running, then we will send it an HA Role update.                     */
@@ -73,14 +82,13 @@ int32_t hm_ha_role_update_callback(void *location_cb)
     /***************************************************************************/
     /* Send update on cluster about its updated role.                          */
     /***************************************************************************/
-
   }
+
+EXIT_LABEL:
   /***************************************************************************/
   /* Stop the timer                                                          */
   /***************************************************************************/
   HM_TIMER_STOP(LOCAL.local_location_cb.ha_timer_cb);
-
-EXIT_LABEL:
   /***************************************************************************/
   /* Exit Level Checks                                                       */
   /***************************************************************************/
@@ -504,6 +512,10 @@ void hm_ha_resolve_active_backup(HM_NODE_CB *node_cb)
           {
             /* If the other node is a local node, setup subscriptions too.*/
             hm_subscribe(HM_REG_SUBS_TYPE_NODE, node_cb->id, (void *)glob_cb);
+            if(hm_global_node_update(glob_cb->node_cb, HM_UPDATE_NODE_ROLE)!=HM_OK)
+            {
+              TRACE_ERROR(("Error updating global node."));
+            }
           }
         }
       }

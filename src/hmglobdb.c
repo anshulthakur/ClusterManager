@@ -546,8 +546,9 @@ int32_t hm_global_node_update(HM_NODE_CB *node_cb, uint32_t op)
 
       case HM_UPDATE_NODE_ROLE:
         TRACE_DETAIL(("Node Role update."));
+        /* Active and None behave alike. */
         TRACE_DETAIL(("Node must be %s",
-            (node_cb->role== NODE_ROLE_PASSIVE)?"passive":"active"));
+            (node_cb->role== NODE_ROLE_PASSIVE)?"Passive":"Active/None"));
         notify = (node_cb->role== NODE_ROLE_PASSIVE)?
             HM_NOTIFICATION_NODE_ROLE_PASSIVE:HM_NOTIFICATION_NODE_ROLE_ACTIVE;
         break;

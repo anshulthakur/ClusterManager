@@ -19,7 +19,8 @@ void hm_terminate();
 
 /* hmconf.c */
 int32_t hm_parse_config(HM_CONFIG_CB *, char *);
-
+int32_t hm_write_config_file(char *);
+int32_t hm_config_write_node(xmlNodeSet *, const xmlChar* );
 /* hmcbs.c */
 HM_CONFIG_CB * hm_alloc_config_cb();
 HM_TRANSPORT_CB * hm_alloc_transport_cb(uint32_t);
