@@ -23,6 +23,9 @@ int32_t hm_service_notify_queue()
   /* Variable Declarations                           */
   /***************************************************************************/
   HM_NOTIFICATION_CB *notify_cb = NULL, *temp = NULL;
+  HM_NOTIFICATION_MSG *notify_msg = NULL;
+  HM_TRANSPORT_CB *tprt_cb = NULL;
+
   HM_SUBSCRIBER affected_node, subscriber;
   HM_MSG *msg = NULL;
   int32_t ret_val = HM_OK;
@@ -78,8 +81,6 @@ int32_t hm_service_notify_queue()
           list_member != NULL;
         list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(list_member->node))
       {
-
-        //TODO
         processed = (uint32_t *)list_member->opaque;
         TRACE_ASSERT(processed != NULL);
         if( *processed >= notify_cb->id)
@@ -87,28 +88,49 @@ int32_t hm_service_notify_queue()
           TRACE_DETAIL(("Subscriber has been serviced!"));
           continue;
         }
-        /***************************************************************************/
-        /* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
-        /* will be notified.                             */
-        /* Later, this must be improved (by using switch case on the table_type    */
-        /* field, to allow location to node, or node to locations subs.         */
-        /***************************************************************************/
-        subscriber.node_cb = (HM_GLOBAL_NODE_CB *)list_member->target;
+        subscriber.void_cb = (void *)list_member->target;
+        switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+        {
+          case HM_TABLE_TYPE_NODES:
+            TRACE_DETAIL(("Global Node type"));
+            tprt_cb = subscriber.node_cb->node_cb->transport_cb;
+            break;
 
-        TRACE_ASSERT(subscriber.node_cb != NULL);
-        TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+          case HM_TABLE_TYPE_PROCESS:
+            TRACE_DETAIL(("Global Process type"));
+            tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_NODES_LOCAL:
+            TRACE_DETAIL(("Node Structure."));
+            tprt_cb = subscriber.proper_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_PROCESS_LOCAL:
+            TRACE_DETAIL(("Local Process Structure."));
+            TRACE_ASSERT(subscriber.proper_process_cb->parent_node_cb != NULL);
+            /* Fixup PID values in message and then, fixup subscriber pointer */
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.proper_process_cb->pid;
+            tprt_cb = subscriber.proper_process_cb->parent_node_cb->transport_cb;
+            break;
+
+          default:
+            TRACE_WARN(("Unknown type of subscriber"));
+            TRACE_ASSERT((FALSE));
+        }
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
         /* node.                                   */
         /***************************************************************************/
-        if(subscriber.node_cb->node_cb->transport_cb != NULL)
+        if(tprt_cb != NULL)
         {
           block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
           if(block == NULL)
           {
             TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
+            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
             ret_val = HM_ERR;
             goto EXIT_LABEL;
           }
@@ -116,13 +138,9 @@ int32_t hm_service_notify_queue()
 
           block->target = msg;
 
-          HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
           msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
-          /***************************************************************************/
-          /* Mark the Node as serviced.                         */
-          /***************************************************************************/
-          processed = (uint32_t *)list_member->opaque;
+          hm_tprt_process_outgoing_queue(tprt_cb);
           *processed = notify_cb->id;
         }
         else
@@ -165,8 +183,6 @@ int32_t hm_service_notify_queue()
           list_member != NULL;
         list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(list_member->node))
       {
-
-        //TODO
         processed = (uint32_t *)list_member->opaque;
         TRACE_ASSERT(processed != NULL);
         if( *processed >= notify_cb->id)
@@ -174,28 +190,49 @@ int32_t hm_service_notify_queue()
           TRACE_DETAIL(("Subscriber has been serviced!"));
           continue;
         }
-        /***************************************************************************/
-        /* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
-        /* will be notified.                             */
-        /* Later, this must be improved (by using switch case on the table_type    */
-        /* field, to allow location to node, or node to locations subs.         */
-        /***************************************************************************/
-        subscriber.node_cb = (HM_GLOBAL_NODE_CB *)list_member->target;
+        subscriber.void_cb = (void *)list_member->target;
+        switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+        {
+          case HM_TABLE_TYPE_NODES:
+            TRACE_DETAIL(("Global Node type"));
+            tprt_cb = subscriber.node_cb->node_cb->transport_cb;
+            break;
 
-        TRACE_ASSERT(subscriber.node_cb != NULL);
-        TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+          case HM_TABLE_TYPE_PROCESS:
+            TRACE_DETAIL(("Global Process type"));
+            tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_NODES_LOCAL:
+            TRACE_DETAIL(("Node Structure."));
+            tprt_cb = subscriber.proper_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_PROCESS_LOCAL:
+            TRACE_DETAIL(("Local Process Structure."));
+            TRACE_ASSERT(subscriber.proper_process_cb->parent_node_cb != NULL);
+            /* Fixup PID values in message and then, fixup subscriber pointer */
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.proper_process_cb->pid;
+            tprt_cb = subscriber.proper_process_cb->parent_node_cb->transport_cb;
+            break;
+
+          default:
+            TRACE_WARN(("Unknown type of subscriber"));
+            TRACE_ASSERT((FALSE));
+        }
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
         /* node.                                   */
         /***************************************************************************/
-        if(subscriber.node_cb->node_cb->transport_cb != NULL)
+        if(tprt_cb != NULL)
         {
           block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
           if(block == NULL)
           {
             TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
+            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
             ret_val = HM_ERR;
             goto EXIT_LABEL;
           }
@@ -203,12 +240,9 @@ int32_t hm_service_notify_queue()
 
           block->target = msg;
 
-          HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
           msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
-          /***************************************************************************/
-          /* Mark the Node as serviced.                         */
-          /***************************************************************************/
+          hm_tprt_process_outgoing_queue(tprt_cb);
           *processed = notify_cb->id;
         }
         else
@@ -253,8 +287,6 @@ int32_t hm_service_notify_queue()
         list_member != NULL;
         list_member = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(list_member->node))
       {
-
-        //TODO
         processed = (uint32_t *)list_member->opaque;
         TRACE_ASSERT(processed != NULL);
         if( *processed >= notify_cb->id)
@@ -262,28 +294,49 @@ int32_t hm_service_notify_queue()
           TRACE_DETAIL(("Subscriber has been serviced!"));
           continue;
         }
-        /***************************************************************************/
-        /* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
-        /* will be notified.                             */
-        /* Later, this must be improved (by using switch case on the table_type    */
-        /* field, to allow location to node, or node to locations subs.         */
-        /***************************************************************************/
-        subscriber.node_cb = (HM_GLOBAL_NODE_CB *)list_member->target;
+        subscriber.void_cb = (void *)list_member->target;
+        switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+        {
+          case HM_TABLE_TYPE_NODES:
+            TRACE_DETAIL(("Global Node type"));
+            tprt_cb = subscriber.node_cb->node_cb->transport_cb;
+            break;
 
-        TRACE_ASSERT(subscriber.node_cb != NULL);
-        TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+          case HM_TABLE_TYPE_PROCESS:
+            TRACE_DETAIL(("Global Process type"));
+            tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_NODES_LOCAL:
+            TRACE_DETAIL(("Node Structure."));
+            tprt_cb = subscriber.proper_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_PROCESS_LOCAL:
+            TRACE_DETAIL(("Local Process Structure."));
+            TRACE_ASSERT(subscriber.proper_process_cb->parent_node_cb != NULL);
+            /* Fixup PID values in message and then, fixup subscriber pointer */
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.proper_process_cb->pid;
+            tprt_cb = subscriber.proper_process_cb->parent_node_cb->transport_cb;
+            break;
+
+          default:
+            TRACE_WARN(("Unknown type of subscriber"));
+            TRACE_ASSERT((FALSE));
+        }
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
         /* node.                                   */
         /***************************************************************************/
-        if(subscriber.node_cb->node_cb->transport_cb != NULL)
+        if(tprt_cb != NULL)
         {
           block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
           if(block == NULL)
           {
             TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
+            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
             ret_val = HM_ERR;
             goto EXIT_LABEL;
           }
@@ -291,9 +344,9 @@ int32_t hm_service_notify_queue()
 
           block->target = msg;
 
-          HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
           msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+          hm_tprt_process_outgoing_queue(tprt_cb);
           *processed = notify_cb->id;
         }
         else
@@ -346,22 +399,44 @@ int32_t hm_service_notify_queue()
           TRACE_DETAIL(("Subscriber has been serviced!"));
           continue;
         }
-        /***************************************************************************/
-        /* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
-        /* will be notified.                             */
-        /* Later, this must be improved (by using switch case on the table_type    */
-        /* field, to allow location to node, or node to locations subs.         */
-        /***************************************************************************/
-        subscriber.node_cb = (HM_GLOBAL_NODE_CB *)list_member->target;
 
-        TRACE_ASSERT(subscriber.node_cb != NULL);
-        TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+        subscriber.void_cb = (void *)list_member->target;
+        switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+        {
+          case HM_TABLE_TYPE_NODES:
+            TRACE_DETAIL(("Global Node type"));
+            tprt_cb = subscriber.node_cb->node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_PROCESS:
+            TRACE_DETAIL(("Global Process type"));
+            tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_NODES_LOCAL:
+            TRACE_DETAIL(("Node Structure."));
+            tprt_cb = subscriber.proper_node_cb->transport_cb;
+            break;
+
+          case HM_TABLE_TYPE_PROCESS_LOCAL:
+            TRACE_DETAIL(("Local Process Structure."));
+            TRACE_ASSERT(subscriber.proper_process_cb->parent_node_cb != NULL);
+            /* Fixup PID values in message and then, fixup subscriber pointer */
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.proper_process_cb->pid;
+            tprt_cb = subscriber.proper_process_cb->parent_node_cb->transport_cb;
+            break;
+
+          default:
+            TRACE_WARN(("Unknown type of subscriber"));
+            TRACE_ASSERT((FALSE));
+        }
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
         /* node.                                   */
         /***************************************************************************/
-        if(subscriber.node_cb->node_cb->transport_cb != NULL)
+        if(tprt_cb != NULL)
         {
           block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
           if(block == NULL)
@@ -374,10 +449,9 @@ int32_t hm_service_notify_queue()
           HM_INIT_LQE(block->node, block);
 
           block->target = msg;
-
-          HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
           msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+          hm_tprt_process_outgoing_queue(tprt_cb);
           *processed = notify_cb->id;
         }
         else
@@ -418,22 +492,43 @@ int32_t hm_service_notify_queue()
       /***************************************************************************/
       notify_cb->ref_count = 1 ;
 
-      /***************************************************************************/
-      /* For Now, I am just assuming that only nodes subscribe to nodes and hence*/
-      /* will be notified.                             */
-      /* Later, this must be improved (by using switch case on the table_type    */
-      /* field, to allow location to node, or node to locations subs.         */
-      /***************************************************************************/
-      subscriber.node_cb = (HM_GLOBAL_NODE_CB *)affected_node.node_cb;
+      subscriber.void_cb = (void *)affected_node.void_cb;
+      switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+      {
+        case HM_TABLE_TYPE_NODES:
+          TRACE_DETAIL(("Global Node type"));
+          tprt_cb = subscriber.node_cb->node_cb->transport_cb;
+          break;
 
-      TRACE_ASSERT(subscriber.node_cb != NULL);
-      TRACE_ASSERT(subscriber.node_cb->node_cb != NULL);
+        case HM_TABLE_TYPE_PROCESS:
+          TRACE_DETAIL(("Global Process type"));
+          tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
+          break;
+
+        case HM_TABLE_TYPE_NODES_LOCAL:
+          TRACE_DETAIL(("Node Structure."));
+          tprt_cb = subscriber.proper_node_cb->transport_cb;
+          break;
+
+        case HM_TABLE_TYPE_PROCESS_LOCAL:
+          TRACE_DETAIL(("Local Process Structure."));
+          TRACE_ASSERT(subscriber.proper_process_cb->parent_node_cb != NULL);
+          /* Fixup PID values in message and then, fixup subscriber pointer */
+          notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+          notify_msg->subs_pid = subscriber.proper_process_cb->pid;
+          tprt_cb = subscriber.proper_process_cb->parent_node_cb->transport_cb;
+          break;
+
+        default:
+          TRACE_WARN(("Unknown type of subscriber"));
+          TRACE_ASSERT((FALSE));
+      }
 
       /***************************************************************************/
       /* Append the message to the outgoing message queue on the transport of the*/
       /* node.                                   */
       /***************************************************************************/
-      if(subscriber.node_cb->node_cb->transport_cb != NULL)
+      if(tprt_cb != NULL)
       {
         block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
         if(block == NULL)
@@ -447,9 +542,9 @@ int32_t hm_service_notify_queue()
 
         block->target = msg;
 
-        HM_INSERT_BEFORE(subscriber.node_cb->node_cb->transport_cb->pending, block->node);
+        HM_INSERT_BEFORE(tprt_cb->pending, block->node);
         msg->ref_count++; /* This is more important */
-        hm_tprt_process_outgoing_queue(subscriber.node_cb->node_cb->transport_cb);
+        hm_tprt_process_outgoing_queue(tprt_cb);
       }
       else
       {

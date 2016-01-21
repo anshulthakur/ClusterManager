@@ -26,6 +26,10 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
 
   int32_t msg_size = sizeof(HM_REGISTER_MSG);
 
+  void *subscriber = NULL;
+
+  HM_PROCESS_CB *proc_cb = NULL;
+
   SOCKADDR *udp_sender;
 
   HM_REGISTER_TLV_CB *tlv = NULL;
@@ -45,17 +49,42 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   if(reg->subscriber_pid != 0)
   {
     /***************************************************************************/
-    /* PID has been provided. Pass to Process Management.             */
+    /* PID has been provided. Pass to Process Management.                      */
     /* For now, even if a process is subscribing to notifications, they will be*/
     /* dispatched on a nodal level. This is because more than one processes on */
     /* a node may subscribe to the same notifications and in such a case rather*/
     /* than sending multiple notifications from HM itself, the distribution of */
-    /* a single notification into multiple is done at the HM-Stub end.       */
-    /* Thus, PID becomes irrelevant right now.                    */
+    /* a single notification into multiple is done at the HM-Stub end.         */
+    /* Thus, PID becomes irrelevant right now.                                 */
     /* It can however be changed easily by calling hm_subscribe on the subscri-*/
-    /*-ption entity of the process rather than the node.             */
+    /*-ption entity of the process rather than the node.                       */
     /***************************************************************************/
     TRACE_DETAIL(("Subscriber PID: 0x%x", reg->subscriber_pid));
+    /* Find subscribing process */
+    for(proc_cb = (HM_PROCESS_CB *)HM_AVL3_FIRST(tprt_cb->node_cb->process_tree,
+                                                  node_process_tree_by_proc_id);
+        proc_cb !=NULL;
+        proc_cb = (HM_PROCESS_CB *)HM_AVL3_NEXT(proc_cb->node,
+                                                  node_process_tree_by_proc_id))
+    {
+      if(proc_cb->pid == reg->subscriber_pid)
+      {
+        TRACE_DETAIL(("Found process."));
+        subscriber = (void *)proc_cb;
+        break;
+      }
+    }
+    TRACE_ASSERT(proc_cb!=NULL);
+    if(proc_cb == NULL)
+    {
+      TRACE_WARN(("Process %x not found on Node.", reg->subscriber_pid));
+      /* Register to Node instead. In release only. */
+      subscriber = (void *)tprt_cb->node_cb;
+    }
+  }
+  else
+  {
+    subscriber = (void *)tprt_cb->node_cb;
   }
   if(reg->num_register ==0)
   {
@@ -115,7 +144,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   {
     tlv = (HM_REGISTER_TLV_CB *)reg->data + i;
     /* TODO: Possible BUG, It should be a global table entry? */
-    if(hm_subscribe(reg->type, tlv->id, (void *)tprt_cb->node_cb) != HM_OK)
+    if(hm_subscribe(reg->type, tlv->id, subscriber) != HM_OK)
     {
       TRACE_ERROR(("Error creating subscriptions."));
       ret_val = HM_ERR;
