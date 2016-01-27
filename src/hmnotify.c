@@ -98,6 +98,8 @@ int32_t hm_service_notify_queue()
 
           case HM_TABLE_TYPE_PROCESS:
             TRACE_DETAIL(("Global Process type"));
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.process_cb->pid;
             tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
             break;
 
@@ -200,6 +202,8 @@ int32_t hm_service_notify_queue()
 
           case HM_TABLE_TYPE_PROCESS:
             TRACE_DETAIL(("Global Process type"));
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.process_cb->pid;
             tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
             break;
 
@@ -304,6 +308,8 @@ int32_t hm_service_notify_queue()
 
           case HM_TABLE_TYPE_PROCESS:
             TRACE_DETAIL(("Global Process type"));
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.process_cb->pid;
             tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
             break;
 
@@ -410,6 +416,8 @@ int32_t hm_service_notify_queue()
 
           case HM_TABLE_TYPE_PROCESS:
             TRACE_DETAIL(("Global Process type"));
+            notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+            notify_msg->subs_pid = subscriber.process_cb->pid;
             tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
             break;
 
@@ -502,6 +510,8 @@ int32_t hm_service_notify_queue()
 
         case HM_TABLE_TYPE_PROCESS:
           TRACE_DETAIL(("Global Process type"));
+          notify_msg = (HM_NOTIFICATION_MSG *)msg->msg;
+          notify_msg->subs_pid = subscriber.process_cb->pid;
           tprt_cb = subscriber.process_cb->proc_cb->parent_node_cb->transport_cb;
           break;
 
