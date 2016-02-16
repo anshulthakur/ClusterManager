@@ -144,6 +144,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   {
     tlv = (HM_REGISTER_TLV_CB *)reg->data + i;
     /* TODO: Possible BUG, It should be a global table entry? */
+    TRACE_INFO(("Subscribe to %x", tlv->id));
     if(hm_subscribe(reg->type, tlv->id, subscriber) != HM_OK)
     {
       TRACE_ERROR(("Error creating subscriptions."));

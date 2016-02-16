@@ -414,6 +414,7 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
       if(node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
       {
         hm_tprt_close_connection(node_cb->transport_cb);
+        HM_TIMER_STOP(node_cb->timer_cb);
       }
       else
       {

@@ -883,6 +883,7 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
     if(bytes_rcvd == length)
     {
       TRACE_DETAIL(("Message received in full"));
+#if 0
 #ifdef I_WANT_TO_DEBUG
       {
         uint32_t debug_length;
@@ -892,6 +893,7 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
           TRACE_INFO(("%02X", *((unsigned char *)buf+debug_length)));
         }
       }
+#endif
 #endif
       buf = NULL;
       op_complete = TRUE;

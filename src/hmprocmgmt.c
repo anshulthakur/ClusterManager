@@ -73,14 +73,14 @@ int32_t hm_process_add(HM_PROCESS_CB *proc_cb, HM_NODE_CB *node_cb)
     /* Fixup pointers. We'll use insert_cb only from now on.           */
     /***************************************************************************/
     insert_cb = proc_cb;
-    /***************************************************************************/
-    /* Increment it's parent location's number of active processes count     */
-    /***************************************************************************/
-    proc_cb->parent_node_cb->parent_location_cb->active_processes++;
-    TRACE_INFO(("Parent location %d's active processes now %d",
-        proc_cb->parent_node_cb->parent_location_cb->index,
-        proc_cb->parent_node_cb->parent_location_cb->active_processes));
   }
+  /***************************************************************************/
+  /* Increment it's parent location's number of active processes count     */
+  /***************************************************************************/
+  insert_cb->parent_node_cb->parent_location_cb->active_processes++;
+  TRACE_INFO(("Parent location %d's active processes now %d",
+              insert_cb->parent_node_cb->parent_location_cb->index,
+              insert_cb->parent_node_cb->parent_location_cb->active_processes));
   /***************************************************************************/
   /* Inherit the role of its parent node.                     */
   /***************************************************************************/
