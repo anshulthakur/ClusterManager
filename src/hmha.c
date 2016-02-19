@@ -511,7 +511,7 @@ void hm_ha_resolve_active_backup(HM_NODE_CB *node_cb)
           if(glob_cb->node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
           {
             /* If the other node is a local node, setup subscriptions too.*/
-            hm_subscribe(HM_REG_SUBS_TYPE_NODE, node_cb->id, (void *)glob_cb);
+            hm_subscribe(HM_REG_SUBS_TYPE_NODE, node_cb->id, (void *)glob_cb, FALSE);
             if(hm_global_node_update(glob_cb->node_cb, HM_UPDATE_NODE_ROLE)!=HM_OK)
             {
               TRACE_ERROR(("Error updating global node."));

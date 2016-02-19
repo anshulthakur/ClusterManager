@@ -215,7 +215,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
   LOCAL.next_node_tree_id = 1;
 
   /* Aggregate Processes Tree */
-  HM_AVL3_INIT_TREE(LOCAL.process_tree, nodes_tree_by_db_id);
+  HM_AVL3_INIT_TREE(LOCAL.process_tree, process_tree_by_db_id);
   LOCAL.next_process_tree_id = 1;
 
   /* Aggregate PID Tree  */
@@ -237,7 +237,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
   HM_INIT_ROOT(LOCAL.notification_queue);
   LOCAL.next_notification_id = 1;
 
-  /* Wildcard Queue */
+  /* Wildcard list */
   HM_INIT_ROOT(LOCAL.table_root_subscribers);
 
   /***************************************************************************/
@@ -460,7 +460,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
         subs != NULL;
         subs = (HM_CONFIG_SUBSCRIPTION_CB *)HM_NEXT_IN_LIST(subs->node))
       {
-        if(hm_subscribe(subs->subs_type, subs->value, (void *)node_config_cb->node_cb) != HM_OK)
+        if(hm_subscribe(subs->subs_type, subs->value, (void *)node_config_cb->node_cb, FALSE) != HM_OK)
         {
           TRACE_ERROR(("Error creating subscriptions."));
           ret_val = HM_ERR;

@@ -1053,6 +1053,17 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
     }
     break;
 
+  case HM_PEER_MSG_TYPE_BINDING:
+    TRACE_DETAIL(("Received Subscription binding message"));
+    msg = (HM_PEER_MSG_UNION *)sock_cb->tprt_cb->in_buffer;
+    if(hm_cluster_recv_binding((HM_PEER_MSG_BINDING *)msg, loc_cb)!=HM_OK)
+    {
+      TRACE_ERROR(("Error processing Subscription bidning!"));
+      ret_val = HM_ERR;
+      goto EXIT_LABEL;
+    }
+    break;
+
   default:
     TRACE_WARN(("Unknown Message type."));
     TRACE_ASSERT(FALSE);
@@ -1218,13 +1229,6 @@ EXIT_LABEL:
 }/* hm_cluster_process_replay */
 
 
-/***************************************************************************/
-/* Name:  hm_cluster_send_update                   */
-/* Parameters: Input -                     */
-/*         Input/Output -                */
-/* Return:  int32_t                  */
-/* Purpose: Sends out an update on the status of this entry in DB      */
-/***************************************************************************/
 /**
  *  @brief Sends out an update on the status of this entry in DB
  *
@@ -1385,3 +1389,270 @@ EXIT_LABEL:
   TRACE_EXIT();
   return(ret_val);
 }/* hm_cluster_send_update */
+
+/**
+ *  hm_cluster_exchange_binding
+ *  @brief Sends out subscription bindings on the cluster
+ *
+ *  @param *src_cb A global table entry pointer for the local entity which subscribed.
+ *  @param num_bindings Number of bindings to be propagated
+ *  @param *reg_msg Register Message from which to extract requests
+ *
+ *  @return Nothing
+ */
+void hm_cluster_exchange_binding(void *cb, uint32_t num_bindings, void *reg_msg)
+{
+  /***************************************************************************/
+  /* Local Variables                                                         */
+  /***************************************************************************/
+  HM_PEER_MSG_BINDING *bind_msg = NULL;
+  HM_PEER_BINDING_CB *binding_cb = NULL;
+  HM_REGISTER_TLV_CB *tlv = NULL;
+  int32_t i =0, subscriber_type, reqd;
+  HM_SUBSCRIBER subscriber;
+
+  int32_t packed = 0, total_packed = 0;
+
+  HM_MSG *msg=NULL;
+  HM_GLOBAL_LOCATION_CB *loc_cb;
+  /***************************************************************************/
+  /* Sanity Checks                                                           */
+  /***************************************************************************/
+  TRACE_ENTRY();
+
+  TRACE_ASSERT(cb !=NULL);
+  TRACE_ASSERT(reg_msg != NULL);
+  TRACE_ASSERT(num_bindings > 0);
+
+  /***************************************************************************/
+  /* Main Routine                                                            */
+  /***************************************************************************/
+  reqd = (num_bindings/HM_PEER_NUM_TLVS_PER_UPDATE);
+  if((num_bindings%HM_PEER_NUM_TLVS_PER_UPDATE) != 0)
+  {
+    reqd +=
+      (
+        (num_bindings%HM_PEER_NUM_TLVS_PER_UPDATE)
+        /
+        (num_bindings%HM_PEER_NUM_TLVS_PER_UPDATE)
+       ); /* or simply 1 */
+  }
+
+  TRACE_DETAIL(("Require %d messages", reqd));
+  /* Determine subscriber type to set subscriber ID */
+  subscriber_type =*(int32_t *)((char *)cb+ (uint32_t)(sizeof(int32_t)));
+  subscriber.void_cb = cb;
+  tlv = (HM_REGISTER_TLV_CB *)((HM_REGISTER_MSG *)reg_msg)->data;
+
+  while(reqd>0)
+  {
+    bind_msg = NULL;
+    msg = hm_get_buffer(sizeof(HM_PEER_MSG_BINDING));
+    if(msg == NULL)
+    {
+      TRACE_ASSERT(msg!=NULL);
+      TRACE_ERROR(("Error allocating binding message buffer."));
+      goto EXIT_LABEL;
+    }
+    bind_msg = (HM_PEER_MSG_BINDING *)msg->msg;
+
+    memset(bind_msg, 0, sizeof(HM_PEER_MSG_BINDING));
+    HM_PUT_LONG(bind_msg->hdr.hw_id, LOCAL.local_location_cb.index);
+    HM_PUT_LONG(bind_msg->hdr.msg_type, HM_PEER_MSG_TYPE_BINDING);
+    HM_PUT_LONG(bind_msg->hdr.timestamp, 0);
+
+    packed = 0;
+    switch(subscriber_type)
+    {
+    case HM_TABLE_TYPE_NODES_LOCAL:
+      TRACE_DETAIL(("Local Node Structure."));
+      HM_PUT_LONG(bind_msg->subscriber_id, subscriber.proper_node_cb->index);
+      HM_PUT_LONG(bind_msg->subscriber_type, HM_PEER_REPLAY_UPDATE_TYPE_NODE);
+      break;
+
+    case HM_TABLE_TYPE_PROCESS_LOCAL:
+      TRACE_DETAIL(("Local Process Structure."));
+      HM_PUT_LONG(bind_msg->subscriber_id, subscriber.proper_process_cb->pid);
+      HM_PUT_LONG(bind_msg->subscriber_type, HM_PEER_REPLAY_UPDATE_TYPE_PROC);
+      break;
+
+    default:
+      TRACE_WARN(("Unknown type of subscriber %d", subscriber_type));
+      TRACE_ASSERT((FALSE));
+    }
+
+    binding_cb = bind_msg->bindings;
+    while(i<((HM_REGISTER_MSG *)reg_msg)->num_register
+                                          && packed < HM_PEER_NUM_TLVS_PER_UPDATE)
+    {
+      tlv = tlv+i;
+
+      if(tlv->cross_bind && packed < HM_PEER_NUM_TLVS_PER_UPDATE)
+      {
+        HM_PUT_LONG(binding_cb->subscription_id, tlv->id);
+        switch(((HM_REGISTER_MSG *)reg_msg)->type)
+        {
+          case HM_REG_SUBS_TYPE_GROUP:
+            TRACE_DETAIL(("Registering for Node Group"));
+            HM_PUT_LONG(binding_cb->subscription_type, HM_REG_SUBS_TYPE_GROUP);
+            break;
+          case HM_REG_SUBS_TYPE_PROC:
+            TRACE_DETAIL(("Registering for Process Types"));
+            HM_PUT_LONG(binding_cb->subscription_type, HM_REG_SUBS_TYPE_PROC);
+            break;
+          default:
+            TRACE_ERROR(("Registering for unsupported type: %d", ((HM_REGISTER_MSG *)reg_msg)->type));
+            TRACE_ASSERT(0!=0);
+            break;
+        }
+        packed++;
+        total_packed++;
+        binding_cb = binding_cb+1;
+      }
+      i++;
+    }
+
+
+    TRACE_DETAIL(("Try to send message to cluster."));
+    HM_PUT_LONG(bind_msg->num_bindings, packed);
+    /***************************************************************************/
+    /* Later, it might be sending update only on the multicast port, but right */
+    /* now, we must loop through all Location CBs and send to each if its      */
+    /* connection in active.                           */
+    /***************************************************************************/
+    for(loc_cb = (HM_GLOBAL_LOCATION_CB *)HM_AVL3_FIRST(LOCAL.locations_tree, locations_tree_by_db_id);
+        loc_cb != NULL;
+        loc_cb = (HM_GLOBAL_LOCATION_CB *)HM_AVL3_NEXT(loc_cb->node, locations_tree_by_db_id))
+    {
+      if(loc_cb->loc_cb->index == LOCAL.local_location_cb.index)
+      {
+        /***************************************************************************/
+        /* Don't send to itself!                           */
+        /***************************************************************************/
+        continue;
+      }
+      if(loc_cb->loc_cb->peer_listen_cb->sock_cb == NULL ||
+          loc_cb->loc_cb->peer_listen_cb->sock_cb->sock_fd == -1)
+      {
+        /***************************************************************************/
+        /* Peer is not connected.                           */
+        /***************************************************************************/
+        TRACE_DETAIL(("Skipping %d", loc_cb->index));
+      }
+      hm_queue_on_transport(msg, loc_cb->loc_cb->peer_listen_cb, FALSE);
+    }
+    /***************************************************************************/
+    /* We've sent/queued message on all transports. Release buffer on our side */
+    /***************************************************************************/
+    hm_free_buffer(msg);
+    reqd--;
+  }//end while
+
+  if(total_packed != num_bindings)
+  {
+    TRACE_ERROR(("Unequal bindings and packing values."));
+    TRACE_ASSERT(packed==num_bindings);
+  }
+EXIT_LABEL:
+  /***************************************************************************/
+  /* Exit Level Checks                                                       */
+  /***************************************************************************/
+  TRACE_EXIT();
+  return;
+} /* hm_cluster_exchange_binding */
+
+
+/**
+ *  hm_cluster_recv_binding
+ *  @brief Receive a subscription binding from the cluster
+ *
+ *  @param *msg Subscription binding message.
+ *  @return True if successful, else FALSE
+ *
+ *  A subscription binding can never arrive before the create message for the
+ *  entity that generated it was received. Consequently, it is guaranteed that
+ *  the initiator has a cb present here.
+ *
+ *  Proceed from here as if it were a regular subscribe request received from
+ *  a regular local node.
+ */
+uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_cb)
+{
+  /***************************************************************************/
+  /* Local Variables                                                         */
+  /***************************************************************************/
+  uint32_t ret_val = TRUE;
+  uint32_t subscriber_id, subscriber_type, i;
+  uint32_t reg_type, value, num_bindings;
+  HM_SUBSCRIBER subscriber;
+
+  HM_PEER_BINDING_CB *binding_cb = NULL;
+
+  /***************************************************************************/
+  /* Sanity Checks                                                           */
+  /***************************************************************************/
+  TRACE_ENTRY();
+  TRACE_ASSERT(msg!= NULL);
+  TRACE_ASSERT(loc_cb!=NULL);
+
+  /***************************************************************************/
+  /* Main Routine                                                            */
+  /***************************************************************************/
+  HM_GET_LONG(subscriber_id, msg->subscriber_id);
+  HM_GET_LONG(subscriber_type, msg->subscriber_type);
+  HM_GET_LONG(num_bindings, msg->num_bindings);
+  /* First find the corresponding subscriber. */
+
+  switch(subscriber_type)
+  {
+    case HM_PEER_REPLAY_UPDATE_TYPE_NODE:
+      TRACE_DETAIL(("Node subscriber"));
+      /* There will always be a node */
+      subscriber.proper_node_cb = (HM_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
+                              &subscriber_id,
+                              nodes_tree_by_db_id);
+      if(subscriber.proper_node_cb == NULL)
+      {
+        TRACE_ERROR(("Binding received from a Node that we don't know about!"));
+        TRACE_ASSERT(FALSE);
+      }
+      break;
+    case HM_PEER_REPLAY_UPDATE_TYPE_PROC:
+      TRACE_DETAIL(("Process subscriber"));
+      subscriber.proper_process_cb = (HM_NODE_CB *)HM_AVL3_FIND(LOCAL.process_tree,
+                              &subscriber_id,
+                              process_tree_by_db_id);
+      if(subscriber.proper_process_cb == NULL)
+      {
+        TRACE_ERROR(("Binding received from a Node that we don't know about!"));
+        TRACE_ASSERT(FALSE);
+      }
+      break;
+
+    default:
+      TRACE_ERROR(("Unsupported type: %d", subscriber_type));
+      TRACE_ASSERT(0!=0);
+      break;
+  }
+  binding_cb = msg->bindings;
+  for(i=0; i< num_bindings; i++)
+  {
+    binding_cb = binding_cb+i;
+    HM_GET_LONG(reg_type, binding_cb->subscription_type);
+    TRACE_DETAIL(("Registration Type: %d", reg_type));
+    TRACE_DETAIL(("Subscription ID: %d", value));
+    HM_GET_LONG(value, binding_cb->subscription_id);
+    /* We've received it over a cluster. Don't need cross-bind. It already is.*/
+    if(hm_subscribe(reg_type, value, subscriber.void_cb, FALSE) != HM_OK)
+    {
+      TRACE_ERROR(("Error creating subscriptions."));
+      ret_val = FALSE;
+      break;
+    }
+  }
+  /***************************************************************************/
+  /* Exit Level Checks                                                       */
+  /***************************************************************************/
+  TRACE_EXIT();
+  return (ret_val);
+} /* hm_cluster_recv_binding */

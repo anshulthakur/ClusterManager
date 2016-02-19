@@ -55,7 +55,8 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *);
 int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *, HM_LOCATION_CB *);
 int32_t hm_cluster_send_update(void *);
 int32_t hm_cluster_send_init(HM_TRANSPORT_CB *);
-
+void hm_cluster_exchange_binding(void *, uint32_t , void *);
+uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *, HM_LOCATION_CB *);
 
 /* hmnodemgmt.c */
 int32_t hm_node_fsm(uint32_t, HM_NODE_CB *);
@@ -79,7 +80,7 @@ int32_t hm_global_process_update(HM_PROCESS_CB *, uint32_t);
 int32_t hm_global_process_remove(HM_PROCESS_CB *);
 HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t, uint32_t, void *);
 int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *);
-int32_t hm_subscribe(uint32_t, uint32_t , void *);
+int32_t hm_subscribe(uint32_t, uint32_t , void *, uint32_t);
 int32_t hm_subscription_insert(HM_SUBSCRIPTION_CB *, HM_LIST_BLOCK *);
 int32_t hm_compare_proc_tree_keys(void *, void *);
 

@@ -9,292 +9,6 @@
 
 #include <hmincl.h>
 
-/**
- *  @brief Receives a REGISTER (#HM_REGISTER_MSG) message and routes it to Node or Process Layer
- *
- *  @param *msg #HM_MSG type buffer received from the transport layer
- *  @param *tprt_cb #HM_TRANSPORT_CB type of Transport Control Block on which message was received
- *  @return #HM_OK on success, #HM_ERR otherwise
- */
-int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
-{
-  /***************************************************************************/
-  /* Variable Declarations                           */
-  /***************************************************************************/
-  HM_REGISTER_MSG *reg = NULL;
-  int32_t ret_val = HM_OK, bytes_rcvd = 0, i;
-
-  int32_t msg_size = sizeof(HM_REGISTER_MSG);
-
-  void *subscriber = NULL;
-
-  HM_PROCESS_CB *proc_cb = NULL;
-
-  SOCKADDR *udp_sender;
-
-  HM_REGISTER_TLV_CB *tlv = NULL;
-  /***************************************************************************/
-  /* Sanity Checks                               */
-  /***************************************************************************/
-  TRACE_ENTRY();
-
-  TRACE_ASSERT(tprt_cb != NULL);
-  TRACE_ASSERT(msg != NULL);
-
-  /***************************************************************************/
-  /* Main Routine                                 */
-  /***************************************************************************/
-  reg = (HM_REGISTER_MSG *)msg->msg;
-
-  if(reg->subscriber_pid != 0)
-  {
-    /***************************************************************************/
-    /* PID has been provided. Pass to Process Management.                      */
-    /* For now, even if a process is subscribing to notifications, they will be*/
-    /* dispatched on a nodal level. This is because more than one processes on */
-    /* a node may subscribe to the same notifications and in such a case rather*/
-    /* than sending multiple notifications from HM itself, the distribution of */
-    /* a single notification into multiple is done at the HM-Stub end.         */
-    /* Thus, PID becomes irrelevant right now.                                 */
-    /* It can however be changed easily by calling hm_subscribe on the subscri-*/
-    /*-ption entity of the process rather than the node.                       */
-    /***************************************************************************/
-    TRACE_DETAIL(("Subscriber PID: 0x%x", reg->subscriber_pid));
-    /* Find subscribing process */
-    for(proc_cb = (HM_PROCESS_CB *)HM_AVL3_FIRST(tprt_cb->node_cb->process_tree,
-                                                  node_process_tree_by_proc_id);
-        proc_cb !=NULL;
-        proc_cb = (HM_PROCESS_CB *)HM_AVL3_NEXT(proc_cb->node,
-                                                  node_process_tree_by_proc_id))
-    {
-      if(proc_cb->pid == reg->subscriber_pid)
-      {
-        TRACE_DETAIL(("Found process."));
-        subscriber = (void *)proc_cb;
-        break;
-      }
-    }
-    TRACE_ASSERT(proc_cb!=NULL);
-    if(proc_cb == NULL)
-    {
-      TRACE_WARN(("Process %x not found on Node.", reg->subscriber_pid));
-      /* Register to Node instead. In release only. */
-      subscriber = (void *)tprt_cb->node_cb;
-    }
-  }
-  else
-  {
-    subscriber = (void *)tprt_cb->node_cb;
-  }
-  if(reg->num_register ==0)
-  {
-    TRACE_WARN(("Number of register TLVs value is malformed. Reject Register"));
-    reg->hdr.response_ok = FALSE;
-    reg->hdr.request = FALSE;
-    goto EXIT_LABEL;
-  }
-  /***************************************************************************/
-  /* Allocate Memory to receive the rest of Register TLVs             */
-  /***************************************************************************/
-  TRACE_DETAIL(("Need extra memory for %d registers.[%d/block]",
-                reg->num_register -1 ,sizeof(HM_REGISTER_TLV_CB) ));
-
-  if((msg_size + ((reg->num_register - 1) * sizeof(HM_REGISTER_TLV_CB)))>msg_size)
-  {
-    msg_size = msg_size + ((reg->num_register - 1) * sizeof(HM_REGISTER_TLV_CB));
-    msg = hm_grow_buffer(msg, msg_size);
-    if(msg == NULL)
-    {
-      TRACE_ERROR(("Error allocating buffers for Incoming Message."));
-      ret_val = HM_ERR;
-      /* THIS is a terminal error. ABORT! ABORT! ABORT!*/
-      TRACE_ASSERT(FALSE);
-      goto EXIT_LABEL;
-    }
-    /***************************************************************************/
-    /* Got Buffer. Set incoming buffer pointer to it and receive.         */
-    /***************************************************************************/
-    reg = (HM_REGISTER_MSG *)msg->msg;
-    tprt_cb->in_buffer = (char *)msg->msg+ sizeof(HM_REGISTER_MSG);
-    bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
-                      tprt_cb->sock_cb->sock_type,
-                      (uint8_t *)tprt_cb->in_buffer,
-                      ((reg->num_register-1) * sizeof(HM_REGISTER_TLV_CB)),
-                      &udp_sender);
-    if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB)))
-    {
-      TRACE_WARN(("Bytes received (%d) less than expected %d",
-                  bytes_rcvd, sizeof(HM_REGISTER_MSG)));
-      hm_tprt_handle_improper_read(bytes_rcvd, tprt_cb);
-      goto EXIT_LABEL;
-    }
-  }
-
-  /***************************************************************************/
-  /* Hold transport from sending out any subscription notifications before   */
-  /* response.                                                               */
-  /***************************************************************************/
-  TRACE_INFO(("Acquire Transport Lock!"));
-  tprt_cb->hold = TRUE;
-
-  /***************************************************************************/
-  /* Have TLVs. Handle Subscription.                                         */
-  /***************************************************************************/
-  for(i=0; i< reg->num_register; i++)
-  {
-    tlv = (HM_REGISTER_TLV_CB *)reg->data + i;
-    /* TODO: Possible BUG, It should be a global table entry? */
-    TRACE_INFO(("Subscribe to %x", tlv->id));
-    if(hm_subscribe(reg->type, tlv->id, subscriber) != HM_OK)
-    {
-      TRACE_ERROR(("Error creating subscriptions."));
-      ret_val = HM_ERR;
-      /* Now how do we selectively tell that this particular subscription failed? */
-      goto EXIT_LABEL;
-    }
-  }
-
-  /***************************************************************************/
-  /* Successful subscriptions! Return Register with OK Response         */
-  /***************************************************************************/
-  reg->hdr.response_ok = TRUE;
-  reg->hdr.request = FALSE;
-
-EXIT_LABEL:
-  if(ret_val == HM_OK)
-  {
-    TRACE_DETAIL(("Send Response"));
-    ret_val = hm_queue_on_transport(msg, tprt_cb, TRUE);
-    tprt_cb->in_buffer = NULL;
-  }
-  /***************************************************************************/
-  /* Exit Level Checks                             */
-  /***************************************************************************/
-  TRACE_EXIT();
-  return (ret_val);
-}/* hm_recv_register */
-
-
-/**
- *  @brief Receives update on Process Creation/Destruction
- *
- *  @param *msg #HM_MSG type of message buffer on which #HM_PROCESS_UPDATE_MSG was received
- *  @param &tprt_cb #HM_TRANSPOR_CB structure of the transport on which message was received
- *  @return #HM_OK on success, #HM_ERR on failure.
- */
-int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
-{
-  /***************************************************************************/
-  /* Variable Declarations                           */
-  /***************************************************************************/
-  HM_PROCESS_UPDATE_MSG *proc_msg = NULL;
-  int32_t ret_val = HM_OK;
-
-  int32_t key[2];
-
-  HM_PROCESS_CB *proc_cb = NULL;
-  /***************************************************************************/
-  /* Sanity Checks                               */
-  /***************************************************************************/
-  TRACE_ENTRY();
-
-  TRACE_ASSERT(msg != NULL);
-  TRACE_ASSERT(tprt_cb != NULL);
-  /***************************************************************************/
-  /* Main Routine                                 */
-  /***************************************************************************/
-  proc_msg = msg->msg;
-
-  if(proc_msg->proc_type == 0)
-  {
-    TRACE_WARN(("Invalid Process Type"));
-    proc_msg->hdr.response_ok = FALSE;
-    proc_msg->hdr.request = FALSE;
-    goto EXIT_LABEL;
-  }
-  if(proc_msg->pid == 0)
-  {
-    TRACE_WARN(("Invalid Process ID"));
-    proc_msg->hdr.response_ok = FALSE;
-    proc_msg->hdr.request = FALSE;
-    goto EXIT_LABEL;
-  }
-
-  if(proc_msg->hdr.msg_type == HM_MSG_TYPE_PROCESS_CREATE)
-  {
-    TRACE_INFO(("Process 0x%x Created", proc_msg->pid));
-    /***************************************************************************/
-    /* Allocate a Process Control Block                       */
-    /***************************************************************************/
-    proc_cb = hm_alloc_process_cb();
-    if(proc_cb == NULL)
-    {
-      TRACE_ERROR(("Error allocating memory for Process CBs"));
-      /***************************************************************************/
-      /* Maybe, try again later?                           */
-      /***************************************************************************/
-      proc_msg->hdr.response_ok = FALSE;
-      proc_msg->hdr.request = FALSE;
-      goto EXIT_LABEL;
-    }
-
-    proc_cb->parent_node_cb = tprt_cb->node_cb;
-    proc_cb->pid = proc_msg->pid;
-    proc_cb->type = proc_msg->proc_type;
-    proc_cb->running = TRUE;
-    snprintf((char *)proc_cb->name, sizeof(proc_cb->name),"%s",proc_msg->name);
-
-    if(hm_process_add(proc_cb, proc_cb->parent_node_cb)!= HM_OK)
-    {
-      TRACE_ERROR(("Error occurred while adding process info to HM."));
-      proc_msg->hdr.response_ok = FALSE;
-      proc_msg->hdr.request = FALSE;
-      hm_free_process_cb(proc_cb);
-      proc_cb = NULL;
-      goto EXIT_LABEL;
-    }
-  }
-  else if(proc_msg->hdr.msg_type == HM_MSG_TYPE_PROCESS_DESTROY)
-  {
-    TRACE_INFO(("Process Destroyed"));
-    key[0] = proc_msg->proc_type;
-    key[2] = proc_msg->pid;
-
-    proc_cb = (HM_PROCESS_CB *)HM_AVL3_FIND(tprt_cb->node_cb->process_tree,
-                        &key,
-                    node_process_tree_by_proc_type_and_pid);
-    if(proc_cb == NULL)
-    {
-      TRACE_ERROR(("Process CB not found!"));
-      TRACE_ASSERT(FALSE);
-      proc_msg->hdr.response_ok = FALSE;
-      proc_msg->hdr.request = FALSE;
-      goto EXIT_LABEL;
-    }
-    TRACE_DETAIL(("Found Process CB. Update status to down."));
-    proc_cb->running = FALSE;
-    hm_process_update(proc_cb);
-  }
-  /***************************************************************************/
-  /* Everything went fine. Send a proper response.               */
-  /***************************************************************************/
-  proc_msg->hdr.response_ok = TRUE;
-  proc_msg->hdr.request = FALSE;
-
-EXIT_LABEL:
-  if(ret_val == HM_OK)
-  {
-    TRACE_DETAIL(("Send Response"));
-    ret_val = hm_queue_on_transport(msg,tprt_cb, TRUE);
-    tprt_cb->in_buffer = NULL;
-  }
-  /***************************************************************************/
-  /* Exit Level Checks                             */
-  /***************************************************************************/
-  TRACE_EXIT();
-  return ret_val;
-}/* hm_recv_proc_update */
-
 
 /**
  *  @brief Determines where to send the incoming message.
@@ -595,6 +309,310 @@ int32_t hm_tprt_handle_improper_read(int32_t bytes_rcvd, HM_TRANSPORT_CB *tprt_c
   TRACE_EXIT();
   return(ret_val);
 }/* hm_tprt_handle_improper_read */
+
+/**
+ *  @brief Receives a REGISTER (#HM_REGISTER_MSG) message and routes it to Node or Process Layer
+ *
+ *  @param *msg #HM_MSG type buffer received from the transport layer
+ *  @param *tprt_cb #HM_TRANSPORT_CB type of Transport Control Block on which message was received
+ *  @return #HM_OK on success, #HM_ERR otherwise
+ */
+int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
+{
+  /***************************************************************************/
+  /* Variable Declarations                           */
+  /***************************************************************************/
+  HM_REGISTER_MSG *reg = NULL;
+  int32_t ret_val = HM_OK, bytes_rcvd = 0, i;
+
+  int32_t msg_size = sizeof(HM_REGISTER_MSG);
+
+  void *subscriber = NULL;
+
+  HM_PROCESS_CB *proc_cb = NULL;
+
+  SOCKADDR *udp_sender;
+
+  HM_REGISTER_TLV_CB *tlv = NULL;
+  int32_t num_binding = 0; /* Number of bindings to propagate to cluster. */
+  /***************************************************************************/
+  /* Sanity Checks                               */
+  /***************************************************************************/
+  TRACE_ENTRY();
+
+  TRACE_ASSERT(tprt_cb != NULL);
+  TRACE_ASSERT(msg != NULL);
+
+  /***************************************************************************/
+  /* Main Routine                                 */
+  /***************************************************************************/
+  reg = (HM_REGISTER_MSG *)msg->msg;
+
+  if(reg->subscriber_pid != 0)
+  {
+    /***************************************************************************/
+    /* PID has been provided. Pass to Process Management.                      */
+    /* For now, even if a process is subscribing to notifications, they will be*/
+    /* dispatched on a nodal level. This is because more than one processes on */
+    /* a node may subscribe to the same notifications and in such a case rather*/
+    /* than sending multiple notifications from HM itself, the distribution of */
+    /* a single notification into multiple is done at the HM-Stub end.         */
+    /* Thus, PID becomes irrelevant right now.                                 */
+    /* It can however be changed easily by calling hm_subscribe on the subscri-*/
+    /*-ption entity of the process rather than the node.                       */
+    /***************************************************************************/
+    TRACE_DETAIL(("Subscriber PID: 0x%x", reg->subscriber_pid));
+    /* Find subscribing process */
+    for(proc_cb = (HM_PROCESS_CB *)HM_AVL3_FIRST(tprt_cb->node_cb->process_tree,
+                                                  node_process_tree_by_proc_id);
+        proc_cb !=NULL;
+        proc_cb = (HM_PROCESS_CB *)HM_AVL3_NEXT(proc_cb->node,
+                                                  node_process_tree_by_proc_id))
+    {
+      if(proc_cb->pid == reg->subscriber_pid)
+      {
+        TRACE_DETAIL(("Found process."));
+        subscriber = (void *)proc_cb;
+        break;
+      }
+    }
+    TRACE_ASSERT(proc_cb!=NULL);
+    if(proc_cb == NULL)
+    {
+      TRACE_WARN(("Process %x not found on Node.", reg->subscriber_pid));
+      /* Register to Node instead. In release only. */
+      subscriber = (void *)tprt_cb->node_cb;
+    }
+  }
+  else
+  {
+    subscriber = (void *)tprt_cb->node_cb;
+  }
+  if(reg->num_register ==0)
+  {
+    TRACE_WARN(("Number of register TLVs value is malformed. Reject Register"));
+    reg->hdr.response_ok = FALSE;
+    reg->hdr.request = FALSE;
+    goto EXIT_LABEL;
+  }
+  /***************************************************************************/
+  /* Allocate Memory to receive the rest of Register TLVs             */
+  /***************************************************************************/
+  TRACE_DETAIL(("Need extra memory for %d registers.[%d/block]",
+                reg->num_register ,sizeof(HM_REGISTER_TLV_CB) ));
+  /* -1 is to account for the 1 uint_32 already in the header to mark start of data */
+  if((msg_size + ((reg->num_register) * sizeof(HM_REGISTER_TLV_CB)) -1)>msg_size)
+  {
+    msg_size = msg_size + ((reg->num_register) * sizeof(HM_REGISTER_TLV_CB))-1;
+    msg = hm_grow_buffer(msg, msg_size);
+    if(msg == NULL)
+    {
+      TRACE_ERROR(("Error allocating buffers for Incoming Message."));
+      ret_val = HM_ERR;
+      /* THIS is a terminal error. ABORT! ABORT! ABORT!*/
+      TRACE_ASSERT(FALSE);
+      goto EXIT_LABEL;
+    }
+    /***************************************************************************/
+    /* Got Buffer. Set incoming buffer pointer to it and receive.         */
+    /***************************************************************************/
+    reg = (HM_REGISTER_MSG *)msg->msg;
+    tprt_cb->in_buffer = (char *)msg->msg+ sizeof(HM_REGISTER_MSG);
+    bytes_rcvd = hm_tprt_recv_on_socket(tprt_cb->sock_cb->sock_fd,
+                      tprt_cb->sock_cb->sock_type,
+                      (uint8_t *)tprt_cb->in_buffer,
+                      ((reg->num_register) * sizeof(HM_REGISTER_TLV_CB))-1,
+                      &udp_sender);
+    if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB))-1)
+    {
+      TRACE_WARN(("Bytes received (%d) less than expected %d",
+                  bytes_rcvd, (reg->num_register * sizeof(HM_REGISTER_TLV_CB))-1));
+      hm_tprt_handle_improper_read(bytes_rcvd, tprt_cb);
+      goto EXIT_LABEL;
+    }
+  }
+
+  /***************************************************************************/
+  /* Hold transport from sending out any subscription notifications before   */
+  /* response.                                                               */
+  /***************************************************************************/
+  TRACE_INFO(("Acquire Transport Lock!"));
+  tprt_cb->hold = TRUE;
+
+  /***************************************************************************/
+  /* Have TLVs. Handle Subscription.                                         */
+  /***************************************************************************/
+  for(i=0; i< reg->num_register; i++)
+  {
+    tlv = (HM_REGISTER_TLV_CB *)reg->data + i;
+    TRACE_INFO(("Subscribe to 0X%x", tlv->id));
+    if(hm_subscribe(reg->type, tlv->id, subscriber, tlv->cross_bind) != HM_OK)
+    {
+      TRACE_ERROR(("Error creating subscriptions."));
+      ret_val = HM_ERR;
+      /* Now how do we selectively tell that this particular subscription failed? */
+      goto EXIT_LABEL;
+    }
+    /***************************************************************************/
+    /* Also propagate update to cluster if it is a cross binding               */
+    /***************************************************************************/
+    if(tlv->cross_bind)
+    {
+      TRACE_DETAIL(("Bidirectional subscriber. Propagate binding to cluster."));
+      /* First pack the updates together. */
+      num_binding++;
+    }
+  }
+
+  /***************************************************************************/
+  /* Successful subscriptions! Return Register with OK Response         */
+  /***************************************************************************/
+  reg->hdr.response_ok = TRUE;
+  reg->hdr.request = FALSE;
+
+  /***************************************************************************/
+  /* Setup message to send to cluster                                        */
+  /***************************************************************************/
+  if(num_binding>0)
+  {
+    hm_cluster_exchange_binding((void *)subscriber, num_binding, reg);
+  }
+
+EXIT_LABEL:
+  if(ret_val == HM_OK)
+  {
+    TRACE_DETAIL(("Send Response"));
+    ret_val = hm_queue_on_transport(msg, tprt_cb, TRUE);
+    tprt_cb->in_buffer = NULL;
+  }
+  /***************************************************************************/
+  /* Exit Level Checks                             */
+  /***************************************************************************/
+  TRACE_EXIT();
+  return (ret_val);
+}/* hm_recv_register */
+
+
+/**
+ *  @brief Receives update on Process Creation/Destruction
+ *
+ *  @param *msg #HM_MSG type of message buffer on which #HM_PROCESS_UPDATE_MSG was received
+ *  @param &tprt_cb #HM_TRANSPOR_CB structure of the transport on which message was received
+ *  @return #HM_OK on success, #HM_ERR on failure.
+ */
+int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
+{
+  /***************************************************************************/
+  /* Variable Declarations                           */
+  /***************************************************************************/
+  HM_PROCESS_UPDATE_MSG *proc_msg = NULL;
+  int32_t ret_val = HM_OK;
+
+  int32_t key[2];
+
+  HM_PROCESS_CB *proc_cb = NULL;
+  /***************************************************************************/
+  /* Sanity Checks                               */
+  /***************************************************************************/
+  TRACE_ENTRY();
+
+  TRACE_ASSERT(msg != NULL);
+  TRACE_ASSERT(tprt_cb != NULL);
+  /***************************************************************************/
+  /* Main Routine                                 */
+  /***************************************************************************/
+  proc_msg = msg->msg;
+
+  if(proc_msg->proc_type == 0)
+  {
+    TRACE_WARN(("Invalid Process Type"));
+    proc_msg->hdr.response_ok = FALSE;
+    proc_msg->hdr.request = FALSE;
+    goto EXIT_LABEL;
+  }
+  if(proc_msg->pid == 0)
+  {
+    TRACE_WARN(("Invalid Process ID"));
+    proc_msg->hdr.response_ok = FALSE;
+    proc_msg->hdr.request = FALSE;
+    goto EXIT_LABEL;
+  }
+
+  if(proc_msg->hdr.msg_type == HM_MSG_TYPE_PROCESS_CREATE)
+  {
+    TRACE_INFO(("Process 0x%x Created", proc_msg->pid));
+    /***************************************************************************/
+    /* Allocate a Process Control Block                       */
+    /***************************************************************************/
+    proc_cb = hm_alloc_process_cb();
+    if(proc_cb == NULL)
+    {
+      TRACE_ERROR(("Error allocating memory for Process CBs"));
+      /***************************************************************************/
+      /* Maybe, try again later?                           */
+      /***************************************************************************/
+      proc_msg->hdr.response_ok = FALSE;
+      proc_msg->hdr.request = FALSE;
+      goto EXIT_LABEL;
+    }
+
+    proc_cb->parent_node_cb = tprt_cb->node_cb;
+    proc_cb->pid = proc_msg->pid;
+    proc_cb->type = proc_msg->proc_type;
+    proc_cb->running = TRUE;
+    snprintf((char *)proc_cb->name, sizeof(proc_cb->name),"%s",proc_msg->name);
+
+    if(hm_process_add(proc_cb, proc_cb->parent_node_cb)!= HM_OK)
+    {
+      TRACE_ERROR(("Error occurred while adding process info to HM."));
+      proc_msg->hdr.response_ok = FALSE;
+      proc_msg->hdr.request = FALSE;
+      hm_free_process_cb(proc_cb);
+      proc_cb = NULL;
+      goto EXIT_LABEL;
+    }
+  }
+  else if(proc_msg->hdr.msg_type == HM_MSG_TYPE_PROCESS_DESTROY)
+  {
+    TRACE_INFO(("Process Destroyed"));
+    key[0] = proc_msg->proc_type;
+    key[2] = proc_msg->pid;
+
+    proc_cb = (HM_PROCESS_CB *)HM_AVL3_FIND(tprt_cb->node_cb->process_tree,
+                        &key,
+                    node_process_tree_by_proc_type_and_pid);
+    if(proc_cb == NULL)
+    {
+      TRACE_ERROR(("Process CB not found!"));
+      TRACE_ASSERT(FALSE);
+      proc_msg->hdr.response_ok = FALSE;
+      proc_msg->hdr.request = FALSE;
+      goto EXIT_LABEL;
+    }
+    TRACE_DETAIL(("Found Process CB. Update status to down."));
+    proc_cb->running = FALSE;
+    hm_process_update(proc_cb);
+  }
+  /***************************************************************************/
+  /* Everything went fine. Send a proper response.               */
+  /***************************************************************************/
+  proc_msg->hdr.response_ok = TRUE;
+  proc_msg->hdr.request = FALSE;
+
+EXIT_LABEL:
+  if(ret_val == HM_OK)
+  {
+    TRACE_DETAIL(("Send Response"));
+    ret_val = hm_queue_on_transport(msg,tprt_cb, TRUE);
+    tprt_cb->in_buffer = NULL;
+  }
+  /***************************************************************************/
+  /* Exit Level Checks                             */
+  /***************************************************************************/
+  TRACE_EXIT();
+  return ret_val;
+}/* hm_recv_proc_update */
+
 
 
 /**

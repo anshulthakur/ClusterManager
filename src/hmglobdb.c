@@ -62,7 +62,7 @@ int32_t hm_global_location_add(HM_LOCATION_CB *loc_cb, uint32_t status)
     /* THE DESIRED BEHAVIOR IF THIS CONDITION OCCURS IS NOT THOUGHT AS OF YET */
     /* FIXME:                                  */
     /* It is hard to say that such a condition will not arise. This is because*/
-    /* we are operating on a cluster, and conflicts may arise.          */
+    /* we are operating on a cluster, and conflicts may arise.                */
     /* But because, at the given moment, we are in control of the cluster     */
     /* topology (closed system design), we'll handle it as a non-recoverable  */
     /* error.                                  */
@@ -337,10 +337,13 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
   /***************************************************************************/
   HM_GLOBAL_NODE_CB *insert_cb = NULL;
   int32_t ret_val = HM_OK;
-  HM_SUBSCRIPTION_CB *sub_cb = NULL;
+  HM_SUBSCRIPTION_CB *sub_cb = NULL, *cross_bind = NULL;
   HM_SUBSCRIBER_WILDCARD *greedy = NULL;
-  HM_LIST_BLOCK *list_member = NULL;
+
+  HM_LIST_BLOCK *list_member = NULL, *cross_bind_member=NULL;
   uint32_t *processed = NULL;
+
+  int32_t subscriber_type;
   /***************************************************************************/
   /* Sanity Checks                               */
   /***************************************************************************/
@@ -472,6 +475,95 @@ int32_t hm_global_node_add(HM_NODE_CB *node_cb)
         sub_cb = NULL;
         list_member = NULL;
         goto EXIT_LABEL;
+      }
+
+      /***************************************************************************/
+      /* if the wildcard is also a bidirectional subscriber, setup cross-binds   */
+      /***************************************************************************/
+      if(greedy->cross_bind)
+      {
+        TRACE_DETAIL(("Setup cross-binding."));
+        /***************************************************************************/
+        /* Find the type of subscriber                                             */
+        /***************************************************************************/
+        TRACE_ASSERT(greedy->subscriber.void_cb!=NULL);
+        subscriber_type =*(int32_t *)((char *)greedy->subscriber.void_cb
+                                                      + (uint32_t)(sizeof(int32_t)));
+
+        /***************************************************************************/
+        /* Allocate Node.                                                          */
+        /***************************************************************************/
+        cross_bind_member = NULL;
+        cross_bind_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK)+ sizeof(uint32_t));
+        if(cross_bind_member == NULL)
+        {
+          TRACE_ERROR(("Error allocating resources for Subscriber list element."));
+          hm_free_subscription_cb(sub_cb);
+          free(list_member);
+          sub_cb = NULL;
+          list_member = NULL;
+          goto EXIT_LABEL;
+        }
+        HM_INIT_LQE(cross_bind_member->node, cross_bind_member);
+        cross_bind_member->opaque = (void *)((char *)cross_bind_member + sizeof(HM_LIST_BLOCK));
+        cross_bind_member->target = (void *)insert_cb; //greedy->subscriber.void_cb;
+
+        processed = (uint32_t *)cross_bind_member->opaque;
+        *processed = 0;
+
+        switch(subscriber_type)
+        {
+          case HM_TABLE_TYPE_NODES:
+            TRACE_DETAIL(("Global Node Subscriber"));
+            cross_bind = greedy->subscriber.node_cb->sub_cb;
+            break;
+          case HM_TABLE_TYPE_NODES_LOCAL:
+            TRACE_DETAIL(("Node Subscriber"));
+            cross_bind =
+                ((HM_GLOBAL_NODE_CB *)greedy->subscriber.proper_node_cb->db_ptr)->sub_cb;
+            break;
+          case HM_TABLE_TYPE_PROCESS:
+            TRACE_DETAIL(("Global Process Subscriber"));
+            cross_bind = greedy->subscriber.process_cb->sub_cb;
+            break;
+
+          case HM_TABLE_TYPE_PROCESS_LOCAL:
+            TRACE_DETAIL(("Process Subscriber"));
+            cross_bind =
+                ((HM_GLOBAL_PROCESS_CB *)greedy->subscriber.proper_node_cb->db_ptr)->sub_cb;
+            break;
+
+          default:
+            TRACE_DETAIL(("Unknown type %d", subscriber_type));
+            TRACE_ASSERT(0!=0);
+        }
+
+        /***************************************************************************/
+        /* Insert into List                                                        */
+        /***************************************************************************/
+        if((ret_val  = hm_subscription_insert(cross_bind, cross_bind_member)) != HM_OK)
+        {
+          TRACE_ERROR(("Error inserting subscription to its entity"));
+          if(ret_val == HM_DUP)
+          {
+            /* It isn't a critical error. Could be caused by a duplicate entry */
+            TRACE_WARN(("Duplicate Registration"));
+            ret_val = HM_OK;
+            free(cross_bind_member);
+            cross_bind_member = NULL;
+          }
+          else
+          {
+            ret_val = HM_ERR;
+            free(cross_bind_member);
+            cross_bind_member = NULL;
+            hm_free_subscription_cb(sub_cb);
+            free(list_member);
+            sub_cb = NULL;
+            list_member = NULL;
+            goto EXIT_LABEL;
+          }
+        }
       }
     }
   }
@@ -692,10 +784,12 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
   /***************************************************************************/
   HM_GLOBAL_PROCESS_CB *insert_cb = NULL, *temp_cb = NULL;
   int32_t ret_val = HM_OK;
-  HM_SUBSCRIPTION_CB *sub_cb = NULL;
+  HM_SUBSCRIPTION_CB *sub_cb = NULL, *cross_bind = NULL;
   HM_SUBSCRIBER_WILDCARD *greedy = NULL;
-  HM_LIST_BLOCK *list_member = NULL;
+  HM_LIST_BLOCK *list_member = NULL, *cross_bind_member=NULL;
   uint32_t *processed = NULL;
+
+  int32_t subscriber_type;
   /***************************************************************************/
   /* Sanity Checks                                                           */
   /***************************************************************************/
@@ -846,6 +940,95 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
           sub_cb = NULL;
           list_member = NULL;
           goto EXIT_LABEL;
+        }
+
+        /***************************************************************************/
+        /* if the wildcard is also a bidirectional subscriber, setup cross-binds   */
+        /***************************************************************************/
+        if(greedy->cross_bind)
+        {
+          TRACE_DETAIL(("Setup cross-binding."));
+          /***************************************************************************/
+          /* Find the type of subscriber                                             */
+          /***************************************************************************/
+          TRACE_ASSERT(greedy->subscriber.void_cb!=NULL);
+          subscriber_type =*(int32_t *)((char *)greedy->subscriber.void_cb
+                                                        + (uint32_t)(sizeof(int32_t)));
+
+          /***************************************************************************/
+          /* Allocate Node.                                                          */
+          /***************************************************************************/
+          cross_bind_member = NULL;
+          cross_bind_member = (HM_LIST_BLOCK *) malloc(sizeof(HM_LIST_BLOCK)+ sizeof(uint32_t));
+          if(cross_bind_member == NULL)
+          {
+            TRACE_ERROR(("Error allocating resources for Subscriber list element."));
+            hm_free_subscription_cb(sub_cb);
+            free(list_member);
+            sub_cb = NULL;
+            list_member = NULL;
+            goto EXIT_LABEL;
+          }
+          HM_INIT_LQE(cross_bind_member->node, cross_bind_member);
+          cross_bind_member->opaque = (void *)((char *)cross_bind_member + sizeof(HM_LIST_BLOCK));
+          cross_bind_member->target = (void *)insert_cb; //greedy->subscriber.void_cb;
+
+          processed = (uint32_t *)cross_bind_member->opaque;
+          *processed = 0;
+
+          switch(subscriber_type)
+          {
+            case HM_TABLE_TYPE_NODES:
+              TRACE_DETAIL(("Global Node Subscriber"));
+              cross_bind = greedy->subscriber.node_cb->sub_cb;
+              break;
+            case HM_TABLE_TYPE_NODES_LOCAL:
+              TRACE_DETAIL(("Node Subscriber"));
+              cross_bind =
+                  ((HM_GLOBAL_NODE_CB *)greedy->subscriber.proper_node_cb->db_ptr)->sub_cb;
+              break;
+            case HM_TABLE_TYPE_PROCESS:
+              TRACE_DETAIL(("Global Process Subscriber"));
+              cross_bind = greedy->subscriber.process_cb->sub_cb;
+              break;
+
+            case HM_TABLE_TYPE_PROCESS_LOCAL:
+              TRACE_DETAIL(("Process Subscriber"));
+              cross_bind =
+                  ((HM_GLOBAL_PROCESS_CB *)greedy->subscriber.proper_node_cb->db_ptr)->sub_cb;
+              break;
+
+            default:
+              TRACE_DETAIL(("Unknown type %d", subscriber_type));
+              TRACE_ASSERT(0!=0);
+          }
+
+          /***************************************************************************/
+          /* Insert into List                                                        */
+          /***************************************************************************/
+          if((ret_val  = hm_subscription_insert(cross_bind, cross_bind_member)) != HM_OK)
+          {
+            TRACE_ERROR(("Error inserting subscription to its entity"));
+            if(ret_val == HM_DUP)
+            {
+              /* It isn't a critical error. Could be caused by a duplicate entry */
+              TRACE_WARN(("Duplicate Registration"));
+              ret_val = HM_OK;
+              free(cross_bind_member);
+              cross_bind_member = NULL;
+            }
+            else
+            {
+              ret_val = HM_ERR;
+              free(cross_bind_member);
+              cross_bind_member = NULL;
+              hm_free_subscription_cb(sub_cb);
+              free(list_member);
+              sub_cb = NULL;
+              list_member = NULL;
+              goto EXIT_LABEL;
+            }
+          }
         }
       }
     }
@@ -1059,6 +1242,7 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
   /***************************************************************************/
   HM_SUBSCRIPTION_CB *tree_node = NULL;
   HM_SUBSCRIPTION_CB *sub_cb = NULL;
+
   /***************************************************************************/
   /* Sanity Checks                               */
   /***************************************************************************/
@@ -1146,6 +1330,7 @@ HM_SUBSCRIPTION_CB * hm_create_subscription_entry(uint32_t subs_type, uint32_t v
     TRACE_ERROR(("Error creating subscription point."));
     LOCAL.next_pending_tree_id -=1;
     hm_free_subscription_cb(sub_cb);
+    goto EXIT_LABEL;
   }
 
 EXIT_LABEL:
@@ -1198,10 +1383,11 @@ int32_t hm_update_subscribers(HM_SUBSCRIPTION_CB *subs_cb)
  *  @param subs_type Subscription type
  *  @param value Value of subscription index
  *  @param *cb A Control block of the subscribing entity
+ *  @param bidir Whether it is a bidirectional subscription or unidirectional
  *
  *  @return #HM_OK on success, #HM_ERR otherwise
  */
-int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
+int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb, uint32_t bidir)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
@@ -1217,6 +1403,7 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
   int32_t keys[2];
 
   uint32_t *processed = NULL;
+  uint32_t subscriber_type;
   /***************************************************************************/
   /* Sanity Checks                               */
   /***************************************************************************/
@@ -1275,6 +1462,7 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
     subscriber->subs_type = subs_type;
     subscriber->value = value;
     subscriber->subscriber.void_cb = cb;
+    subscriber->cross_bind = bidir;
     global_cb.void_cb= cb;
     /***************************************************************************/
     /* Determine its table type and accordingly, find its global table entry   */
@@ -1282,14 +1470,15 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
     if(cb != NULL)
     {
       TRACE_DETAIL(("Checking type %d", *(int32_t *)((char *)cb+ (uint32_t)(sizeof(int32_t)))));
-      switch(*(int32_t *)((char *)cb+ (uint32_t)(sizeof(int32_t))))
+      subscriber_type =*(int32_t *)((char *)cb+ (uint32_t)(sizeof(int32_t)));
+      switch(subscriber_type)
       {
       case HM_TABLE_TYPE_NODES_LOCAL:
         TRACE_DETAIL(("Local Node Structure. Find its Global Entry."));
         TRACE_DETAIL(("ID in Global Node Table %d", *(int32_t *)(global_cb.void_cb)));
         subscriber->subscriber.void_cb = global_cb.proper_node_cb->db_ptr;
         TRACE_DETAIL(("Subscriber type %d", *(int32_t *)(
-            (char *)subscriber->subscriber.void_cb+ (uint32_t)(sizeof(int32_t)))));
+        (char *)subscriber->subscriber.void_cb+ (uint32_t)(sizeof(int32_t)))));
         break;
       case HM_TABLE_TYPE_LOCATION_LOCAL:
         TRACE_DETAIL(("Local Location Structure. Find its Global Entry."));
@@ -1564,6 +1753,60 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb)
         list_member = NULL;
         goto EXIT_LABEL;
       }
+    }
+  }
+
+  /***************************************************************************/
+  /* If it is a bidirectional subscription, make the crossbind.              */
+  /* It is possible that the remote binding does not exist yet.              */
+  /***************************************************************************/
+  if(bidir == TRUE)
+  {
+    TRACE_DETAIL(("Bidirectional Subscription."));
+    /***************************************************************************/
+    /* Find the type of subscriber                                             */
+    /***************************************************************************/
+    switch(subscriber_type)
+    {
+      case HM_TABLE_TYPE_NODES:
+        TRACE_DETAIL(("Global Node Subscriber"));
+        subs_type = HM_CONFIG_ATTR_SUBS_TYPE_NODE;
+        value = ((HM_GLOBAL_NODE_CB *)cb)->index;
+        break;
+      case HM_TABLE_TYPE_NODES_LOCAL:
+        TRACE_DETAIL(("Node Subscriber"));
+        subs_type = HM_CONFIG_ATTR_SUBS_TYPE_NODE;
+        value = ((HM_NODE_CB *)cb)->index;
+        break;
+      case HM_TABLE_TYPE_PROCESS:
+        TRACE_DETAIL(("Global Process Subscriber"));
+        subs_type = HM_CONFIG_ATTR_SUBS_TYPE_PROC;
+        value = ((HM_GLOBAL_PROCESS_CB *)cb)->pid;
+        break;
+
+      case HM_TABLE_TYPE_PROCESS_LOCAL:
+        TRACE_DETAIL(("Process Subscriber"));
+        subs_type = HM_CONFIG_ATTR_SUBS_TYPE_PROC;
+        value = ((HM_PROCESS_CB *)cb)->pid;
+        break;
+
+      default:
+        TRACE_DETAIL(("Unknown type %d", subscriber_type));
+        TRACE_ASSERT(0!=0);
+    }
+
+    if(subscription != NULL)
+    {
+      if(hm_subscribe(subs_type, value, subscription->row_cb.void_cb, FALSE) != HM_OK)
+      {
+        TRACE_ERROR(("Error creating cross-binding subscription."));
+        ret_val = HM_ERR;
+        goto EXIT_LABEL;
+      }
+    }
+    else
+    {
+      TRACE_DETAIL(("Subscribed entity does not exist yet. Will add when it exists."));
     }
   }
 EXIT_LABEL:

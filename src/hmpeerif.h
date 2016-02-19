@@ -24,6 +24,7 @@
 #define HM_PEER_MSG_TYPE_NODE_UPDATE      ((uint32_t) 4) /* Node Create/Destroy update to HM */
 #define HM_PEER_MSG_TYPE_HA_UPDATE        ((uint32_t) 5) /* Updates on HA roles */
 #define HM_PEER_MSG_TYPE_REPLAY           ((uint32_t) 6) /* Replay messages */
+#define HM_PEER_MSG_TYPE_BINDING          ((uint32_t) 7) /* Subscription binding */
 /***************************************************************************/
 
 /***************************************************************************/
@@ -293,6 +294,70 @@ typedef struct hm_peer_msg_ha_update
 /**STRUCT-********************************************************************/
 
 /**
+ * @brief Peer to Peer binding information block
+ *
+ */
+typedef struct hm_peer_binding_cb
+{
+  /*
+   * Subscription information: Who was subscribed?
+   * Node/Process/Interface binding can be created.
+   */
+  uint8_t subscription_type[4];
+
+  /*
+   * Unique key of subscription:
+   * For a node, it would be node id.
+   * For a process, it would be a process id
+   * For an interface, we need process id and interface type
+   */
+  uint8_t subscription_id[4];
+
+  /*
+   * For interfaces, specify interface ID here.
+   */
+  uint8_t if_id[4];
+}HM_PEER_BINDING_CB;
+
+/**
+ * @brief HM Peer Subscription binding exchange message
+ *
+ */
+typedef struct hm_peer_msg_binding
+{
+  /*
+   *  HM Header
+   */
+  HM_PEER_MSG_HEADER hdr;
+
+  /*
+   * Subscriber information: Who subscribed?
+   * Node/Process may have subscribed.
+   */
+  uint8_t subscriber_type[4];
+
+  /*
+   * Unique key of subscriber:
+   * For a node, it would be node id.
+   * For a process, it would be a process id
+   */
+  uint8_t subscriber_id[4];
+
+  /*
+   * Number of bindings in this message
+   */
+  uint8_t num_bindings[4];
+
+  /*
+   * Bindings to be filled in.
+   */
+  HM_PEER_BINDING_CB bindings[HM_PEER_NUM_TLVS_PER_UPDATE];
+
+} HM_PEER_MSG_BINDING ;
+/**STRUCT-********************************************************************/
+
+
+/**
  * @brief HM Peer Message Union
  *
  * A Union of all Peer Interface Messages. This is mainly to implicitly determine
@@ -308,6 +373,7 @@ typedef struct hm_peer_msg_union
   HM_PEER_MSG_NODE_UPDATE peer_node_update;
   HM_PEER_MSG_PROCESS_UPDATE peer_proc_update;
   HM_PEER_MSG_HA_UPDATE peer_ha_update;
+  HM_PEER_MSG_BINDING peer_binding;
 } HM_PEER_MSG_UNION ;
 /**STRUCT-********************************************************************/
 

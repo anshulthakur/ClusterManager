@@ -124,25 +124,33 @@ int32_t hm_service_notify_queue()
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
-        /* node.                                   */
+        /* node.                                                                   */
+        /* Send only if it is a local dispatch.                                    */
         /***************************************************************************/
         if(tprt_cb != NULL)
         {
-          block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-          if(block == NULL)
+          if(tprt_cb->location_cb->index == LOCAL.local_location_cb.index)
           {
-            TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
-            ret_val = HM_ERR;
-            goto EXIT_LABEL;
+            block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+            if(block == NULL)
+            {
+              TRACE_ASSERT(FALSE);
+              TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
+              ret_val = HM_ERR;
+              goto EXIT_LABEL;
+            }
+            HM_INIT_LQE(block->node, block);
+
+            block->target = msg;
+
+            HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+            msg->ref_count++; /* This is more important */
+            hm_tprt_process_outgoing_queue(tprt_cb);
           }
-          HM_INIT_LQE(block->node, block);
-
-          block->target = msg;
-
-          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
-          msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(tprt_cb);
+          else
+          {
+            TRACE_DETAIL(("Remote peer binding. Discard!"));
+          }
           *processed = notify_cb->id;
         }
         else
@@ -228,30 +236,34 @@ int32_t hm_service_notify_queue()
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
-        /* node.                                   */
+        /* node.                                                                   */
+        /* Send only if it is a local dispatch.                                    */
         /***************************************************************************/
         if(tprt_cb != NULL)
         {
-          block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-          if(block == NULL)
+          if(tprt_cb->location_cb->index == LOCAL.local_location_cb.index)
           {
-            TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
-            ret_val = HM_ERR;
-            goto EXIT_LABEL;
+            block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+            if(block == NULL)
+            {
+              TRACE_ASSERT(FALSE);
+              TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
+              ret_val = HM_ERR;
+              goto EXIT_LABEL;
+            }
+            HM_INIT_LQE(block->node, block);
+
+            block->target = msg;
+
+            HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+            msg->ref_count++; /* This is more important */
+            hm_tprt_process_outgoing_queue(tprt_cb);
           }
-          HM_INIT_LQE(block->node, block);
-
-          block->target = msg;
-
-          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
-          msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(tprt_cb);
+          else
+          {
+            TRACE_DETAIL(("Remote peer binding. Discard!"));
+          }
           *processed = notify_cb->id;
-        }
-        else
-        {
-          TRACE_INFO(("Subscribers are inactive. No notifications!"));
         }
       }
       break;
@@ -334,30 +346,34 @@ int32_t hm_service_notify_queue()
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
-        /* node.                                   */
+        /* node.                                                                   */
+        /* Send only if it is a local dispatch.                                    */
         /***************************************************************************/
         if(tprt_cb != NULL)
         {
-          block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-          if(block == NULL)
+          if(tprt_cb->location_cb->index == LOCAL.local_location_cb.index)
           {
-            TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
-            ret_val = HM_ERR;
-            goto EXIT_LABEL;
+            block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+            if(block == NULL)
+            {
+              TRACE_ASSERT(FALSE);
+              TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
+              ret_val = HM_ERR;
+              goto EXIT_LABEL;
+            }
+            HM_INIT_LQE(block->node, block);
+
+            block->target = msg;
+
+            HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+            msg->ref_count++; /* This is more important */
+            hm_tprt_process_outgoing_queue(tprt_cb);
           }
-          HM_INIT_LQE(block->node, block);
-
-          block->target = msg;
-
-          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
-          msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(tprt_cb);
+          else
+          {
+            TRACE_DETAIL(("Remote peer binding. Discard!"));
+          }
           *processed = notify_cb->id;
-        }
-        else
-        {
-          TRACE_INFO(("Subscribers are inactive. No notifications!"));
         }
       }
       break;
@@ -442,29 +458,34 @@ int32_t hm_service_notify_queue()
 
         /***************************************************************************/
         /* Append the message to the outgoing message queue on the transport of the*/
-        /* node.                                   */
+        /* node.                                                                   */
+        /* Send only if it is a local dispatch.                                    */
         /***************************************************************************/
         if(tprt_cb != NULL)
         {
-          block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-          if(block == NULL)
+          if(tprt_cb->location_cb->index == LOCAL.local_location_cb.index)
           {
-            TRACE_ASSERT(FALSE);
-            TRACE_ERROR(("Error allocating memory for INIT response queuing!"));
-            ret_val = HM_ERR;
-            goto EXIT_LABEL;
-          }
-          HM_INIT_LQE(block->node, block);
+            block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+            if(block == NULL)
+            {
+              TRACE_ASSERT(FALSE);
+              TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
+              ret_val = HM_ERR;
+              goto EXIT_LABEL;
+            }
+            HM_INIT_LQE(block->node, block);
 
-          block->target = msg;
-          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
-          msg->ref_count++; /* This is more important */
-          hm_tprt_process_outgoing_queue(tprt_cb);
+            block->target = msg;
+
+            HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+            msg->ref_count++; /* This is more important */
+            hm_tprt_process_outgoing_queue(tprt_cb);
+          }
+          else
+          {
+            TRACE_DETAIL(("Remote peer binding. Discard!"));
+          }
           *processed = notify_cb->id;
-        }
-        else
-        {
-          TRACE_INFO(("Subscribers are inactive. No notifications!"));
         }
       }
       break;
@@ -536,30 +557,33 @@ int32_t hm_service_notify_queue()
 
       /***************************************************************************/
       /* Append the message to the outgoing message queue on the transport of the*/
-      /* node.                                   */
+      /* node.                                                                   */
+      /* Send only if it is a local dispatch.                                    */
       /***************************************************************************/
       if(tprt_cb != NULL)
       {
-        block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
-        if(block == NULL)
+        if(tprt_cb->location_cb->index == LOCAL.local_location_cb.index)
         {
-          TRACE_ASSERT(FALSE);
-          TRACE_ERROR(("Error allocating memory for Sending notification queuing!"));
-          ret_val = HM_ERR;
-          goto EXIT_LABEL;
+          block = (HM_LIST_BLOCK *)malloc(sizeof(HM_LIST_BLOCK));
+          if(block == NULL)
+          {
+            TRACE_ASSERT(FALSE);
+            TRACE_ERROR(("Error allocating memory for Process creation notificaton queuing!"));
+            ret_val = HM_ERR;
+            goto EXIT_LABEL;
+          }
+          HM_INIT_LQE(block->node, block);
+
+          block->target = msg;
+
+          HM_INSERT_BEFORE(tprt_cb->pending, block->node);
+          msg->ref_count++; /* This is more important */
+          hm_tprt_process_outgoing_queue(tprt_cb);
         }
-        HM_INIT_LQE(block->node, block);
-
-        block->target = msg;
-
-        HM_INSERT_BEFORE(tprt_cb->pending, block->node);
-        msg->ref_count++; /* This is more important */
-        hm_tprt_process_outgoing_queue(tprt_cb);
-      }
-      else
-      {
-        TRACE_WARN(("Transport CB Missing!"));
-        TRACE_ASSERT(FALSE);
+        else
+        {
+          TRACE_DETAIL(("Remote peer binding. Discard!"));
+        }
       }
       break;
 
