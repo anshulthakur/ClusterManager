@@ -411,6 +411,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
       ret_val = HM_ERR;
       goto EXIT_LABEL;
     }
+    ressave = res;
     TRACE_DETAIL(("Opening Socket"));
     sock_fd = hm_open_socket(res, (SOCKADDR **)&addr, &length);
   }

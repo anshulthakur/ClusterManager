@@ -758,7 +758,6 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
       {
         TRACE_WARN(("Unknown Transport Type"));
       }
-
     }
     else
     {
@@ -810,6 +809,7 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
     notify_msg->addr_info.hw_index =
           affected_node.process_cb->proc_cb->parent_node_cb->parent_location_cb->index;
     notify_msg->addr_info.node_id = affected_node.process_cb->proc_cb->parent_node_cb->index;
+    notify_msg->addr_info.role = affected_node.process_cb->proc_cb->parent_node_cb->role;
 
     break;
   case HM_NOTIFICATION_PROCESS_DESTROYED:
@@ -849,6 +849,7 @@ HM_MSG * hm_build_notify_message(HM_NOTIFICATION_CB *notify_cb)
     notify_msg->addr_info.hw_index =
           affected_node.process_cb->proc_cb->parent_node_cb->parent_location_cb->index;
     notify_msg->addr_info.node_id = affected_node.process_cb->proc_cb->parent_node_cb->index;
+    notify_msg->addr_info.role = affected_node.process_cb->proc_cb->parent_node_cb->role;
     break;
 
   case HM_NOTIFICATION_INTERFACE_ADDED:
