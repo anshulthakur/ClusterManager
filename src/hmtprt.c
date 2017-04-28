@@ -107,6 +107,7 @@ static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t 
   if(*saptr == NULL)
   {
     TRACE_ERROR(("Error allocating memory for address structure."));
+    FD_CLR(sock_fd, &hm_tprt_conn_set);
     close(sock_fd);
     sock_fd = -1;
     goto EXIT_LABEL;
@@ -441,6 +442,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
      if(val == -1)
      {
        TRACE_PERROR(("Error Setting TCP_NODELAY"));
+       FD_CLR(sock_fd, &hm_tprt_conn_set);
        close(sock_fd);
        sock_fd = -1;
        goto EXIT_LABEL;
@@ -452,6 +454,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
     if(bind(sock_fd, &addr->sock_addr, length) != 0)
     {
       TRACE_PERROR(("Error binding to port"));
+      FD_CLR(sock_fd, &hm_tprt_conn_set);
       close(sock_fd);
       sock_fd = -1;
       goto EXIT_LABEL;
@@ -461,6 +464,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
     if(listen(sock_fd, HM_MAX_PENDING_CONNECT_REQ) != 0)
     {
       TRACE_PERROR(("Listen on socket %d failed.", sock_fd));
+      FD_CLR(sock_fd, &hm_tprt_conn_set);
       close(sock_fd);
       sock_fd = -1;
       goto EXIT_LABEL;
@@ -481,7 +485,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
       else
       {
         TRACE_PERROR(("Connect failed on socket %d", sock_fd));
-        FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
+        FD_CLR(sock_fd, &hm_tprt_conn_set);
         close(sock_fd);
         sock_fd = -1;
         goto EXIT_LABEL;
@@ -506,6 +510,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
     if(bind(sock_fd, &addr->sock_addr, length) != 0)
     {
       TRACE_PERROR(("Error binding to port"));
+      FD_CLR(sock_fd, &hm_tprt_conn_set);
       close(sock_fd);
       sock_fd = -1;
       goto EXIT_LABEL;
@@ -520,6 +525,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
     if(bind(sock_fd, &addr->sock_addr, length) != 0)
     {
       TRACE_PERROR(("Error binding to port"));
+      FD_CLR(sock_fd, &hm_tprt_conn_set);
       close(sock_fd);
       sock_fd = -1;
       goto EXIT_LABEL;
@@ -553,6 +559,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
     if(setsockopt(sock_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == -1)
     {
       TRACE_PERROR(("Error joining Multicast Group"));
+      FD_CLR(sock_fd, &hm_tprt_conn_set);
       close(sock_fd);
       sock_fd = -1;
       goto EXIT_LABEL;
@@ -1092,6 +1099,16 @@ void  hm_close_sock_connection(HM_SOCKET_CB *sock_cb)
   if(sock_cb->sock_fd > 0)
   {
     TRACE_INFO(("Closing socket"));
+    if(FD_ISSET(sock_cb->sock_fd, &hm_tprt_conn_set))
+    {
+      TRACE_DETAIL(("Remove from Read set."));
+      FD_CLR(sock_cb->sock_fd, &hm_tprt_conn_set);
+    }
+    if(FD_ISSET(sock_cb->sock_fd, &hm_tprt_write_set))
+    {
+      TRACE_DETAIL(("Remove from write set."));
+      FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
+    }
     close(sock_cb->sock_fd);
     sock_cb->sock_fd = -1;
   }
