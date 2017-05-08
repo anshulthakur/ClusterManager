@@ -1488,6 +1488,11 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb, uint32_t bidi
         TRACE_DETAIL(("Local Process Structure. Find its Global Entry."));
         subscriber->subscriber.void_cb = global_cb.proper_process_cb->db_ptr;
         break;
+      case HM_TABLE_TYPE_PROCESS:
+        TRACE_DETAIL(("Remote Process Structure. Find its Global Entry."));
+        subscriber->subscriber.void_cb = global_cb.proper_process_cb->db_ptr;
+        break;
+
       default:
         TRACE_WARN(("Unknown type of subscriber"));
         TRACE_ASSERT((FALSE));
