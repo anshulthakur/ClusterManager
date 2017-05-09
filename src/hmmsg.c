@@ -65,7 +65,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
                   );
     if((sock_cb->tprt_cb->in_bytes != sizeof(HM_MSG_HEADER)))
     {
-      TRACE_DETAIL(("Message Length of %d was expected, %d was received",
+      TRACE_DETAIL(("Message Length of %lu was expected, %d was received",
             sizeof(HM_MSG_HEADER), sock_cb->tprt_cb->in_bytes));
       hm_tprt_handle_improper_read(sock_cb->tprt_cb->in_bytes, sock_cb->tprt_cb);
       //ret_val = HM_ERR;
@@ -239,7 +239,7 @@ int32_t hm_route_incoming_message(HM_SOCKET_CB *sock_cb)
                   );
     if(sock_cb->tprt_cb->in_bytes < sizeof(HM_PEER_MSG_HEADER))
     {
-      TRACE_DETAIL(("Message Length of at least %d was expected, %d was received",
+      TRACE_DETAIL(("Message Length of at least %lu was expected, %d was received",
             sizeof(HM_PEER_MSG_HEADER), bytes_rcvd));
       hm_tprt_handle_improper_read(sock_cb->tprt_cb->in_bytes, sock_cb->tprt_cb);
       /***************************************************************************/
@@ -398,7 +398,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   /***************************************************************************/
   /* Allocate Memory to receive the rest of Register TLVs             */
   /***************************************************************************/
-  TRACE_DETAIL(("Need extra memory for %d registers.[%d/block]",
+  TRACE_DETAIL(("Need extra memory for %d registers.[%lu/block]",
                 reg->num_register ,sizeof(HM_REGISTER_TLV_CB) ));
   /* -1 is to account for the 1 uint_32 already in the header to mark start of data */
   if((msg_size + ((reg->num_register) * sizeof(HM_REGISTER_TLV_CB)) -1)>msg_size)
@@ -425,7 +425,7 @@ int32_t hm_recv_register(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
                       &udp_sender);
     if(bytes_rcvd < (reg->num_register * sizeof(HM_REGISTER_TLV_CB))-1)
     {
-      TRACE_WARN(("Bytes received (%d) less than expected %d",
+      TRACE_WARN(("Bytes received (%d) less than expected %lu",
                   bytes_rcvd, (reg->num_register * sizeof(HM_REGISTER_TLV_CB))-1));
       hm_tprt_handle_improper_read(bytes_rcvd, tprt_cb);
       goto EXIT_LABEL;

@@ -298,7 +298,7 @@ int32_t hm_cluster_send_init(HM_TRANSPORT_CB *tprt_cb)
   {
     uint32_t test;
     HM_GET_LONG(test, init_msg->hdr.msg_type);
-    TRACE_DETAIL(("Sending %d", (uint32_t)(init_msg->hdr.msg_type)));
+    TRACE_DETAIL(("Sending %d", *(uint32_t *)((void *)&(init_msg->hdr.msg_type))));
     TRACE_DETAIL(("Sending %x", test));
   }
 #endif
@@ -1044,7 +1044,7 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 
   case HM_PEER_MSG_TYPE_HA_UPDATE:
     TRACE_DETAIL(("Received HA Update Message"));
-    msg = (HM_PEER_MSG_UNION *)sock_cb->tprt_cb->in_buffer;
+    msg = (HM_MSG *)sock_cb->tprt_cb->in_buffer;
     if(hm_cluster_recv_ha_update((HM_PEER_MSG_HA_UPDATE *)msg, loc_cb)!=HM_OK)
     {
       TRACE_ERROR(("Error processing HA Update!"));
@@ -1055,7 +1055,7 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
 
   case HM_PEER_MSG_TYPE_BINDING:
     TRACE_DETAIL(("Received Subscription binding message"));
-    msg = (HM_PEER_MSG_UNION *)sock_cb->tprt_cb->in_buffer;
+    msg = (HM_MSG *)sock_cb->tprt_cb->in_buffer;
     if(hm_cluster_recv_binding((HM_PEER_MSG_BINDING *)msg, loc_cb)!=HM_OK)
     {
       TRACE_ERROR(("Error processing Subscription bidning!"));

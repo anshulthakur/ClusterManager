@@ -1571,7 +1571,7 @@ int32_t hm_write_config_file(char *file_name)
     }
     /* Currently, only active/passive updates are allowed. So, doing here only */
     snprintf(xpath_expr, sizeof(xpath_expr), "/config/nodes/node[group=1]/role");
-    obj = xmlXPathEvalExpression(xpath_expr, ctxt);
+    obj = xmlXPathEvalExpression((const xmlChar *)xpath_expr, ctxt);
     if(obj == NULL)
     {
       TRACE_WARN(("Error evaluating XPath expression. Nothing will be written"));
@@ -1591,7 +1591,7 @@ int32_t hm_write_config_file(char *file_name)
       if(node->node_cb->group == 1)
       {
         TRACE_DETAIL(("Found Node. Write role for value %d", node->node_cb->role));
-        snprintf(value, sizeof(value), "%s",
+        snprintf((char *)value, sizeof(value), "%s",
             (node->node_cb->role== NODE_ROLE_ACTIVE? "active":"passive"));
         break;
       }
