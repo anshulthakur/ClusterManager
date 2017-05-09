@@ -1624,7 +1624,7 @@ uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_c
 #ifdef I_WANT_TO_DEBUG
       node_cb = (HM_NODE_CB *)HM_AVL3_FIND(loc_cb->node_tree,
                                                  &subscriber_nid,
-                                                 nodes_tree_by_db_id);
+                                                 nodes_tree_by_node_id);
       if(node_cb == NULL)
       {
         TRACE_ERROR(("Node with index %d not found in location %d", subscriber_nid,
@@ -1639,7 +1639,7 @@ uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_c
       /* Need Proc Type and PID to get the Process CB. Scan Location's Tree */
       node_cb = (HM_NODE_CB *)HM_AVL3_FIND(loc_cb->node_tree,
                                            &subscriber_nid,
-                                           nodes_tree_by_db_id);
+                                           nodes_tree_by_node_id);
       if(node_cb == NULL)
       {
         TRACE_ERROR(("Node with index %d not found in location %d", subscriber_nid,

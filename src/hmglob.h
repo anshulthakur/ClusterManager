@@ -81,22 +81,22 @@ HM_AVL3_TREE_INFO nodes_tree_by_node_id = {
   HM_OFFSETOF(HM_NODE_CB, index)  , /**< key offset*/
   HM_OFFSETOF(HM_NODE_CB, index_node)  /**< node offset */
 };
-HM_AVL3_TREE_INFO process_tree_by_db_id = {
+HM_AVL3_TREE_INFO process_tree_by_db_id = { /* Currently not in use */
   hm_aggregate_compare_pid, /**< pointer to function*/
   HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
   HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
 };
-HM_AVL3_TREE_INFO process_tree_by_pid = {
+HM_AVL3_TREE_INFO process_tree_by_pid = { /* Currently not in use */
   hm_compare_ulong, /**< pointer to function*/
   HM_OFFSETOF(HM_PROCESS_CB, pid)  , /**< key offset*/
   HM_OFFSETOF(HM_PROCESS_CB, node)  /**< node offset */
 };
-HM_AVL3_TREE_INFO interface_tree_by_db_id = {
+HM_AVL3_TREE_INFO interface_tree_by_db_id = { /* Currently not in use */
   hm_aggregate_compare_if_id, /**< pointer to function*/
   HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
   HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */
 };
-HM_AVL3_TREE_INFO interface_tree_by_if_id = {
+HM_AVL3_TREE_INFO interface_tree_by_if_id = { /* Currently not in use */
   hm_compare_ulong, /**< pointer to function*/
   HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, id)  , /**< key offset*/
   HM_OFFSETOF(HM_GLOBAL_PROCESS_CB, node)  /**< node offset */

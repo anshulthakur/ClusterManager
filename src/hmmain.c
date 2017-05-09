@@ -215,7 +215,7 @@ int32_t hm_init_local(HM_CONFIG_CB *config_cb)
   LOCAL.next_node_tree_id = 1;
 
   /* Aggregate Processes Tree */
-  HM_AVL3_INIT_TREE(LOCAL.process_tree, process_tree_by_db_id);
+  HM_AVL3_INIT_TREE(LOCAL.process_tree, global_process_tree_by_id);
   LOCAL.next_process_tree_id = 1;
 
   /* Aggregate PID Tree  */
