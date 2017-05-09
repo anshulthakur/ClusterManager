@@ -1466,13 +1466,14 @@ void hm_cluster_exchange_binding(void *cb, uint32_t num_bindings, void *reg_msg)
     {
     case HM_TABLE_TYPE_NODES_LOCAL:
       TRACE_DETAIL(("Local Node Structure."));
-      HM_PUT_LONG(bind_msg->subscriber_id, subscriber.proper_node_cb->index);
+      HM_PUT_LONG(bind_msg->subscriber_nid, subscriber.proper_node_cb->index);
       HM_PUT_LONG(bind_msg->subscriber_type, HM_PEER_REPLAY_UPDATE_TYPE_NODE);
       break;
 
     case HM_TABLE_TYPE_PROCESS_LOCAL:
       TRACE_DETAIL(("Local Process Structure."));
-      HM_PUT_LONG(bind_msg->subscriber_id, subscriber.proper_process_cb->pid);
+      HM_PUT_LONG(bind_msg->subscriber_nid, subscriber.proper_process_cb->parent_node_cb->index);
+      HM_PUT_LONG(bind_msg->subscriber_pid, subscriber.proper_process_cb->pid);
       HM_PUT_LONG(bind_msg->subscriber_type, HM_PEER_REPLAY_UPDATE_TYPE_PROC);
       break;
 
@@ -1582,11 +1583,13 @@ uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_c
   /* Local Variables                                                         */
   /***************************************************************************/
   uint32_t ret_val = TRUE;
-  uint32_t subscriber_id, subscriber_type, i;
+  uint32_t subscriber_nid, subscriber_type, i, subscriber_pid;
   uint32_t reg_type, value, num_bindings;
   HM_SUBSCRIBER subscriber;
 
   HM_PEER_BINDING_CB *binding_cb = NULL;
+  HM_NODE_CB *node_cb  = NULL;
+  HM_PROCESS_CB *proc_cb = NULL;
 
   /***************************************************************************/
   /* Sanity Checks                                                           */
@@ -1598,9 +1601,10 @@ uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_c
   /***************************************************************************/
   /* Main Routine                                                            */
   /***************************************************************************/
-  HM_GET_LONG(subscriber_id, msg->subscriber_id);
+  HM_GET_LONG(subscriber_nid, msg->subscriber_nid);
   HM_GET_LONG(subscriber_type, msg->subscriber_type);
   HM_GET_LONG(num_bindings, msg->num_bindings);
+  HM_GET_LONG(subscriber_pid, msg->subscriber_pid);
   /* First find the corresponding subscriber. */
 
   switch(subscriber_type)
@@ -1608,23 +1612,55 @@ uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_c
     case HM_PEER_REPLAY_UPDATE_TYPE_NODE:
       TRACE_DETAIL(("Node subscriber"));
       /* There will always be a node */
-      subscriber.proper_node_cb = (HM_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
-                              &subscriber_id,
+      subscriber.node_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
+                              &subscriber_nid,
                               nodes_tree_by_db_id);
-      if(subscriber.proper_node_cb == NULL)
+      if(subscriber.node_cb == NULL)
       {
         TRACE_ERROR(("Binding received from a Node that we don't know about!"));
         TRACE_ASSERT(FALSE);
       }
+      subscriber.proper_node_cb = subscriber.node_cb->node_cb;
+#ifdef I_WANT_TO_DEBUG
+      node_cb = (HM_NODE_CB *)HM_AVL3_FIND(loc_cb->node_tree,
+                                                 &subscriber_nid,
+                                                 nodes_tree_by_db_id);
+      if(node_cb == NULL)
+      {
+        TRACE_ERROR(("Node with index %d not found in location %d", subscriber_nid,
+                                                                    loc_cb->index));
+        TRACE_ASSERT(FALSE);
+      }
+      TRACE_ASSERT(node_cb == subscriber.proper_node_cb);
+#endif
       break;
     case HM_PEER_REPLAY_UPDATE_TYPE_PROC:
       TRACE_DETAIL(("Process subscriber"));
-      subscriber.proper_process_cb = (HM_NODE_CB *)HM_AVL3_FIND(LOCAL.process_tree,
-                              &subscriber_id,
-                              process_tree_by_db_id);
-      if(subscriber.proper_process_cb == NULL)
+      /* Need Proc Type and PID to get the Process CB. Scan Location's Tree */
+      node_cb = (HM_NODE_CB *)HM_AVL3_FIND(loc_cb->node_tree,
+                                           &subscriber_nid,
+                                           nodes_tree_by_db_id);
+      if(node_cb == NULL)
       {
-        TRACE_ERROR(("Binding received from a Node that we don't know about!"));
+        TRACE_ERROR(("Node with index %d not found in location %d", subscriber_nid,
+                                                                    loc_cb->index));
+        TRACE_ASSERT(FALSE);
+      }
+
+      proc_cb = HM_AVL3_FIRST(node_cb->process_tree, node_process_tree_by_proc_type_and_pid);
+      while(proc_cb != NULL && proc_cb->pid != subscriber_pid)
+      {
+        proc_cb = HM_AVL3_NEXT(proc_cb->node, node_process_tree_by_proc_type_and_pid);
+      }
+
+      if(proc_cb != NULL)
+      {
+        TRACE_DETAIL(("Found Process CB"));
+        subscriber.proper_process_cb = proc_cb;
+      }
+      else
+      {
+        TRACE_ERROR(("Binding received from a Process that we don't know about!"));
         TRACE_ASSERT(FALSE);
       }
       break;
@@ -1634,6 +1670,7 @@ uint32_t hm_cluster_recv_binding(HM_PEER_MSG_BINDING *msg, HM_LOCATION_CB *loc_c
       TRACE_ASSERT(0!=0);
       break;
   }
+
   binding_cb = msg->bindings;
   for(i=0; i< num_bindings; i++)
   {

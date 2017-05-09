@@ -337,11 +337,17 @@ typedef struct hm_peer_msg_binding
   uint8_t subscriber_type[4];
 
   /*
-   * Unique key of subscriber:
+   * Subscriber's Node ID
    * For a node, it would be node id.
-   * For a process, it would be a process id
    */
-  uint8_t subscriber_id[4];
+  uint8_t subscriber_nid[4];
+
+  /*
+   * Subscriber's Process ID
+   * For a node, it would be 0.
+   * For a process, it would be its PID
+   */
+  uint8_t subscriber_pid[4];
 
   /*
    * Number of bindings in this message
