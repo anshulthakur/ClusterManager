@@ -560,7 +560,7 @@ HM_PROCESS_CB * hm_alloc_process_cb()
   proc_cb->parent_node_cb = NULL;
   HM_AVL3_INIT_NODE(proc_cb->node, proc_cb);
   HM_INIT_ROOT(proc_cb->interfaces_list);
-  proc_cb->running = FALSE;
+  proc_cb->running = HM_STATUS_DOWN;
 
   proc_cb->role = NODE_ROLE_PASSIVE;
   proc_cb->partner = NULL;

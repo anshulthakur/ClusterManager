@@ -1,10 +1,10 @@
-/** 
+/**
  *  @file hmha.c
  *  @brief High Avaialbility specific messages
- *  
+ *
  *  @author Anshul
  *  @date 07-Dec-2015
- *  @bug 
+ *  @bug
  */
 
 #include <hmincl.h>
@@ -28,6 +28,7 @@ int32_t hm_ha_role_update_callback(void *location_cb)
   /***************************************************************************/
   /* Local Variables                                                         */
   /***************************************************************************/
+  UNUSED(location_cb);
   int32_t ret_val = HM_OK;
   HM_LOCATION_CB *loc_cb = NULL;
   HM_NODE_CB *node_cb = NULL;
@@ -44,17 +45,20 @@ int32_t hm_ha_role_update_callback(void *location_cb)
   /***************************************************************************/
   /* Loop through each node and determine what status to set.                */
   /***************************************************************************/
-  for(node_cb = (HM_NODE_CB *)HM_AVL3_FIRST(LOCAL.local_location_cb.node_tree,
-                              nodes_tree_by_node_id);
-      node_cb != NULL;
-      node_cb = (HM_NODE_CB *)HM_AVL3_NEXT(node_cb->index_node, nodes_tree_by_node_id))
+  for (node_cb = (HM_NODE_CB *)HM_AVL3_FIRST(LOCAL.local_location_cb.node_tree,
+                 nodes_tree_by_node_id);
+       node_cb != NULL;
+       node_cb = (HM_NODE_CB *)HM_AVL3_NEXT(node_cb->index_node,
+                 nodes_tree_by_node_id))
   {
-    if(node_cb->current_role == NODE_ROLE_NONE)
+    if (node_cb->current_role == NODE_ROLE_NONE)
     {
-      TRACE_DETAIL(("Node %d did not receive any update on cluster.", node_cb->index));
+      TRACE_DETAIL(("Node %d did not receive any update on cluster.",
+                    node_cb->index));
+
       /* Set role to that set in desired role field (role) if it is active. */
       /* If it is set to passive, then we cannot promote it to active.      */
-      if(node_cb->role == NODE_ROLE_PASSIVE)
+      if (node_cb->role == NODE_ROLE_PASSIVE)
       {
         TRACE_WARN(("Cannot set Node to passive without any active."));
         continue;
@@ -64,21 +68,24 @@ int32_t hm_ha_role_update_callback(void *location_cb)
         node_cb->current_role = node_cb->role;
       }
     }
+
     /* Else if it was updated, we'll send that value only.*/
-    TRACE_DETAIL(("Set node as %s",
-                  (node_cb->current_role==NODE_ROLE_PASSIVE?"Passive":"Active/None")));
+    TRACE_DETAIL(("Set node %d as %s", node_cb->index,
+                  (node_cb->current_role == NODE_ROLE_PASSIVE ? "Passive" : "Active/None")));
+
     /***************************************************************************/
     /* Check if the node is running or not.                                    */
     /* If running, then we will send it an HA Role update.                     */
     /* Otherwise, it will get the update when it connects (if it does in window*/
     /* period).                                                                */
     /***************************************************************************/
-    if(hm_global_node_update(node_cb, HM_UPDATE_NODE_ROLE)!= HM_OK)
+    if (hm_global_node_update(node_cb, HM_UPDATE_NODE_ROLE) != HM_OK)
     {
-       TRACE_ERROR(("Error propagating node update"));
-       ret_val = HM_ERR;
-       goto EXIT_LABEL;
+      TRACE_ERROR(("Error propagating node update"));
+      ret_val = HM_ERR;
+      goto EXIT_LABEL;
     }
+
     /***************************************************************************/
     /* Send update on cluster about its updated role.                          */
     /***************************************************************************/
@@ -126,12 +133,12 @@ int32_t hm_recv_ha_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   /* Sanity Checks                                                           */
   /***************************************************************************/
   TRACE_ENTRY();
-  TRACE_ASSERT(msg!=NULL);
+  TRACE_ASSERT(msg != NULL);
   TRACE_ASSERT(tprt_cb != NULL);
   /***************************************************************************/
   /* Main Routine                                                            */
   /***************************************************************************/
-  TRACE_ASSERT(tprt_cb->node_cb!=NULL);
+  TRACE_ASSERT(tprt_cb->node_cb != NULL);
   ha_msg = (HM_HA_STATUS_UPDATE_MSG *)msg->msg;
   node_cb = tprt_cb->node_cb;
   TRACE_DETAIL(("HA Message from Node index %d", node_cb->index));
@@ -139,22 +146,24 @@ int32_t hm_recv_ha_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
   /***************************************************************************/
   /* Parse the message                                                       */
   /***************************************************************************/
-  switch(ha_msg->node_role)
+  switch (ha_msg->node_role)
   {
     case HM_HA_NODE_ROLE_ACTIVE:
       TRACE_DETAIL(("Node requested to be Active."));
 
       /* Write preferred status to config cb and to file */
       node_cb->role = NODE_ROLE_ACTIVE;
-      if(ha_msg->node_info_provided!=FALSE)
+
+      if (ha_msg->node_info_provided != FALSE)
       {
         /* Send message to passive node.  */
-        node_cb=NULL;
+        node_cb = NULL;
         addr_info = (HM_ADDRESS_INFO *)(BYTE *)ha_msg + ha_msg->offset;
-        node_cb =  (HM_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
-                                              &(addr_info->node_id),
-                                              nodes_tree_by_db_id);
-        if(node_cb == NULL)
+        node_cb = (HM_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
+                                             &(addr_info->node_id),
+                                             nodes_tree_by_db_id);
+
+        if (node_cb == NULL)
         {
           TRACE_WARN(("Backup Node (%d) not found!", addr_info->node_id));
           /* Not a critical error. */
@@ -163,11 +172,12 @@ int32_t hm_recv_ha_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
         else
         {
           /* Both must have same group indices */
-          TRACE_ASSERT(tprt_cb->node_cb->group== node_cb->group);
+          TRACE_ASSERT(tprt_cb->node_cb->group == node_cb->group);
           /* Also, partner cb pointer must match */
           TRACE_ASSERT(tprt_cb->node_cb->partner == node_cb);
+
           /* Send message to backup */
-          if(hm_cluster_send_ha_update(tprt_cb->node_cb, node_cb, node_cb)!=HM_OK)
+          if (hm_cluster_send_ha_update(tprt_cb->node_cb, node_cb, node_cb) != HM_OK)
           {
             TRACE_ERROR(("Error sending HA Update to peer."));
             ret_val = HM_ERR;
@@ -175,22 +185,25 @@ int32_t hm_recv_ha_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
           }
         }
       }
-      else if(node_cb->partner!=NULL)
+      else if (node_cb->partner != NULL)
       {
         TRACE_DETAIL(("Have an autoresolved partner at %d", node_cb->partner->index));
         node_cb = node_cb->partner;
+
         /* Send message to backup */
-        if(hm_cluster_send_ha_update(tprt_cb->node_cb, node_cb, node_cb)!=HM_OK)
+        if (hm_cluster_send_ha_update(tprt_cb->node_cb, node_cb, node_cb) != HM_OK)
         {
           TRACE_ERROR(("Error sending HA Update to peer."));
           ret_val = HM_ERR;
           goto EXIT_LABEL;
         }
+
         /*
          * FIXME: Does an entry in table ensure it is alive?
          * Is it appropriately dereferenced on termination?
          */
       }
+
       changed = TRUE;
       break;
 
@@ -201,40 +214,44 @@ int32_t hm_recv_ha_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
       addr_info = (HM_ADDRESS_INFO *)((BYTE *)msg + ha_msg->offset);
 
       /* The value must also have been auto-resolved? */
-      TRACE_ASSERT(node_cb->partner!=NULL);
-      TRACE_ASSERT(node_cb->partner->index==addr_info->node_id);
+      TRACE_ASSERT(node_cb->partner != NULL);
+      TRACE_ASSERT(node_cb->partner->index == addr_info->node_id);
       node_cb->role = NODE_ROLE_ACTIVE;
+
       /* Send message to backup, which would now become active*/
-      if(hm_cluster_send_ha_update(node_cb, tprt_cb->node_cb, node_cb)!=HM_OK)
+      if (hm_cluster_send_ha_update(node_cb, tprt_cb->node_cb, node_cb) != HM_OK)
       {
         TRACE_ERROR(("Error sending HA Update to peer."));
         ret_val = HM_ERR;
         goto EXIT_LABEL;
       }
+
       /* Initiate planned Fail-Over. */
       /* Check if it can be done, by checking the status of node */
-      changed=TRUE;
+      changed = TRUE;
       break;
 
     default:
       TRACE_ASSERT(FALSE);
       break;
   }
-  if(changed)
+
+  if (changed)
   {
     /* Assuming only the group 1 node may currently send such signals */
-    if(hm_write_config_file(HM_DEFAULT_CONFIG_FILE_NAME)!=HM_OK)
+    if (hm_write_config_file(HM_DEFAULT_CONFIG_FILE_NAME) != HM_OK)
     {
       TRACE_ERROR(("Error writing configuration file!"));
       ret_val = HM_ERR;
     }
   }
+
 EXIT_LABEL:
   /***************************************************************************/
   /* Exit Level Checks                                                       */
   /***************************************************************************/
   TRACE_EXIT();
-  return(ret_val);
+  return (ret_val);
 } /* hm_recv_ha_update */
 
 /**
@@ -246,7 +263,8 @@ EXIT_LABEL:
  *
  *  @return #HM_OK on success, #HM_ERR on failure
  */
-int32_t hm_cluster_send_ha_update(HM_NODE_CB *master_node, HM_NODE_CB *slave_node,
+int32_t hm_cluster_send_ha_update(HM_NODE_CB *master_node,
+                                  HM_NODE_CB *slave_node,
                                   HM_NODE_CB *dest_node)
 {
   /***************************************************************************/
@@ -257,50 +275,58 @@ int32_t hm_cluster_send_ha_update(HM_NODE_CB *master_node, HM_NODE_CB *slave_nod
   HM_MSG *msg = NULL;
   time_t current_time;
 #ifdef I_WANT_TO_DEBUG
-  int32_t i = 0;
+  uint32_t i = 0;
 #endif
   /***************************************************************************/
   /* Sanity Checks                                                           */
   /***************************************************************************/
   TRACE_ENTRY();
-  TRACE_ASSERT(master_node !=NULL);
-  TRACE_ASSERT(slave_node !=NULL);
+  TRACE_ASSERT(master_node != NULL);
+  TRACE_ASSERT(slave_node != NULL);
 
   /***************************************************************************/
   /* Main Routine                                                            */
   /***************************************************************************/
   msg  = hm_get_buffer(sizeof(HM_PEER_MSG_HA_UPDATE));
-  if(msg == NULL)
+
+  if (msg == NULL)
   {
     TRACE_ERROR(("Error allocating buffer"));
     ret_val = HM_ERR;
     goto EXIT_LABEL;
   }
+
   ha_msg = (HM_PEER_MSG_HA_UPDATE *)msg->msg;
   HM_PUT_LONG(ha_msg->hdr.hw_id, LOCAL.local_location_cb.index);
 #ifdef I_WANT_TO_DEBUG
-  for(i=0;i<sizeof(ha_msg->hdr.hw_id);i++)
+
+  for (i = 0; i < sizeof(ha_msg->hdr.hw_id); i++)
   {
-    TRACE_DETAIL(("Index[%d]: %x", i,ha_msg->hdr.hw_id[i]));
+    TRACE_DETAIL(("Index[%d]: %x", i, ha_msg->hdr.hw_id[i]));
   }
+
 #endif
 
   HM_PUT_LONG(ha_msg->hdr.msg_type, HM_PEER_MSG_TYPE_HA_UPDATE);
 #ifdef I_WANT_TO_DEBUG
-  for(i=0;i<sizeof(ha_msg->hdr.msg_type);i++)
+
+  for (i = 0; i < sizeof(ha_msg->hdr.msg_type); i++)
   {
-    TRACE_DETAIL(("Msg Type[%d]: %x", i,ha_msg->hdr.msg_type[i]));
+    TRACE_DETAIL(("Msg Type[%d]: %x", i, ha_msg->hdr.msg_type[i]));
   }
+
 #endif
 
   current_time = hm_hton64(time(NULL));
   TRACE_DETAIL(("Time value: 0x%x", (unsigned int)current_time));
   memcpy(ha_msg->hdr.timestamp, &current_time, sizeof(current_time));
 #ifdef I_WANT_TO_DEBUG
-  for(i=0;i<sizeof(ha_msg->hdr.timestamp);i++)
+
+  for (i = 0; i < sizeof(ha_msg->hdr.timestamp); i++)
   {
-    TRACE_DETAIL(("Timestamp[%d]: %x", i,ha_msg->hdr.timestamp[i]));
+    TRACE_DETAIL(("Timestamp[%d]: %x", i, ha_msg->hdr.timestamp[i]));
   }
+
 #endif
 
   HM_PUT_LONG(ha_msg->group, slave_node->group);
@@ -310,17 +336,18 @@ int32_t hm_cluster_send_ha_update(HM_NODE_CB *master_node, HM_NODE_CB *slave_nod
   /***************************************************************************/
   /* Message created. Now, add it to outgoing queue and try to send          */
   /***************************************************************************/
-  if(hm_queue_on_transport(msg, dest_node->transport_cb, FALSE)!= HM_OK)
+  if (hm_queue_on_transport(msg, dest_node->transport_cb, FALSE) != HM_OK)
   {
     TRACE_ERROR(("Error occured while sending HA Update"));
     ret_val = HM_ERR;
   }
+
 EXIT_LABEL:
   /***************************************************************************/
   /* Exit Level Checks                                                       */
   /***************************************************************************/
   TRACE_EXIT();
-  return(ret_val);
+  return (ret_val);
 } /* hm_cluster_send_ha_update */
 
 /**
@@ -333,7 +360,7 @@ EXIT_LABEL:
  *  @return #HM_OK on success, #HM_ERR on failure
  */
 int32_t hm_cluster_recv_ha_update(HM_PEER_MSG_HA_UPDATE *ha_msg,
-                                                        HM_LOCATION_CB *loc_cb)
+                                  HM_LOCATION_CB *loc_cb)
 {
   /***************************************************************************/
   /* Local Variables                                                         */
@@ -342,7 +369,7 @@ int32_t hm_cluster_recv_ha_update(HM_PEER_MSG_HA_UPDATE *ha_msg,
   HM_GLOBAL_NODE_CB *node_cb = NULL;
   int32_t node_id;
 #ifdef I_WANT_TO_DEBUG
-  int32_t group_id;
+  uint32_t group_id;
 #endif
   /***************************************************************************/
   /* Sanity Checks                                                           */
@@ -355,20 +382,24 @@ int32_t hm_cluster_recv_ha_update(HM_PEER_MSG_HA_UPDATE *ha_msg,
   /***************************************************************************/
   HM_GET_LONG(node_id, ha_msg->master_node);
   node_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIND(LOCAL.nodes_tree,
-                                           &node_id,
-                                           nodes_tree_by_db_id);
-  if(node_cb==NULL)
+            &node_id,
+            nodes_tree_by_db_id);
+
+  if (node_cb == NULL)
   {
     TRACE_ERROR(("Node %d not found in tree. Out of sync?", node_id));
     ret_val = HM_ERR;
     goto EXIT_LABEL;
   }
+
 #ifdef I_WANT_TO_DEBUG
   HM_GET_LONG(group_id, ha_msg->group);
-  TRACE_ASSERT(group_id== node_cb->group_index);
+  TRACE_ASSERT(group_id == node_cb->group_index);
 #endif
+
   /* Found node. Is it us, or is it a remote node? */
-  if(node_cb->node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
+  if (node_cb->node_cb->parent_location_cb->index ==
+      LOCAL.local_location_cb.index)
   {
     TRACE_DETAIL(("We're promoted as primary. Fail-over message awaited."));
     /* Update config and write to file */
@@ -378,7 +409,8 @@ int32_t hm_cluster_recv_ha_update(HM_PEER_MSG_HA_UPDATE *ha_msg,
   {
     node_cb->role = NODE_ROLE_PASSIVE;
   }
-  if(hm_write_config_file(HM_DEFAULT_CONFIG_FILE_NAME)!=HM_OK)
+
+  if (hm_write_config_file(HM_DEFAULT_CONFIG_FILE_NAME) != HM_OK)
   {
     TRACE_ERROR(("Error writing configuration file!"));
     ret_val = HM_ERR;
@@ -389,7 +421,7 @@ EXIT_LABEL:
   /* Exit Level Checks                                                       */
   /***************************************************************************/
   TRACE_EXIT();
-  return(ret_val);
+  return (ret_val);
 } /* hm_cluster_recv_ha_update */
 
 /**
@@ -415,77 +447,86 @@ void hm_ha_resolve_active_backup(HM_NODE_CB *node_cb)
   /* Sanity Checks                                                           */
   /***************************************************************************/
   TRACE_ENTRY();
+
   /***************************************************************************/
   /* Main Routine                                                            */
   /***************************************************************************/
-  for(glob_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIRST(LOCAL.nodes_tree, nodes_tree_by_db_id);
-      glob_cb != NULL;
-      glob_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_NEXT(glob_cb->node, nodes_tree_by_db_id))
+  for (glob_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_FIRST(LOCAL.nodes_tree,
+                 nodes_tree_by_db_id);
+       glob_cb != NULL;
+       glob_cb = (HM_GLOBAL_NODE_CB *)HM_AVL3_NEXT(glob_cb->node,
+                 nodes_tree_by_db_id))
   {
-    if(glob_cb->index != node_cb->index)
+    if (glob_cb->index != node_cb->index)
     {
       if (glob_cb->node_cb->group == node_cb->group)
       {
         TRACE_INFO(("Found a candidate node on location %d, node id %d",
-              glob_cb->node_cb->parent_location_cb->index,
-              glob_cb->index));
-        TRACE_INFO(("Candidate's Role: %s", (glob_cb->role == NODE_ROLE_ACTIVE)?"active":"passive"));
-        TRACE_INFO(("Node's Role: %s", (node_cb->current_role == NODE_ROLE_ACTIVE)?"active":"passive"));
+                    glob_cb->node_cb->parent_location_cb->index,
+                    glob_cb->index));
+        TRACE_INFO(("Candidate's Role: %s",
+                    (glob_cb->role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
+        TRACE_INFO(("Node's Role: %s",
+                    (node_cb->current_role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
+
         /* Resolve only if roles are not NONE */
         /* Or, if both are running on same location, and desired_roles are not NONE */
-        if(
-            (
-              (glob_cb->node_cb->parent_location_cb->index
-                                          == LOCAL.local_location_cb.index) &&
-              ( node_cb->parent_location_cb->index
-                                          == LOCAL.local_location_cb.index) &&
-              (glob_cb->node_cb->role != NODE_ROLE_NONE)
-            )
-            ||(
-                ( node_cb->parent_location_cb->index
-                            != LOCAL.local_location_cb.index) &&
-                (glob_cb->role != NODE_ROLE_NONE)
-               )
-           )
+        if (
+          (
+            (glob_cb->node_cb->parent_location_cb->index
+             == LOCAL.local_location_cb.index) &&
+            (node_cb->parent_location_cb->index
+             == LOCAL.local_location_cb.index) &&
+            (glob_cb->node_cb->role != NODE_ROLE_NONE)
+          )
+          || (
+            (node_cb->parent_location_cb->index
+             != LOCAL.local_location_cb.index) &&
+            (glob_cb->role != NODE_ROLE_NONE)
+          )
+        )
         {
           /* Edge case: Active and Backup on same hardware (A poor choice, though)*/
-          if(glob_cb->node_cb->parent_location_cb->index==
-                                    node_cb->parent_location_cb->index)
+          if (glob_cb->node_cb->parent_location_cb->index ==
+              node_cb->parent_location_cb->index)
           {
             TRACE_INFO(("Active and backup on same location."));
+
             /* Here, chances are the current roles are NONE. In that case, compare desired roles */
-            if(glob_cb->role == node_cb->role &&
-                              glob_cb->node_cb->current_role== NODE_ROLE_NONE)
+            if (glob_cb->role == node_cb->role &&
+                glob_cb->node_cb->current_role == NODE_ROLE_NONE)
             {
               TRACE_ERROR(("Two Nodes on the same system want to take same roles."));
               TRACE_ASSERT(FALSE);
             }
-            else if(glob_cb->role == node_cb->role &&
-                              glob_cb->node_cb->current_role!= NODE_ROLE_NONE)
+            else if (glob_cb->role == node_cb->role &&
+                     glob_cb->node_cb->current_role != NODE_ROLE_NONE)
             {
               /* Both want same roles, but one is late. Grant the alternative role*/
               /* This means that no other remote node has reported roles          */
               /* Note that this has nothing to do with their running status       */
               TRACE_WARN(("Two Nodes on the same system want to take same roles."));
-              node_cb->current_role = (glob_cb->node_cb->current_role == NODE_ROLE_ACTIVE)?
-                                                        NODE_ROLE_PASSIVE:NODE_ROLE_ACTIVE;
+              node_cb->current_role = (glob_cb->node_cb->current_role == NODE_ROLE_ACTIVE) ?
+                                      NODE_ROLE_PASSIVE : NODE_ROLE_ACTIVE;
               TRACE_DETAIL(("Set Node %d as %s.", node_cb->index,
-                  (node_cb->current_role == NODE_ROLE_ACTIVE)?"active":"passive"));
+                            (node_cb->current_role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
               TRACE_DETAIL(("Set Node %d as %s.", glob_cb->index,
-                      (glob_cb->node_cb->current_role == NODE_ROLE_ACTIVE)?"active":"passive"));
+                            (glob_cb->node_cb->current_role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
             }
           }
-          else if(glob_cb->role == node_cb->current_role)
+          else if (glob_cb->role == node_cb->current_role)
           {
             TRACE_WARN(("Contingency on Node roles for %s",
-                (glob_cb->role==NODE_ROLE_ACTIVE)?"active":"passive"));
-            if(glob_cb->node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
+                        (glob_cb->role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
+
+            if (glob_cb->node_cb->parent_location_cb->index ==
+                LOCAL.local_location_cb.index)
             {
               /* Own node. Conflict must be resolved soon */
               TRACE_WARN(("Conflict with our node! OYE!"));
               /* By virtue of current Protocol Sequence, we must oblige */
-              glob_cb->node_cb->current_role = (node_cb->current_role == NODE_ROLE_ACTIVE)?
-                                                        NODE_ROLE_PASSIVE:NODE_ROLE_ACTIVE;
+              glob_cb->node_cb->current_role = (node_cb->current_role == NODE_ROLE_ACTIVE) ?
+                                               NODE_ROLE_PASSIVE : NODE_ROLE_ACTIVE;
             }
           }
           else
@@ -494,6 +535,7 @@ void hm_ha_resolve_active_backup(HM_NODE_CB *node_cb)
             /* No conflicts. Grant desired role */
             glob_cb->node_cb->current_role = glob_cb->node_cb->role;
           }
+
           /* We should be reaching here only if the nodes are similar */
           /* By the end of this, if a similar node was found, the current_roles of   */
           /* both the parties will be updated with proper values.                    */
@@ -504,26 +546,30 @@ void hm_ha_resolve_active_backup(HM_NODE_CB *node_cb)
           glob_cb->node_cb->partner = node_cb;
 
           TRACE_DETAIL(("Set Node %d as %s.", node_cb->index,
-              (node_cb->current_role == NODE_ROLE_ACTIVE)?"active":"passive"));
+                        (node_cb->current_role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
           TRACE_DETAIL(("Set Node %d as %s.", glob_cb->index,
-              (glob_cb->node_cb->current_role == NODE_ROLE_ACTIVE)?"active":"passive"));
+                        (glob_cb->node_cb->current_role == NODE_ROLE_ACTIVE) ? "active" : "passive"));
 
-          if(glob_cb->node_cb->parent_location_cb->index == LOCAL.local_location_cb.index)
+          if (glob_cb->node_cb->parent_location_cb->index ==
+              LOCAL.local_location_cb.index)
           {
             /* If the other node is a local node, setup subscriptions too.*/
             hm_subscribe(HM_REG_SUBS_TYPE_NODE, node_cb->id, (void *)glob_cb, FALSE);
-            if(hm_global_node_update(glob_cb->node_cb, HM_UPDATE_NODE_ROLE)!=HM_OK)
+
+            if (hm_global_node_update(glob_cb->node_cb, HM_UPDATE_NODE_ROLE) != HM_OK)
             {
               TRACE_ERROR(("Error updating global node."));
             }
           }
         }
       }
+
       /* Do not look any further */
       TRACE_DETAIL(("Partner found. Break search."));
       break;
     }
   }
+
   /***************************************************************************/
   /* Exit Level Checks                                                       */
   /***************************************************************************/

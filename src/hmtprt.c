@@ -26,7 +26,8 @@
  *
  *  @return Descriptor of socket if successful, -1 otherwise
  */
-static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t *lenp)
+static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr,
+                              socklen_t *lenp)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
@@ -40,24 +41,29 @@ static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t 
   /***************************************************************************/
   TRACE_ENTRY();
   TRACE_ASSERT(res != NULL);
+
   /***************************************************************************/
   /* Main Routine                                 */
   /***************************************************************************/
-  do{
+  do
+  {
     sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
     if (sock_fd >= 0)
     {
       TRACE_DETAIL(("Got socket."));
       break;
     }
-  }while((res = res->ai_next) != NULL);
+  }
+  while ((res = res->ai_next) != NULL);
 
-  if(res == NULL)
+  if (res == NULL)
   {
     TRACE_PERROR(("Error opening socket!"));
     sock_fd = -1;
     goto EXIT_LABEL;
   }
+
   /***************************************************************************/
   /* Socket Opened. Now set its options                          */
   /***************************************************************************/
@@ -76,35 +82,38 @@ static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t 
   /***************************************************************************/
   /* Allow the descriptors to be reusable                     */
   /***************************************************************************/
-    option_val = (int)TRUE;
+  option_val = (int)TRUE;
 
   /*************************************************************/
-    /* Allow socket descriptor to be reuseable                   */
+  /* Allow socket descriptor to be reuseable                   */
   /*************************************************************/
-    TRACE_DETAIL(("Setting socket descriptor as reusable"));
+  TRACE_DETAIL(("Setting socket descriptor as reusable"));
   val = setsockopt(sock_fd, SOL_SOCKET,  SO_REUSEADDR,
-                     (char *)&option_val, sizeof(option_val));
+                   (char *)&option_val, sizeof(option_val));
+
   if (val < 0)
   {
     TRACE_PERROR(("Error settting socket descriptor to reusable"));
     close(sock_fd);
-      sock_fd = -1;
-      goto EXIT_LABEL;
+    sock_fd = -1;
+    goto EXIT_LABEL;
   }
 
   /***************************************************************************/
   /* Add the descriptor to global descriptor set                 */
   /***************************************************************************/
-  if(max_fd < sock_fd)
+  if (max_fd < sock_fd)
   {
     TRACE_DETAIL(("Update maximum socket descriptor value to %d", sock_fd));
     max_fd = sock_fd;
   }
+
   TRACE_DETAIL(("Add FD to set"));
   FD_SET(sock_fd, &hm_tprt_conn_set);
 
   *saptr = malloc(res->ai_addrlen);
-  if(*saptr == NULL)
+
+  if (*saptr == NULL)
   {
     TRACE_ERROR(("Error allocating memory for address structure."));
     FD_CLR(sock_fd, &hm_tprt_conn_set);
@@ -112,6 +121,7 @@ static int32_t hm_open_socket(struct addrinfo *res, SOCKADDR **saptr, socklen_t 
     sock_fd = -1;
     goto EXIT_LABEL;
   }
+
   memcpy(*saptr, res->ai_addr, res->ai_addrlen);
   *lenp = res->ai_addrlen;
 
@@ -130,12 +140,12 @@ EXIT_LABEL:
  *  @param sock_fd Socket Descriptor
  *  @return Socket Control Block (#HM_SOCKET_CB) if successful, @c NULL otherwise
  */
-HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
+HM_SOCKET_CB *hm_tprt_accept_connection(int32_t sock_fd)
 {
   /***************************************************************************/
   /* Variable Declarations                           */
   /***************************************************************************/
-  HM_SOCKET_CB *sock_cb =NULL;
+  HM_SOCKET_CB *sock_cb = NULL;
   uint32_t client_len = sizeof(SOCKADDR);
 #ifdef I_WANT_TO_DEBUG
   char address[128];
@@ -151,14 +161,17 @@ HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
   /* Main Routine                                 */
   /***************************************************************************/
   sock_cb = hm_alloc_sock_cb();
-  if(sock_cb == NULL)
+
+  if (sock_cb == NULL)
   {
     TRACE_ERROR(("Error allocating resources for incoming connection request"));
     goto EXIT_LABEL;
   }
+
   TRACE_DETAIL(("Socket: %d", sock_fd));
   sock_cb->sock_fd = accept(sock_fd,
-      (SOCKADDR *)&(sock_cb->addr), (socklen_t *)&client_len);
+                            (SOCKADDR *) & (sock_cb->addr), (socklen_t *)&client_len);
+
   if (sock_cb->sock_fd < 0)
   {
     if (errno != EWOULDBLOCK)
@@ -168,27 +181,32 @@ HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
       sock_cb = NULL;
       goto EXIT_LABEL;
     }
+
     TRACE_WARN(("No new connection requests"));
   }
+
 #ifdef I_WANT_TO_DEBUG
   /***************************************************************************/
   /* Accepted Connection. Its parameters are enumerated.             */
   /***************************************************************************/
   addr = (HM_SOCKADDR_UNION *)&sock_cb->addr;
   TRACE_INFO(("New Connection from %s:%d",
-      inet_ntop(AF_INET, &addr->in_addr.sin_addr, address, client_len),
-      ntohs(addr->in_addr.sin_port)));
+              inet_ntop(AF_INET, &addr->in_addr.sin_addr, address, client_len),
+              ntohs(addr->in_addr.sin_port)));
 #endif
   /***************************************************************************/
   /* Add the descriptor to global descriptor set                 */
   /***************************************************************************/
   TRACE_DETAIL(("Add FD to set"));
   FD_SET(sock_cb->sock_fd, &hm_tprt_conn_set);
-  if(max_fd < sock_cb->sock_fd)
+
+  if (max_fd < sock_cb->sock_fd)
   {
-    TRACE_DETAIL(("Update maximum socket descriptor value to %d", sock_cb->sock_fd));
+    TRACE_DETAIL(("Update maximum socket descriptor value to %d",
+                  sock_cb->sock_fd));
     max_fd = sock_cb->sock_fd;
   }
+
   /***************************************************************************/
   /* We're going to INIT state. Connect has been received, but nothing else  */
   /* has happened. Chances are, it has not been mapped on to a Transport CB  */
@@ -197,7 +215,7 @@ HM_SOCKET_CB * hm_tprt_accept_connection(int32_t sock_fd)
 
   sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
   TRACE_DETAIL(("Connection Accepted on Socket %d. Wait for Messages.",
-                          sock_cb->sock_fd));
+                sock_cb->sock_fd));
   HM_INSERT_BEFORE(LOCAL.conn_list, sock_cb->node);
 
 EXIT_LABEL:
@@ -217,7 +235,7 @@ EXIT_LABEL:
  *
  *  @return Socket CB (#HM_SOCKET_CB) of the connection opened, else @c NULL
  */
-HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
+HM_SOCKET_CB *hm_tprt_open_connection(uint32_t conn_type, void *params)
 {
   /***************************************************************************/
   /* Descriptor of the socket created. Default value denotes error condition */
@@ -249,7 +267,8 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
   /* Create a socket control block                       */
   /***************************************************************************/
   sock_cb = hm_alloc_sock_cb();
-  if(sock_cb == NULL)
+
+  if (sock_cb == NULL)
   {
     TRACE_ERROR(("Resource allocation failed for socket control block"));
     ret_val = HM_ERR;
@@ -258,126 +277,146 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 
   /***************************************************************************/
   /* Depending on the connection type, determine the sockaddr strcuture     */
-  switch(conn_type)
+  switch (conn_type)
   {
-  case HM_TRANSPORT_TCP_LISTEN:
-    TRACE_INFO(("IPv4 Listen Socket"));
-    hints.ai_family = AF_INET;
-    hints.ai_flags = AI_PASSIVE;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
-    break;
+    case HM_TRANSPORT_TCP_LISTEN:
+      TRACE_INFO(("IPv4 Listen Socket"));
+      hints.ai_family = AF_INET;
+      hints.ai_flags = AI_PASSIVE;
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_protocol = IPPROTO_TCP;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN *)params)->sin_port));
+      break;
 
-  case HM_TRANSPORT_TCP_OUT:
-    TRACE_INFO(("IPv4 Outgoing Socket"));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_NUMERICHOST|AI_NUMERICSERV;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
-    break;
+    case HM_TRANSPORT_TCP_OUT:
+      TRACE_INFO(("IPv4 Outgoing Socket"));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_protocol = IPPROTO_TCP;
+      hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN *)params)->sin_port));
+      break;
 
-  case HM_TRANSPORT_TCP_IN:
-    TRACE_INFO(("IPv4 Incoming Socket"));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    break;
+    case HM_TRANSPORT_TCP_IN:
+      TRACE_INFO(("IPv4 Incoming Socket"));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_protocol = IPPROTO_TCP;
+      break;
 
-  case HM_TRANSPORT_UDP:
-    TRACE_INFO(("IPv4 UDP Socket"));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
-    break;
+    case HM_TRANSPORT_UDP:
+      TRACE_INFO(("IPv4 UDP Socket"));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_DGRAM;
+      hints.ai_protocol = IPPROTO_UDP;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN *)params)->sin_port));
+      break;
 
-  case HM_TRANSPORT_MCAST:
-    TRACE_INFO(("IPv4 Multicast Socket"));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
-    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
-    break;
+    case HM_TRANSPORT_MCAST:
+      TRACE_INFO(("IPv4 Multicast Socket"));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_DGRAM;
+      hints.ai_protocol = IPPROTO_UDP;
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN *)params)->sin_port));
+      break;
 
-  case HM_TRANSPORT_SCTP:
-    TRACE_INFO(("IPv4 SCTP Socket"));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_SCTP;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN *)params)->sin_port));
-    break;
+    case HM_TRANSPORT_SCTP:
+      TRACE_INFO(("IPv4 SCTP Socket"));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_protocol = IPPROTO_SCTP;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN *)params)->sin_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN *)params)->sin_port));
+      break;
 
-  case HM_TRANSPORT_TCP_IPv6_LISTEN:
-    TRACE_INFO(("IPv6 Listen Socket"));
-    hints.ai_family = AF_INET6;
-    hints.ai_flags = AI_PASSIVE;
-    hints.ai_socktype = SOCK_STREAM;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
-    break;
+    case HM_TRANSPORT_TCP_IPv6_LISTEN:
+      TRACE_INFO(("IPv6 Listen Socket"));
+      hints.ai_family = AF_INET6;
+      hints.ai_flags = AI_PASSIVE;
+      hints.ai_socktype = SOCK_STREAM;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+      break;
 
-  case HM_TRANSPORT_TCP_IPv6_OUT:
-    TRACE_INFO(("IPv6 I/O Socket"));
-    hints.ai_family = AF_INET6;
-    hints.ai_socktype = SOCK_STREAM;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
-    break;
+    case HM_TRANSPORT_TCP_IPv6_OUT:
+      TRACE_INFO(("IPv6 I/O Socket"));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = SOCK_STREAM;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+      break;
 
-  case HM_TRANSPORT_TCP_IPv6_IN:
-    TRACE_INFO(("IPv6 I/O Socket"));
-    hints.ai_family = AF_INET6;
-    hints.ai_socktype = SOCK_STREAM;
-    break;
+    case HM_TRANSPORT_TCP_IPv6_IN:
+      TRACE_INFO(("IPv6 I/O Socket"));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = SOCK_STREAM;
+      break;
 
-  case HM_TRANSPORT_UDP_IPv6:
-    TRACE_INFO(("IPv6 UDP Socket"));
-    hints.ai_family = AF_INET6;
-    hints.ai_socktype = SOCK_DGRAM;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
-    break;
+    case HM_TRANSPORT_UDP_IPv6:
+      TRACE_INFO(("IPv6 UDP Socket"));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = SOCK_DGRAM;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+      break;
 
-  case HM_TRANSPORT_MCAST_IPv6:
-    TRACE_INFO(("IPv6 Multicast Socket"));
-    hints.ai_family = AF_INET6;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
-    break;
+    case HM_TRANSPORT_MCAST_IPv6:
+      TRACE_INFO(("IPv6 Multicast Socket"));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = SOCK_DGRAM;
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+      break;
 
-  case HM_TRANSPORT_SCTP_IPv6:
-    TRACE_INFO(("IPv6 SCTP Socket"));
-    hints.ai_family = AF_INET6;
-    hints.ai_socktype = SOCK_STREAM;
-    inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target, sizeof(target));
-    snprintf(service, sizeof(service), "%d", ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
-    break;
+    case HM_TRANSPORT_SCTP_IPv6:
+      TRACE_INFO(("IPv6 SCTP Socket"));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = SOCK_STREAM;
+      inet_ntop(hints.ai_family, &((SOCKADDR_IN6 *)params)->sin6_addr, target,
+                sizeof(target));
+      snprintf(service, sizeof(service), "%d",
+               ntohs(((SOCKADDR_IN6 *)params)->sin6_port));
+      break;
 
-  default:
-    TRACE_ERROR(("Unknown connection Type %d", conn_type));
-    TRACE_ASSERT(0==1);
-    goto EXIT_LABEL;
+    default:
+      TRACE_ERROR(("Unknown connection Type %d", conn_type));
+      TRACE_ASSERT(0 == 1);
+      goto EXIT_LABEL;
   }
 
-  switch(conn_type)
+  switch (conn_type)
   {
-  case HM_TRANSPORT_TCP_IN:
-  case HM_TRANSPORT_TCP_IPv6_IN:
-    TRACE_INFO(("Accept incoming connection"));
-    goto EXIT_LABEL;
+    case HM_TRANSPORT_TCP_IN:
+    case HM_TRANSPORT_TCP_IPv6_IN:
+      TRACE_INFO(("Accept incoming connection"));
+      goto EXIT_LABEL;
 
-  default:
-    TRACE_INFO(("One of Outgoing Connections Type %d", conn_type));
+    default:
+      TRACE_INFO(("One of Outgoing Connections Type %d", conn_type));
   }
 
   /***************************************************************************/
@@ -386,15 +425,20 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
   /***************************************************************************/
   TRACE_DETAIL(("AI_FAMILY: %d", hints.ai_family));
   TRACE_DETAIL(("Target: %s:%s", target, service));
-  if((conn_type != HM_TRANSPORT_MCAST)&&(conn_type != HM_TRANSPORT_MCAST_IPv6))
+
+  if ((conn_type != HM_TRANSPORT_MCAST) &&
+      (conn_type != HM_TRANSPORT_MCAST_IPv6))
   {
     TRACE_DETAIL(("Unicast Address"));
-    if((ret_val = getaddrinfo(target, service, &hints, &res)) !=0)
+
+    if ((ret_val = getaddrinfo(target, service, &hints, &res)) != 0)
     {
-      TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_val);
+      TRACE_GAI_ERROR(("Error getting information on target %s:%s", target,
+                       service), ret_val);
       ret_val = HM_ERR;
       goto EXIT_LABEL;
     }
+
     ressave = res;
     /***************************************************************************/
     /* Right now, we are only expecting a single address in response.       */
@@ -406,17 +450,21 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
   else
   {
     TRACE_DETAIL(("Multicast Address"));
-    if((ret_val = getaddrinfo(NULL, service, &hints, &res)) !=0)
+
+    if ((ret_val = getaddrinfo(NULL, service, &hints, &res)) != 0)
     {
-      TRACE_GAI_ERROR(("Error getting information on target %s:%s", target, service),ret_val);
+      TRACE_GAI_ERROR(("Error getting information on target %s:%s", target,
+                       service), ret_val);
       ret_val = HM_ERR;
       goto EXIT_LABEL;
     }
+
     ressave = res;
     TRACE_DETAIL(("Opening Socket"));
     sock_fd = hm_open_socket(res, (SOCKADDR **)&addr, &length);
   }
-  if(sock_fd == -1)
+
+  if (sock_fd == -1)
   {
     TRACE_ERROR(("Error opening socket"));
     ret_val = HM_ERR;
@@ -425,196 +473,212 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
 
   TRACE_DETAIL(("Socket opened: %d", sock_fd));
   TRACE_ASSERT(addr != NULL);
+
   /***************************************************************************/
   /* Other specific options and processing.                   */
   /***************************************************************************/
   switch (conn_type)
   {
-  case HM_TRANSPORT_TCP_LISTEN:
-    /***************************************************************************/
-    /* Set SOCKOPTS to TCP_NODELAY to disable Nagle's algorithm           */
-    /***************************************************************************/
-     val =   setsockopt(sock_fd,
-                          IPPROTO_TCP,
-                          TCP_NODELAY,
-                          &option_val,
-                          sizeof(option_val));
-     if(val == -1)
-     {
-       TRACE_PERROR(("Error Setting TCP_NODELAY"));
-       FD_CLR(sock_fd, &hm_tprt_conn_set);
-       close(sock_fd);
-       sock_fd = -1;
-       goto EXIT_LABEL;
-     }
-    /***************************************************************************/
-    /* Bind to address                               */
-    /***************************************************************************/
-    TRACE_DETAIL(("Binding to address"));
-    if(bind(sock_fd, &addr->sock_addr, length) != 0)
-    {
-      TRACE_PERROR(("Error binding to port"));
-      FD_CLR(sock_fd, &hm_tprt_conn_set);
-      close(sock_fd);
-      sock_fd = -1;
-      goto EXIT_LABEL;
-    }
+    case HM_TRANSPORT_TCP_LISTEN:
+      /***************************************************************************/
+      /* Set SOCKOPTS to TCP_NODELAY to disable Nagle's algorithm           */
+      /***************************************************************************/
+      val =   setsockopt(sock_fd,
+                         IPPROTO_TCP,
+                         TCP_NODELAY,
+                         &option_val,
+                         sizeof(option_val));
 
-    TRACE_DETAIL(("Start Listen on Port"));
-    if(listen(sock_fd, HM_MAX_PENDING_CONNECT_REQ) != 0)
-    {
-      TRACE_PERROR(("Listen on socket %d failed.", sock_fd));
-      FD_CLR(sock_fd, &hm_tprt_conn_set);
-      close(sock_fd);
-      sock_fd = -1;
-      goto EXIT_LABEL;
-    }
-    sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
-    break;
-
-  case HM_TRANSPORT_TCP_OUT:
-    TRACE_INFO(("Trying to connect"));
-    if((val = connect(sock_fd, &addr->sock_addr, length))!=0)
-    {
-      if(errno == EINPROGRESS)
+      if (val == -1)
       {
-        TRACE_DETAIL(("Connect will complete asynchronously."));
-        FD_SET(sock_fd, &hm_tprt_write_set);
-        sock_cb->conn_state = HM_TPRT_CONN_INIT;
-      }
-      else
-      {
-        TRACE_PERROR(("Connect failed on socket %d", sock_fd));
+        TRACE_PERROR(("Error Setting TCP_NODELAY"));
         FD_CLR(sock_fd, &hm_tprt_conn_set);
         close(sock_fd);
         sock_fd = -1;
         goto EXIT_LABEL;
       }
-    }
-    else
-    {
-      TRACE_DETAIL(("Connect succeeded!"));
-      /* Directly move connection to active state */
-      sock_cb->conn_state = HM_TPRT_CONN_ACTIVE;
-    }
-    //TODO: Add socket to write_set and poll on write_set too.
-    sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
-    FD_SET(sock_fd, &hm_tprt_write_set);
-    break;
 
-  case HM_TRANSPORT_UDP:
-    /***************************************************************************/
-    /* Bind to address                               */
-    /***************************************************************************/
-    TRACE_DETAIL(("Binding to address"));
-    if(bind(sock_fd, &addr->sock_addr, length) != 0)
-    {
-      TRACE_PERROR(("Error binding to port"));
-      FD_CLR(sock_fd, &hm_tprt_conn_set);
-      close(sock_fd);
-      sock_fd = -1;
-      goto EXIT_LABEL;
-    }
-    sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_UDP;
-        break;
+      /***************************************************************************/
+      /* Bind to address                               */
+      /***************************************************************************/
+      TRACE_DETAIL(("Binding to address"));
 
-  case HM_TRANSPORT_MCAST:
-    /***************************************************************************/
-    /* Bind to address                               */
-    /***************************************************************************/
-    if(bind(sock_fd, &addr->sock_addr, length) != 0)
-    {
-      TRACE_PERROR(("Error binding to port"));
-      FD_CLR(sock_fd, &hm_tprt_conn_set);
-      close(sock_fd);
-      sock_fd = -1;
-      goto EXIT_LABEL;
-    }
-    sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_UDP;
-
-#ifdef I_WANT_TO_DEBUG
-    {
-    char address_value[128];
-    HM_SOCKADDR_UNION addr;
-    socklen_t addrlen = sizeof(addr);
-
-    getsockname(sock_fd, &addr.sock_addr,  &addrlen);
-    inet_ntop(addr.in_addr.sin_family,
-          &addr.in_addr.sin_addr,
-            address_value, sizeof(address_value));
-    TRACE_INFO(("Address value: %s:%d",address_value,
-                  ntohs(addr.in_addr.sin_port)));
-    TRACE_INFO(("Family: %d", addr.in_addr.sin_family));
-    }
-#endif
-
-    snprintf(mcast_addr, sizeof(mcast_addr), "224.0.0.%d", mcast_group+address->mcast_group);
-    TRACE_DETAIL(("Multicast Group Address: %s", mcast_addr));
-    /***************************************************************************/
-    /* Convert to network representation.                     */
-    /***************************************************************************/
-    inet_pton(res->ai_family, mcast_addr, &mreq.imr_multiaddr.s_addr);
-    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-
-    if(setsockopt(sock_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == -1)
-    {
-      TRACE_PERROR(("Error joining Multicast Group"));
-      FD_CLR(sock_fd, &hm_tprt_conn_set);
-      close(sock_fd);
-      sock_fd = -1;
-      goto EXIT_LABEL;
-    }
-
-    TRACE_INFO(("Joined Multicast Group %d.", address->mcast_group));
-    TRACE_INFO(("Update Global Multicast Address Destination"));
-    /***************************************************************************/
-    /* Also update the Multicast sending address in LOCAL             */
-    /* This is a quickfix.                             */
-    /* FIXME                                      */
-    /***************************************************************************/
-    TRACE_ASSERT(LOCAL.mcast_addr != NULL);
-    LOCAL.mcast_addr->address.mcast_group = address->mcast_group;
-    //IPv4 Specific
-    mcast_cast = (HM_SOCKADDR_UNION *)&LOCAL.mcast_addr->address.address;
-    inet_pton(res->ai_family, mcast_addr,
-        ((SOCKADDR_IN *)&mcast_cast->in_addr.sin_addr));
-    mcast_cast->in_addr.sin_port = ((SOCKADDR_IN*)res->ai_addr)->sin_port;
-    mcast_cast->in_addr.sin_family = res->ai_family;
-
-#ifdef I_WANT_TO_DEBUG
-    {
-    char address_value[128];
-    inet_ntop(res->ai_family,
-        ((SOCKADDR_IN *)&mcast_cast->in_addr.sin_addr),
-        address_value, sizeof(address_value));
-    TRACE_INFO(("Multicast Address value: %s:%d",address_value,
-                  ntohs(mcast_cast->in_addr.sin_port)));
-    TRACE_INFO(("Family: %d", res->ai_family));
-    }
-#endif
-
-    /***************************************************************************/
-    /* Do not loopback the packets                         */
-    /***************************************************************************/
-    {
-      TRACE_DETAIL(("Setting Loopback to off."));
-      u_char flag;
-      flag = 0;
-
-      if(setsockopt(sock_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &flag, sizeof(flag)) == -1)
+      if (bind(sock_fd, &addr->sock_addr, length) != 0)
       {
-        TRACE_PERROR(("Error setting loopback option on Multicast socket"));
+        TRACE_PERROR(("Error binding to port"));
+        FD_CLR(sock_fd, &hm_tprt_conn_set);
+        close(sock_fd);
+        sock_fd = -1;
+        goto EXIT_LABEL;
       }
-    }
-    LOCAL.mcast_addr->sock_cb = sock_cb;
-    LOCAL.mcast_addr->location_cb = &LOCAL.local_location_cb;
 
-    break;
+      TRACE_DETAIL(("Start Listen on Port"));
 
-  default:
-    TRACE_WARN(("Unknown Connection type"));
-    break;
+      if (listen(sock_fd, HM_MAX_PENDING_CONNECT_REQ) != 0)
+      {
+        TRACE_PERROR(("Listen on socket %d failed.", sock_fd));
+        FD_CLR(sock_fd, &hm_tprt_conn_set);
+        close(sock_fd);
+        sock_fd = -1;
+        goto EXIT_LABEL;
+      }
+
+      sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
+      break;
+
+    case HM_TRANSPORT_TCP_OUT:
+      TRACE_INFO(("Trying to connect"));
+
+      if ((val = connect(sock_fd, &addr->sock_addr, length)) != 0)
+      {
+        if (errno == EINPROGRESS)
+        {
+          TRACE_DETAIL(("Connect will complete asynchronously."));
+          FD_SET(sock_fd, &hm_tprt_write_set);
+          sock_cb->conn_state = HM_TPRT_CONN_INIT;
+        }
+        else
+        {
+          TRACE_PERROR(("Connect failed on socket %d", sock_fd));
+          FD_CLR(sock_fd, &hm_tprt_conn_set);
+          close(sock_fd);
+          sock_fd = -1;
+          goto EXIT_LABEL;
+        }
+      }
+      else
+      {
+        TRACE_DETAIL(("Connect succeeded!"));
+        /* Directly move connection to active state */
+        sock_cb->conn_state = HM_TPRT_CONN_ACTIVE;
+      }
+
+      //TODO: Add socket to write_set and poll on write_set too.
+      sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_TCP;
+      FD_SET(sock_fd, &hm_tprt_write_set);
+      break;
+
+    case HM_TRANSPORT_UDP:
+      /***************************************************************************/
+      /* Bind to address                               */
+      /***************************************************************************/
+      TRACE_DETAIL(("Binding to address"));
+
+      if (bind(sock_fd, &addr->sock_addr, length) != 0)
+      {
+        TRACE_PERROR(("Error binding to port"));
+        FD_CLR(sock_fd, &hm_tprt_conn_set);
+        close(sock_fd);
+        sock_fd = -1;
+        goto EXIT_LABEL;
+      }
+
+      sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_UDP;
+      break;
+
+    case HM_TRANSPORT_MCAST:
+
+      /***************************************************************************/
+      /* Bind to address                               */
+      /***************************************************************************/
+      if (bind(sock_fd, &addr->sock_addr, length) != 0)
+      {
+        TRACE_PERROR(("Error binding to port"));
+        FD_CLR(sock_fd, &hm_tprt_conn_set);
+        close(sock_fd);
+        sock_fd = -1;
+        goto EXIT_LABEL;
+      }
+
+      sock_cb->sock_type = HM_TRANSPORT_SOCK_TYPE_UDP;
+
+#ifdef I_WANT_TO_DEBUG
+      {
+        char address_value[128];
+        HM_SOCKADDR_UNION addr;
+        socklen_t addrlen = sizeof(addr);
+
+        getsockname(sock_fd, &addr.sock_addr,  &addrlen);
+        inet_ntop(addr.in_addr.sin_family,
+                  &addr.in_addr.sin_addr,
+                  address_value, sizeof(address_value));
+        TRACE_INFO(("Address value: %s:%d", address_value,
+                    ntohs(addr.in_addr.sin_port)));
+        TRACE_INFO(("Family: %d", addr.in_addr.sin_family));
+      }
+#endif
+
+      snprintf(mcast_addr, sizeof(mcast_addr), "224.0.0.%d",
+               mcast_group + address->mcast_group);
+      TRACE_DETAIL(("Multicast Group Address: %s", mcast_addr));
+      /***************************************************************************/
+      /* Convert to network representation.                     */
+      /***************************************************************************/
+      inet_pton(res->ai_family, mcast_addr, &mreq.imr_multiaddr.s_addr);
+      mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+      if (setsockopt(sock_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq,
+                     sizeof(mreq)) == -1)
+      {
+        TRACE_PERROR(("Error joining Multicast Group"));
+        FD_CLR(sock_fd, &hm_tprt_conn_set);
+        close(sock_fd);
+        sock_fd = -1;
+        goto EXIT_LABEL;
+      }
+
+      TRACE_INFO(("Joined Multicast Group %d.", address->mcast_group));
+      TRACE_INFO(("Update Global Multicast Address Destination"));
+      /***************************************************************************/
+      /* Also update the Multicast sending address in LOCAL             */
+      /* This is a quickfix.                             */
+      /* FIXME                                      */
+      /***************************************************************************/
+      TRACE_ASSERT(LOCAL.mcast_addr != NULL);
+      LOCAL.mcast_addr->address.mcast_group = address->mcast_group;
+      //IPv4 Specific
+      mcast_cast = (HM_SOCKADDR_UNION *)&LOCAL.mcast_addr->address.address;
+      inet_pton(res->ai_family, mcast_addr,
+                ((SOCKADDR_IN *)&mcast_cast->in_addr.sin_addr));
+      mcast_cast->in_addr.sin_port = ((SOCKADDR_IN *)res->ai_addr)->sin_port;
+      mcast_cast->in_addr.sin_family = res->ai_family;
+
+#ifdef I_WANT_TO_DEBUG
+      {
+        char address_value[128];
+        inet_ntop(res->ai_family,
+                  ((SOCKADDR_IN *)&mcast_cast->in_addr.sin_addr),
+                  address_value, sizeof(address_value));
+        TRACE_INFO(("Multicast Address value: %s:%d", address_value,
+                    ntohs(mcast_cast->in_addr.sin_port)));
+        TRACE_INFO(("Family: %d", res->ai_family));
+      }
+#endif
+
+      /***************************************************************************/
+      /* Do not loopback the packets                         */
+      /***************************************************************************/
+      {
+        TRACE_DETAIL(("Setting Loopback to off."));
+        u_char flag;
+        flag = 0;
+
+        if (setsockopt(sock_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &flag,
+                       sizeof(flag)) == -1)
+        {
+          TRACE_PERROR(("Error setting loopback option on Multicast socket"));
+        }
+      }
+      LOCAL.mcast_addr->sock_cb = sock_cb;
+      LOCAL.mcast_addr->location_cb = &LOCAL.local_location_cb;
+
+      break;
+
+    default:
+      TRACE_WARN(("Unknown Connection type"));
+      break;
   }
+
   /***************************************************************************/
   /* All went well. Set the sock_fd as that of sock_cb             */
   /***************************************************************************/
@@ -627,6 +691,7 @@ HM_SOCKET_CB * hm_tprt_open_connection(uint32_t conn_type, void * params )
   HM_INSERT_BEFORE(LOCAL.conn_list, sock_cb->node);
 
 EXIT_LABEL:
+
   if (ret_val == HM_OK)
   {
     /***************************************************************************/
@@ -640,7 +705,7 @@ EXIT_LABEL:
     /***************************************************************************/
     //FIXME
   }
-  else if(ret_val == HM_ERR)
+  else if (ret_val == HM_ERR)
   {
     hm_free_sock_cb(sock_cb);
     sock_cb = NULL;
@@ -662,14 +727,14 @@ EXIT_LABEL:
  *
  *  @return Total number of bytes sent
  */
-int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
-            uint32_t sock_type,BYTE *msg_buffer, uint32_t length )
+int32_t hm_tprt_send_on_socket(struct sockaddr *ip, int32_t sock_fd,
+                               uint32_t sock_type, BYTE *msg_buffer, uint32_t length)
 {
   /***************************************************************************/
   /* Local variables                               */
   /***************************************************************************/
-  int32_t total_bytes_sent=0;
-  int32_t bytes_sent=0;
+  int32_t total_bytes_sent = 0;
+  int32_t bytes_sent = 0;
   int32_t success = FALSE;
   BYTE *buf = NULL;
   int32_t os_error;
@@ -681,75 +746,75 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
 
   TRACE_DETAIL(("Socket type %d", sock_type));
   TRACE_DETAIL(("Attempt to send %d bytes of data on socket %d",
-                    length, sock_fd));
+                length, sock_fd));
 
   buf = msg_buffer;
 
   do
   {
-    if((sock_type== HM_TRANSPORT_TCP_IN) || (sock_type==HM_TRANSPORT_TCP_OUT))
+    if ((sock_type == HM_TRANSPORT_TCP_IN) || (sock_type == HM_TRANSPORT_TCP_OUT))
     {
       TRACE_DETAIL(("data to be sent on TCP connection "));
       bytes_sent = send(sock_fd,
-                buf,
-                (length - bytes_sent),
-                0);
+                        buf,
+                        (length - bytes_sent),
+                        0);
 
     }
 
-    else if(sock_type==HM_TRANSPORT_UDP)
+    else if (sock_type == HM_TRANSPORT_UDP)
     {
       TRACE_DETAIL(("Data to be sent on UDP Ucast connection "));
       bytes_sent = sendto(sock_fd,
-                                 buf,
-                                 (length - bytes_sent),
-                                 0,
-                                 ip,
-                                 sizeof(struct sockaddr));
+                          buf,
+                          (length - bytes_sent),
+                          0,
+                          ip,
+                          sizeof(struct sockaddr));
 
     }
 
-    else if(sock_type==HM_TRANSPORT_MCAST)
+    else if (sock_type == HM_TRANSPORT_MCAST)
     {
       TRACE_DETAIL(("Data to be sent on UDP Mcast connection "));
 #ifdef I_WANT_TO_DEBUG
-    {
-    char address_value[128];
-    HM_SOCKADDR_UNION addr;
-    socklen_t addrlen = sizeof(addr);
+      {
+        char address_value[128];
+        HM_SOCKADDR_UNION addr;
+        socklen_t addrlen = sizeof(addr);
 
-    getsockname(sock_fd, &addr.sock_addr,  &addrlen);
-    inet_ntop(addr.in_addr.sin_family,
-          &addr.in_addr.sin_addr,
-            address_value, sizeof(address_value));
-    TRACE_INFO(("Address value: %s:%d",address_value,
-                  ntohs(addr.in_addr.sin_port)));
-    TRACE_INFO(("Family: %d", addr.in_addr.sin_family));
-    }
+        getsockname(sock_fd, &addr.sock_addr,  &addrlen);
+        inet_ntop(addr.in_addr.sin_family,
+                  &addr.in_addr.sin_addr,
+                  address_value, sizeof(address_value));
+        TRACE_INFO(("Address value: %s:%d", address_value,
+                    ntohs(addr.in_addr.sin_port)));
+        TRACE_INFO(("Family: %d", addr.in_addr.sin_family));
+      }
 
-    TRACE_DETAIL(("Send to %s:%d",
-        inet_ntop(((SOCKADDR_IN *)ip)->sin_family,
-          &((SOCKADDR_IN *)ip)->sin_addr,
-          temp, sizeof(temp)),
-          ntohs(((SOCKADDR_IN *)ip)->sin_port)));
-    TRACE_DETAIL(("Family: %d",((SOCKADDR_IN *)ip)->sin_family));
+      TRACE_DETAIL(("Send to %s:%d",
+                    inet_ntop(((SOCKADDR_IN *)ip)->sin_family,
+                              &((SOCKADDR_IN *)ip)->sin_addr,
+                              temp, sizeof(temp)),
+                    ntohs(((SOCKADDR_IN *)ip)->sin_port)));
+      TRACE_DETAIL(("Family: %d", ((SOCKADDR_IN *)ip)->sin_family));
 #endif
 
       bytes_sent = sendto(sock_fd,
-                                 buf,
-                                 (length - bytes_sent),
-                                 0,
-                                 ip,
-                                 sizeof(struct sockaddr));
+                          buf,
+                          (length - bytes_sent),
+                          0,
+                          ip,
+                          sizeof(struct sockaddr));
 
-        }
+    }
 
-    if(bytes_sent == length)
+    if (bytes_sent == (int32_t)length)
     {
       TRACE_DETAIL(("Message sent in full"));
       buf = NULL;
       success = TRUE;
-      total_bytes_sent +=bytes_sent;
+      total_bytes_sent += bytes_sent;
       break;
     }
     else if (bytes_sent == -1)
@@ -758,42 +823,44 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
       /* An error was returned - check for retryable socket error values.    */
       /***********************************************************************/
       os_error = errno;
-      TRACE_PERROR(("Send failed on socket %d.",sock_fd));
+      TRACE_PERROR(("Send failed on socket %d.", sock_fd));
 
       if ((os_error == EWOULDBLOCK) ||
-                (os_error == ENOMEM) ||
-                (os_error == ENOSR))
+          (os_error == ENOMEM) ||
+          (os_error == ENOSR))
       {
         /*********************************************************************/
-          /* This seems to be a flow control condition - clear the bytes sent  */
-          /* value to show that no data was written.                           */
-          /*********************************************************************/
-          TRACE_WARN(("Resource shortage - try again"));
-          bytes_sent = 0;
+        /* This seems to be a flow control condition - clear the bytes sent  */
+        /* value to show that no data was written.                           */
+        /*********************************************************************/
+        TRACE_WARN(("Resource shortage - try again"));
+        bytes_sent = 0;
       }
       else if (os_error == EINTR)
       {
         TRACE_WARN(("Send interrupted - loop round again"));
-          bytes_sent = 0;
+        bytes_sent = 0;
       }
       else
       {
         /*********************************************************************/
-          /* Socket failed so work source needs to be unregistered.            */
-          /*********************************************************************/
-          TRACE_ERROR(("Socket failed"));
-          success = HM_ERR;
-          break;
+        /* Socket failed so work source needs to be unregistered.            */
+        /*********************************************************************/
+        TRACE_ERROR(("Socket failed"));
+        success = HM_ERR;
+        break;
       }
     }
+
     /***************************************************************************/
     /* Advance current pointer to remaining part of data             */
     /***************************************************************************/
     buf += bytes_sent;
-    total_bytes_sent +=bytes_sent;
-  }while(total_bytes_sent< length);
+    total_bytes_sent += bytes_sent;
+  }
+  while (total_bytes_sent < (int32_t) length);
 
-  if(total_bytes_sent == length)
+  if (total_bytes_sent == (int32_t) length)
   {
     TRACE_DETAIL(("Message sent in full"));
     success = TRUE;
@@ -817,18 +884,18 @@ int32_t hm_tprt_send_on_socket(struct sockaddr* ip,int32_t sock_fd,
  *  @return Total bytes read from the socket
  */
 int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
-              BYTE * msg_buffer, uint32_t length, SOCKADDR **src_addr)
+                               BYTE *msg_buffer, uint32_t length, SOCKADDR **src_addr)
 {
   /***************************************************************************/
   /* Local variables                               */
   /***************************************************************************/
-  int32_t total_bytes_rcvd=0;
-  uint32_t bytes_rcvd=0;
+  int32_t total_bytes_rcvd = 0;
+  int32_t bytes_rcvd = 0;
   int32_t os_error;
   int32_t op_complete = FALSE;
   BYTE *buf = msg_buffer;
 
-  SOCKADDR_IN * ip_addr = NULL;
+  SOCKADDR_IN *ip_addr = NULL;
   extern fd_set hm_tprt_conn_set;
 
   socklen_t len = sizeof(SOCKADDR);
@@ -837,49 +904,53 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 
   TRACE_ASSERT(msg_buffer != NULL);
 
-    /***************************************************************************/
+  /***************************************************************************/
   /* Now try to receive data                           */
   /***************************************************************************/
-  if(src_addr != NULL)
+  if (src_addr != NULL)
   {
     *src_addr = NULL;
   }
+
   do
   {
-    TRACE_DETAIL(("Try to receive %d bytes on Socket %d", (length - bytes_rcvd), sock_fd));
+    TRACE_DETAIL(("Try to receive %d bytes on Socket %d", (length - bytes_rcvd),
+                  sock_fd));
 
-    if(sock_type==HM_TRANSPORT_SOCK_TYPE_TCP)
+    if (sock_type == HM_TRANSPORT_SOCK_TYPE_TCP)
     {
       TRACE_DETAIL(("TCP Socket"));
       bytes_rcvd = recv(sock_fd,
-                buf,
-                (length - bytes_rcvd),
-                0);
+                        buf,
+                        (length - bytes_rcvd),
+                        0);
     }
 
-    else if(sock_type==HM_TRANSPORT_SOCK_TYPE_UDP)
+    else if (sock_type == HM_TRANSPORT_SOCK_TYPE_UDP)
     {
       TRACE_DETAIL(("UDP Socket"));
-      ip_addr = (SOCKADDR_IN*)malloc(sizeof(SOCKADDR_IN));
-      if(ip_addr == NULL)
+      ip_addr = (SOCKADDR_IN *)malloc(sizeof(SOCKADDR_IN));
+
+      if (ip_addr == NULL)
       {
         TRACE_ERROR(("Error allocating memory for incoming Address"));
         op_complete = TRUE;
-          bytes_rcvd = 0;
-          break;
+        bytes_rcvd = 0;
+        break;
       }
+
       bytes_rcvd = recvfrom(sock_fd,
-                                      buf,
-                                      (length - bytes_rcvd),
-                                       0,
-                                       (struct sockaddr *)ip_addr  ,
-                                       &len);
-       /***************************************************************************/
-       /* Do we need to fetch the sender IP information too, from the socket?     */
-       /* or will they tell it themselves?                    */
-       /* In some upper layer structure?                      */
-       /***************************************************************************/
-       //FIXME: So far, they're not telling, so we need to get it here.
+                            buf,
+                            (length - bytes_rcvd),
+                            0,
+                            (struct sockaddr *)ip_addr  ,
+                            &len);
+      /***************************************************************************/
+      /* Do we need to fetch the sender IP information too, from the socket?     */
+      /* or will they tell it themselves?                    */
+      /* In some upper layer structure?                      */
+      /***************************************************************************/
+      //FIXME: So far, they're not telling, so we need to get it here.
       {
         char net_addr[128];
         int32_t length = 128;
@@ -888,7 +959,8 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
 
       }
     }
-    if(bytes_rcvd == length)
+
+    if (bytes_rcvd == (int32_t)length)
     {
       TRACE_DETAIL(("Message received in full"));
 #if 0
@@ -896,16 +968,17 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
       {
         uint32_t debug_length;
         TRACE_INFO(("Buffer:"));
-        for(debug_length=0; debug_length<length; debug_length++)
+
+        for (debug_length = 0; debug_length < length; debug_length++)
         {
-          TRACE_INFO(("%02X", *((unsigned char *)buf+debug_length)));
+          TRACE_INFO(("%02X", *((unsigned char *)buf + debug_length)));
         }
       }
 #endif
 #endif
       buf = NULL;
       op_complete = TRUE;
-      total_bytes_rcvd +=bytes_rcvd;
+      total_bytes_rcvd += bytes_rcvd;
       break;
     }
     else if (bytes_rcvd == -1)
@@ -915,33 +988,34 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
       /***********************************************************************/
       TRACE_PERROR(("Recv failed on socket"));
       os_error = errno;
+
       if ((os_error == EWOULDBLOCK))
       {
         /*********************************************************************/
-          /* This seems to be a flow control condition - clear the bytes sent  */
-          /* value to show that no data was written.                           */
-          /*********************************************************************/
+        /* This seems to be a flow control condition - clear the bytes sent  */
+        /* value to show that no data was written.                           */
+        /*********************************************************************/
         TRACE_WARN(("Resource shortage - try again"));
-          bytes_rcvd = 0;
-       }
+        bytes_rcvd = 0;
+      }
       else if (os_error == EINTR)
       {
         TRACE_WARN(("Receive interrupted - loop round again"));
-          bytes_rcvd = 0;
+        bytes_rcvd = 0;
       }
       else
       {
         /*********************************************************************/
-          /* Socket failed so work source needs to be unregistered.            */
-          /*********************************************************************/
+        /* Socket failed so work source needs to be unregistered.            */
+        /*********************************************************************/
         TRACE_ERROR(("Socket failed"));
         FD_CLR(sock_fd, &hm_tprt_conn_set);
-          op_complete = TRUE;
-          bytes_rcvd = 0;
-          break;
+        op_complete = TRUE;
+        bytes_rcvd = 0;
+        break;
       }
     }
-    else if(bytes_rcvd == 0)
+    else if (bytes_rcvd == 0)
     {
       TRACE_WARN(("The peer has disconnected"));
       op_complete = TRUE;
@@ -955,16 +1029,18 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
       op_complete = TRUE;
       break;
     }
+
     /***************************************************************************/
     /* Advance current pointer to remaining part of data             */
     /***************************************************************************/
     buf += bytes_rcvd;
-    total_bytes_rcvd +=bytes_rcvd;
-  }while(total_bytes_rcvd< length);
+    total_bytes_rcvd += bytes_rcvd;
+  }
+  while (total_bytes_rcvd < (int32_t) length);
 
-  if(op_complete == TRUE)
+  if (op_complete == TRUE)
   {
-    if(total_bytes_rcvd == length)
+    if (total_bytes_rcvd == (int32_t) length)
     {
       TRACE_DETAIL(("Message received in full"));
       buf = NULL;
@@ -976,22 +1052,28 @@ int32_t hm_tprt_recv_on_socket(uint32_t sock_fd , uint32_t sock_type,
       total_bytes_rcvd = bytes_rcvd;
     }
   }
+
 #ifdef I_WANT_TO_DEBUG
-  if(ip_addr != NULL)
+
+  if (ip_addr != NULL)
   {
-    if(src_addr== NULL)
+    if (src_addr == NULL)
     {
       TRACE_WARN((
-      "UDP/Multicast UDP port was specified but address to fill sender addr was not given"
-          ));
+                   "UDP/Multicast UDP port was specified but address to fill sender addr was not given"
+                 ));
     }
-    TRACE_ASSERT(src_addr!=NULL);
+
+    TRACE_ASSERT(src_addr != NULL);
   }
+
 #endif
-  if(src_addr != NULL)
+
+  if (src_addr != NULL)
   {
     *src_addr = (SOCKADDR *)ip_addr;
   }
+
   TRACE_EXIT();
   return (total_bytes_rcvd);
 } /* hm_tprt_recv_on_socket */
@@ -1027,9 +1109,10 @@ int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
   /* Empty the outgoing buffers queue. Don't try to send them, just drop.     */
   /***************************************************************************/
   TRACE_DETAIL(("Emptying pending queue."));
-  for(block = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(tprt_cb->pending);
-      block != NULL;
-    block = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(tprt_cb->pending))
+
+  for (block = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(tprt_cb->pending);
+       block != NULL;
+       block = (HM_LIST_BLOCK *)HM_NEXT_IN_LIST(tprt_cb->pending))
   {
     msg = (HM_MSG *)block->target;
     /***************************************************************************/
@@ -1042,36 +1125,38 @@ int32_t hm_tprt_close_connection(HM_TRANSPORT_CB *tprt_cb)
     block = NULL;
   }
 
-  if(tprt_cb->in_buffer != NULL)
+  if (tprt_cb->in_buffer != NULL)
   {
     TRACE_DETAIL(("Transport has data in its input buffers. Freeing!"));
     hm_free_buffer((HM_MSG *)tprt_cb->in_buffer);
     tprt_cb->in_buffer = NULL;
   }
+
   /***************************************************************************/
   /* Transport Types may differ. Default is Socket Based Transport. So, we're*/
   /* currently only implementing the default case.               */
   /***************************************************************************/
-  switch(tprt_cb->type)
+  switch (tprt_cb->type)
   {
-  default:
-    /***************************************************************************/
-    /* It is possible that the socket connection was torn down before, or never*/
-    /* existed in the first place.                         */
-    /***************************************************************************/
-    if(tprt_cb->sock_cb != NULL)
-    {
-      TRACE_DETAIL(("Closing socket connections"));
-      hm_close_sock_connection(tprt_cb->sock_cb);
-      tprt_cb->sock_cb = NULL;
-    }
+    default:
+
+      /***************************************************************************/
+      /* It is possible that the socket connection was torn down before, or never*/
+      /* existed in the first place.                         */
+      /***************************************************************************/
+      if (tprt_cb->sock_cb != NULL)
+      {
+        TRACE_DETAIL(("Closing socket connections"));
+        hm_close_sock_connection(tprt_cb->sock_cb);
+        tprt_cb->sock_cb = NULL;
+      }
   }
 
   /***************************************************************************/
   /* Exit Level Checks                             */
   /***************************************************************************/
   TRACE_EXIT();
-  return(ret_val);
+  return (ret_val);
 }/* hm_tprt_close_connection */
 
 
@@ -1093,25 +1178,30 @@ void  hm_close_sock_connection(HM_SOCKET_CB *sock_cb)
   TRACE_ENTRY();
 
   TRACE_ASSERT(sock_cb != NULL);
+
   /***************************************************************************/
   /* Main Routine                                 */
   /***************************************************************************/
-  if(sock_cb->sock_fd > 0)
+  if (sock_cb->sock_fd > 0)
   {
     TRACE_INFO(("Closing socket"));
-    if(FD_ISSET(sock_cb->sock_fd, &hm_tprt_conn_set))
+
+    if (FD_ISSET(sock_cb->sock_fd, &hm_tprt_conn_set))
     {
       TRACE_DETAIL(("Remove from Read set."));
       FD_CLR(sock_cb->sock_fd, &hm_tprt_conn_set);
     }
-    if(FD_ISSET(sock_cb->sock_fd, &hm_tprt_write_set))
+
+    if (FD_ISSET(sock_cb->sock_fd, &hm_tprt_write_set))
     {
       TRACE_DETAIL(("Remove from write set."));
       FD_CLR(sock_cb->sock_fd, &hm_tprt_write_set);
     }
+
     close(sock_cb->sock_fd);
     sock_cb->sock_fd = -1;
   }
+
   HM_REMOVE_FROM_LIST(sock_cb->node);
   sock_cb->tprt_cb = NULL;
 

@@ -16,6 +16,8 @@
 #define TRUE         (1==1)
 #define FALSE         (0==1)
 
+#define UNUSED(var) (void)(var)
+
 #define MIN(X, Y)   (((X)<(Y)) ? (X) : (Y))
 #define MAX(X, Y)   (((X)>(Y)) ? (X) : (Y))
 

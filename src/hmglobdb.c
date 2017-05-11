@@ -248,6 +248,7 @@ int32_t hm_global_location_update(HM_LOCATION_CB *loc_cb, uint32_t op)
         TRACE_DETAIL(("Location Down."));
         notify = HM_NOTIFICATION_LOCATION_INACTIVE;
         break;
+
       default:
         TRACE_WARN(("Unknown HM Status %d", glob_cb->status));
         TRACE_ASSERT(FALSE);
@@ -755,6 +756,7 @@ int32_t hm_global_node_remove(HM_NODE_CB *node_cb)
   /* Variable Declarations                           */
   /***************************************************************************/
   int32_t ret_val = HM_OK;
+  UNUSED(node_cb);
   /***************************************************************************/
   /* Sanity Checks                               */
   /***************************************************************************/
@@ -901,7 +903,7 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
   /***************************************************************************/
   /* Try only when it is a new insertion.                                    */
   /***************************************************************************/
-  if(HM_AVL3_IN_TREE(insert_cb->node))
+  if(sub_cb == NULL)
   {
     /***************************************************************************/
     /* Find out if there is some greedy (wildcard) subscriber.                 */
@@ -1073,7 +1075,7 @@ int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb, uint32_t op)
     /* Look into the node state in its FSM variable to determine if an update  */
     /* is needed or not.                             */
     /***************************************************************************/
-    if(proc_cb->running)
+    if(proc_cb->running == HM_STATUS_RUNNING)
     {
       TRACE_DETAIL(("Process active. Send Notifications."));
       notify = HM_NOTIFICATION_PROCESS_CREATED;
@@ -1217,6 +1219,7 @@ int32_t hm_global_process_remove(HM_PROCESS_CB *proc_cb)
   /* Sanity Checks                               */
   /***************************************************************************/
   TRACE_ENTRY();
+  UNUSED(proc_cb);
   /***************************************************************************/
   /* Main Routine                                 */
   /***************************************************************************/
@@ -1399,8 +1402,8 @@ int32_t hm_subscribe(uint32_t subs_type, uint32_t value, void *cb, uint32_t bidi
   int32_t ret_val = HM_OK;
 
   int32_t exists = FALSE;
-  int32_t table_type;
-  int32_t keys[2];
+  uint32_t table_type;
+  uint32_t keys[2];
 
   uint32_t *processed = NULL;
   uint32_t subscriber_type;

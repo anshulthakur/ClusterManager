@@ -361,7 +361,7 @@ int32_t hm_node_fsm(uint32_t input_signal, HM_NODE_CB * node_cb)
           proc_cb = (HM_PROCESS_CB *)HM_AVL3_NEXT(proc_cb->node,
                       node_process_tree_by_proc_type_and_pid ))
       {
-        proc_cb->running = FALSE;
+        proc_cb->running = HM_STATUS_DOWN;
         hm_process_update(proc_cb);
       }
       /***************************************************************************/

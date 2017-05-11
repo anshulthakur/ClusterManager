@@ -669,6 +669,7 @@ void hm_run_main_thread()
   /***************************************************************************/
   /* Start HA Role timer too                                                 */
   /***************************************************************************/
+
   TRACE_INFO(("Starting HA Role Wait timer."));
   LOCAL.local_location_cb.ha_timer_cb =
       HM_TIMER_CREATE(LOCAL.local_location_cb.ha_timer_wait_interval,
@@ -1375,6 +1376,7 @@ int32_t hm_init_location_layer()
 void hm_interrupt_handler(int32_t sig, siginfo_t *info, void *data)
 {
   TRACE_ENTRY();
+  UNUSED(data);
 
   if ( info == NULL )
   {

@@ -31,6 +31,7 @@ int32_t hm_service_notify_queue()
   int32_t ret_val = HM_OK;
   uint32_t *processed = NULL;
   HM_LIST_BLOCK *list_member = NULL, *block = NULL;
+  int32_t target_type, subscriber_type;
   /***************************************************************************/
   /* Sanity Checks                               */
   /***************************************************************************/
@@ -200,8 +201,11 @@ int32_t hm_service_notify_queue()
           TRACE_DETAIL(("Subscriber has been serviced!"));
           continue;
         }
+
         subscriber.void_cb = (void *)list_member->target;
-        switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+        target_type = *(int32_t *)((char *)subscriber.void_cb +
+                                          (uint32_t)(sizeof(int32_t)));
+        switch(target_type)
         {
           case HM_TABLE_TYPE_NODES:
             TRACE_DETAIL(("Global Node type"));
@@ -230,7 +234,7 @@ int32_t hm_service_notify_queue()
             break;
 
           default:
-            TRACE_WARN(("Unknown type of subscriber"));
+            TRACE_WARN(("Unknown type of subscriber %d", target_type));
             TRACE_ASSERT((FALSE));
         }
 
@@ -311,7 +315,10 @@ int32_t hm_service_notify_queue()
           continue;
         }
         subscriber.void_cb = (void *)list_member->target;
-        switch(*(int32_t *)((char *)subscriber.void_cb+ (uint32_t)(sizeof(int32_t))))
+        subscriber_type = *(int32_t *)((char *)subscriber.void_cb +
+                                               (uint32_t)(sizeof(int32_t)));
+
+        switch(subscriber_type)
         {
           case HM_TABLE_TYPE_NODES:
             TRACE_DETAIL(("Global Node type"));
@@ -340,7 +347,7 @@ int32_t hm_service_notify_queue()
             break;
 
           default:
-            TRACE_WARN(("Unknown type of subscriber"));
+            TRACE_WARN(("Unknown type of subscriber %d", subscriber_type));
             TRACE_ASSERT((FALSE));
         }
 
