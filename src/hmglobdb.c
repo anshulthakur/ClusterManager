@@ -903,7 +903,7 @@ int32_t hm_global_process_add(HM_PROCESS_CB *proc_cb)
   /***************************************************************************/
   /* Try only when it is a new insertion.                                    */
   /***************************************************************************/
-  if(sub_cb == NULL)
+  if(sub_cb != NULL)
   {
     /***************************************************************************/
     /* Find out if there is some greedy (wildcard) subscriber.                 */
