@@ -96,8 +96,7 @@ void hm_cluster_check_location(HM_MSG *msg, SOCKADDR *sender)
   else
   {
     TRACE_DETAIL(("Keepalive Message from known location."));
-
-    if (glob_cb->status != HM_STATUS_RUNNING)
+    if(glob_cb->status != HM_STATUS_RUNNING)
     {
       TRACE_WARN(("Receiving Tick from an Inactive Node. State inconsistent!"));
       TRACE_ASSERT(FALSE);
@@ -487,8 +486,10 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
     HM_PUT_LONG(replay_msg->tlv[index_filled].update_type,
                 HM_PEER_REPLAY_UPDATE_TYPE_NODE);
 
-    if (node_cb->role != NODE_ROLE_NONE)
+    if (node_cb->current_role != NODE_ROLE_NONE)
     {
+      TRACE_DETAIL(("Node role: %s",
+          node_cb->current_role== NODE_ROLE_ACTIVE? "ACTIVE": "PASSIVE"));
       HM_PUT_LONG(replay_msg->tlv[index_filled].role,
                   (uint32_t)node_cb->current_role);
     }
@@ -497,6 +498,8 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
       TRACE_DETAIL(("Node role resolution not completed. Use desired role"));
       HM_PUT_LONG(replay_msg->tlv[index_filled].role,
                   (uint32_t)node_cb->role);
+      TRACE_DETAIL(("Node role: %s",
+          node_cb->role== NODE_ROLE_ACTIVE? "ACTIVE": "PASSIVE"));
     }
 
     HM_PUT_LONG(replay_msg->tlv[index_filled].running, (node_cb->fsm_state));
@@ -643,7 +646,7 @@ int32_t hm_cluster_replay_info(HM_TRANSPORT_CB *tprt_cb)
         HM_PUT_LONG(replay_msg->last, 0);
       }
 
-      if (proc_cb->running != HM_STATUS_DOWN)
+      if (proc_cb->running != FALSE)
       {
         HM_PUT_LONG(replay_msg->tlv[index_filled].group,
                     (uint32_t)proc_cb->type);
@@ -1042,6 +1045,11 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
       }
 
       hm_global_node_update(node_cb, HM_UPDATE_RUN_STATUS);
+      if(node_cb->fsm_state == HM_NODE_FSM_STATE_FAILING)
+      {
+        /* FIXME: Added later to avoid multiple receive of same notification. */
+        node_cb->fsm_state = HM_NODE_FSM_STATE_FAILED;
+      }
       break;
 
     case HM_PEER_MSG_TYPE_PROCESS_UPDATE:
@@ -1106,14 +1114,14 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
         if (status == HM_PEER_ENTITY_STATUS_ACTIVE)
         {
           TRACE_DETAIL(("Proces is active"));
-          proc_cb->running = HM_STATUS_RUNNING;
+          proc_cb->running = TRUE;
           //TODO: Let remote nodes also be managed by the same FSM
           //hm_node_fsm(HM_NODE_FSM_TERM, node_cb);
         }
         else
         {
           TRACE_DETAIL(("Process is not running."));
-          proc_cb->running = HM_STATUS_DOWN;
+          proc_cb->running = FALSE;
         }
 
         if (hm_process_add(proc_cb, proc_cb->parent_node_cb) != HM_OK)
@@ -1137,14 +1145,14 @@ int32_t hm_receive_cluster_message(HM_SOCKET_CB *sock_cb)
       if (status == HM_PEER_ENTITY_STATUS_ACTIVE)
       {
         TRACE_DETAIL(("Process %d has become active.", proc_key[1]));
-        proc_cb->running = HM_STATUS_RUNNING;
+        proc_cb->running = TRUE;
         //TODO: Let remote nodes also be managed by the same FSM
         //hm_node_fsm(HM_NODE_FSM_TERM, node_cb);
       }
       else
       {
         TRACE_DETAIL(("Process %d is not running.", proc_key[1]));
-        proc_cb->running = HM_STATUS_DOWN;
+        proc_cb->running = FALSE;
       }
 
       hm_process_update(proc_cb);
@@ -1263,8 +1271,10 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg,
         HM_GET_LONG(node_cb->index, msg->tlv[i].node_id);
         TRACE_DETAIL(("Node ID: %d", node_cb->index));
         HM_GET_LONG(node_cb->group, msg->tlv[i].group);
+        TRACE_DETAIL(("Node group: %d", node_cb->group));
         HM_GET_LONG(node_cb->current_role, msg->tlv[i].role);
-
+        TRACE_DETAIL(("Node Role: %s",
+                  (node_cb->role==NODE_ROLE_ACTIVE)?"ACTIVE": "PASSIVE"));
         HM_GET_LONG(node_cb->fsm_state, msg->tlv[i].running);
 
         if (node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE)
@@ -1327,7 +1337,7 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg,
         proc_cb->parent_node_cb = node_cb;
         HM_GET_LONG(proc_cb->pid, msg->tlv[i].pid);
         HM_GET_LONG(proc_cb->type, msg->tlv[i].group);
-        proc_cb->running = HM_STATUS_RUNNING;
+        proc_cb->running = TRUE;
 
         if (hm_process_add(proc_cb, proc_cb->parent_node_cb) != HM_OK)
         {
@@ -1450,7 +1460,7 @@ int32_t hm_cluster_send_update(void *cb)
       HM_PUT_LONG(proc_update->proc_id, glob_cb.process_cb->pid);
       HM_PUT_LONG(proc_update->node_id, glob_cb.process_cb->node_index);
 
-      if (glob_cb.process_cb->status == HM_STATUS_RUNNING)
+      if (glob_cb.process_cb->status == TRUE)
       {
         HM_PUT_LONG(proc_update->status, HM_PEER_ENTITY_STATUS_ACTIVE);
       }

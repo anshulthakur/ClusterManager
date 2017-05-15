@@ -1075,7 +1075,7 @@ int32_t hm_global_process_update(HM_PROCESS_CB *proc_cb, uint32_t op)
     /* Look into the node state in its FSM variable to determine if an update  */
     /* is needed or not.                             */
     /***************************************************************************/
-    if(proc_cb->running == HM_STATUS_RUNNING)
+    if(proc_cb->running == TRUE)
     {
       TRACE_DETAIL(("Process active. Send Notifications."));
       notify = HM_NOTIFICATION_PROCESS_CREATED;

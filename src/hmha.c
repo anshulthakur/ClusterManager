@@ -428,12 +428,12 @@ EXIT_LABEL:
  *  hm_ha_resolve_active_backup
  *  @brief Resolves candidature of active-backups if any exists in the DB
  *
- *  @param *node_cb a #HM_NDOE_CB type Node Control block
- *  @return Nothing
- *
- *  @detail Search through the global database to see if we have a master/slave
+ *  Search through the global database to see if we have a master/slave
  *  for the same group and if it exists (no matter its current state), update
  *  information in both.
+ *
+ *  @param *node_cb a #HM_NDOE_CB type Node Control block
+ *  @return Nothing
  *
  *  @note Currently only one backup per active is supported.
  */

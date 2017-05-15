@@ -606,7 +606,7 @@ int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
     proc_cb->parent_node_cb = tprt_cb->node_cb;
     proc_cb->pid = proc_msg->pid;
     proc_cb->type = proc_msg->proc_type;
-    proc_cb->running = HM_STATUS_RUNNING;
+    proc_cb->running = TRUE;
     snprintf((char *)proc_cb->name, sizeof(proc_cb->name), "%s", proc_msg->name);
 
     if (hm_process_add(proc_cb, proc_cb->parent_node_cb) != HM_OK)
@@ -639,7 +639,7 @@ int32_t hm_recv_proc_update(HM_MSG *msg, HM_TRANSPORT_CB *tprt_cb)
     }
 
     TRACE_DETAIL(("Found Process CB. Update status to down."));
-    proc_cb->running = HM_STATUS_DOWN;
+    proc_cb->running = FALSE;
     hm_process_update(proc_cb);
   }
 
