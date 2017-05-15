@@ -1274,7 +1274,7 @@ int32_t hm_cluster_process_replay(HM_PEER_MSG_REPLAY *msg,
         TRACE_DETAIL(("Node group: %d", node_cb->group));
         HM_GET_LONG(node_cb->current_role, msg->tlv[i].role);
         TRACE_DETAIL(("Node Role: %s",
-                  (node_cb->role==NODE_ROLE_ACTIVE)?"ACTIVE": "PASSIVE"));
+                  (node_cb->current_role==NODE_ROLE_ACTIVE)?"ACTIVE": "PASSIVE"));
         HM_GET_LONG(node_cb->fsm_state, msg->tlv[i].running);
 
         if (node_cb->fsm_state != HM_NODE_FSM_STATE_ACTIVE)
